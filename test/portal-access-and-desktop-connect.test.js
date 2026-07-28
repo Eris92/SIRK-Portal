@@ -5,7 +5,7 @@ var path = require("path");
 var root = path.resolve(__dirname, "..");
 function read(file) { return fs.readFileSync(path.join(root, file), "utf8"); }
 var portal = read("public/portal/standalone/index.html");
-var workspace = read("public/portal/standalone/scripts/device-workspace.js");
+var workspace = read("public/portal/standalone/scripts/device-workspace.js").replace(/\r\n/g, "\n");
 assert(portal.indexOf('select.value="3"') >= 0);
 assert(portal.indexOf('select.value="2"') >= 0);
 assert(portal.indexOf("Zapytaj o zgodę + Bar") >= 0);
