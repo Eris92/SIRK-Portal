@@ -1,0 +1,17 @@
+{
+  "portalRoot": "public/portal",
+  "sourceRoots": [
+    "server",
+    "public"
+  ],
+  "forbiddenPatterns": [
+    "MeshCentral",
+    "pluginadmin\\.ashx",
+    "public[/\\\\]native",
+    "meshId",
+    "meshid",
+    "data-mesh"
+  ],
+  "buildCommand": "node --check server/standalone.js",
+  "testCommand": "node test/portal-identity.test.js"
+}

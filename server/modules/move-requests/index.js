@@ -12,16 +12,9 @@ module.exports.createModule = function (context) {
         };
     }
 
-    function meshRows(user) {
-        var meshes = context.device.visibleMeshes(user);
-        return Object.keys(meshes).map(function (id) {
-            var mesh = meshes[id] || {};
-            return {
-                id: mesh._id || id,
-                name: mesh.name || mesh.mname || id
-            };
-        }).sort(function (a, b) {
-            return a.name.localeCompare(b.name);
+    function groupRows(user) {
+        return context.device.visibleGroups(user).then(function (groups) {
+            return groups.slice().sort(function (a, b) { return a.name.localeCompare(b.name); });
         });
     }
 
@@ -33,52 +26,36 @@ module.exports.createModule = function (context) {
         }).sort();
     }
 
-    function normalizeMeshApprovalLevels(value, allowedMeshIds) {
+    function normalizeGroupApprovalLevels(value, allowedGroupIds) {
         value = value && typeof value === "object" && !Array.isArray(value) ? value : {};
-        allowedMeshIds = Array.isArray(allowedMeshIds) ? allowedMeshIds.map(String) : [];
+        allowedGroupIds = Array.isArray(allowedGroupIds) ? allowedGroupIds.map(String) : [];
         var result = {};
-        Object.keys(value).forEach(function (meshId) {
-            meshId = String(meshId || "");
-            if (!meshId || allowedMeshIds.indexOf(meshId) < 0) return;
-            result[meshId] = normalizeLevelList(value[meshId]);
+        Object.keys(value).forEach(function (groupId) {
+            groupId = String(groupId || "");
+            if (!groupId || allowedGroupIds.indexOf(groupId) < 0) return;
+            result[groupId] = normalizeLevelList(value[groupId]);
         });
         return result;
     }
 
-    function configuredLevels(targetMeshId) {
+    function configuredLevels(targetGroupId) {
         var config = context.settings.read().modules.moverequests || {};
-        var levels = config.targetMeshApprovalLevels || {};
-        if (!Object.prototype.hasOwnProperty.call(levels, targetMeshId)) return [1];
-        return normalizeLevelList(levels[targetMeshId]);
+        var levels = config.targetGroupApprovalLevels || {};
+        if (!Object.prototype.hasOwnProperty.call(levels, targetGroupId)) return [1];
+        return normalizeLevelList(levels[targetGroupId]);
     }
 
     function moveNode(payload, request) {
-        var web = context.device.getWebServer();
-        if (!web || typeof web.MoveNodeToMesh !== "function") {
-            return Promise.resolve({
-                message: "Move approved. MeshCentral MoveNodeToMesh API is unavailable in this build.",
+        return context.device.moveToGroup(
+            request.requester,
+            payload.nodeId,
+            payload.targetGroupId
+        ).then(function () {
+            return {
+                message: "Device moved.",
                 nodeId: payload.nodeId,
-                targetMeshId: payload.targetMeshId
-            });
-        }
-        return new Promise(function (resolve, reject) {
-            try {
-                web.MoveNodeToMesh(
-                    payload.nodeId,
-                    payload.targetMeshId,
-                    request.requester && request.requester.id,
-                    function (error) {
-                        if (error) reject(new Error(String(error.message || error)));
-                        else resolve({
-                            message: "Device moved.",
-                            nodeId: payload.nodeId,
-                            targetMeshId: payload.targetMeshId
-                        });
-                    }
-                );
-            } catch (error) {
-                reject(error);
-            }
+                targetGroupId: payload.targetGroupId
+            };
         });
     }
 
@@ -94,22 +71,22 @@ module.exports.createModule = function (context) {
             return {
                 nodeId: shared.cleanText(payload.nodeId, 300),
                 nodeName: shared.cleanText(payload.nodeName, 300),
-                sourceMeshId: shared.cleanText(payload.sourceMeshId, 300),
-                sourceMeshName: shared.cleanText(payload.sourceMeshName, 300),
-                targetMeshId: shared.cleanText(payload.targetMeshId, 300),
-                targetMeshName: shared.cleanText(payload.targetMeshName, 300)
+                sourceGroupId: shared.cleanText(payload.sourceGroupId, 300),
+                sourceGroupName: shared.cleanText(payload.sourceGroupName, 300),
+                targetGroupId: shared.cleanText(payload.targetGroupId, 300),
+                targetGroupName: shared.cleanText(payload.targetGroupName, 300)
             };
         },
         getTitle: function (payload) {
             return "Move " + (payload.nodeName || payload.nodeId || "device");
         },
         getSummary: function (payload) {
-            return (payload.sourceMeshName || payload.sourceMeshId || "Current group") +
+            return (payload.sourceGroupName || payload.sourceGroupId || "Current group") +
                 " → " +
-                (payload.targetMeshName || payload.targetMeshId);
+                (payload.targetGroupName || payload.targetGroupId);
         },
         getApprovalLevels: function (payload) {
-            return configuredLevels(String(payload && payload.targetMeshId || ""));
+            return configuredLevels(String(payload && payload.targetGroupId || ""));
         },
         canSubmit: function (user) {
             return !!user;
@@ -120,7 +97,7 @@ module.exports.createModule = function (context) {
                 var nodes = value && value.nodes || [];
                 return {
                     nodes: nodeId ? nodes.filter(function (node) { return String(node._id || node.nodeid || node.id || "") === nodeId; }) : nodes,
-                    meshes: value && value.meshes || []
+                    groups: value && value.groups || []
                 };
             });
         },
@@ -154,8 +131,8 @@ module.exports.createModule = function (context) {
         },
         apiGet: function (asset, req, user) {
             if (!user) throw new Error("Permission denied.");
-            if (asset === "meshes") {
-                return { ok: true, meshes: meshRows(user) };
+            if (asset === "groups") {
+                return groupRows(user).then(function (groups) { return { ok: true, groups: groups }; });
             }
             if (asset === "requests") {
                 var q = Object.assign({}, req && req.query || {}, {
@@ -169,11 +146,9 @@ module.exports.createModule = function (context) {
             if (asset === "settings") {
                 if (!shared.isSiteAdmin(user)) throw new Error("Permission denied.");
                 var current = context.settings.read().modules.moverequests || {};
-                return {
-                    ok: true,
-                    settings: current,
-                    meshes: meshRows(user)
-                };
+                return groupRows(user).then(function (groups) {
+                    return { ok: true, settings: current, groups: groups };
+                });
             }
             throw new Error("Unknown Move Requests action.");
         },
@@ -187,17 +162,19 @@ module.exports.createModule = function (context) {
             }
             if (asset === "settings") {
                 if (!shared.isSiteAdmin(user)) throw new Error("Permission denied.");
-                var allowedMeshes = meshRows(user).map(function (mesh) { return mesh.id; });
-                return context.settings.update(function (current) {
-                    current.modules.moverequests.hostButtonEnabled = value.hostButtonEnabled !== false;
-                    current.modules.moverequests.menuEnabled = false;
-                    if (Object.prototype.hasOwnProperty.call(value, "targetMeshApprovalLevels")) {
-                        current.modules.moverequests.targetMeshApprovalLevels = normalizeMeshApprovalLevels(
-                            value.targetMeshApprovalLevels,
-                            allowedMeshes
-                        );
-                    }
-                    return current;
+                return groupRows(user).then(function (groups) {
+                    var allowedGroups = groups.map(function (group) { return group.id; });
+                    return context.settings.update(function (current) {
+                        current.modules.moverequests.hostButtonEnabled = value.hostButtonEnabled !== false;
+                        current.modules.moverequests.menuEnabled = false;
+                        if (Object.prototype.hasOwnProperty.call(value, "targetGroupApprovalLevels")) {
+                            current.modules.moverequests.targetGroupApprovalLevels = normalizeGroupApprovalLevels(
+                                value.targetGroupApprovalLevels,
+                                allowedGroups
+                            );
+                        }
+                        return current;
+                    });
                 }).then(function () { return { ok: true }; });
             }
             throw new Error("Unknown Move Requests action.");

@@ -36,19 +36,6 @@
         (document.head || document.documentElement).appendChild(script);
     }
 
-    function loadAdminAssetScript(id, name) {
-        if (document.getElementById(id)) return;
-        var url = new URL(window.__SIRK_PLATFORM_API_BASE__ || "pluginadmin.ashx", window.location.href);
-        url.searchParams.set("pin", "SIRKPortal");
-        url.searchParams.set("asset", name);
-        url.searchParams.set("v", String(window.__SIRK_PLATFORM_PORTAL_VERSION__ || ""));
-        var script = document.createElement("script");
-        script.id = id;
-        script.src = url.href;
-        script.async = false;
-        (document.head || document.documentElement).appendChild(script);
-    }
-
     function loadUiContract() {
         loadStyle("sirk-platform-portal-ui-contract-style", "vendor/sirk-portal/portal-ui-contract.css");
         loadStyle("sirk-platform-portal-cleanup-style", "portal-cleanup.css");
@@ -246,12 +233,10 @@
             window.requestAnimationFrame(function () {
                 scheduled = false;
                 normalizeDeviceWorkspace();
-                normalizeSettingsNavigation();
             });
         });
         observer.observe(content, { childList: true, subtree: true });
         normalizeDeviceWorkspace();
-        normalizeSettingsNavigation();
     }
 
     function navigate(view) {
@@ -281,7 +266,6 @@
     loadStyle("sirk-platform-settings-style", "settings.css");
     loadScript("sirk-platform-system-updates-script", "system-updates.js");
     loadScript("sirk-platform-settings-script", "settings.js");
-    loadAdminAssetScript("sirk-platform-settings-structure-script", "vendor/sirk-portal/settings-structure.js");
     loadScript("sirk-platform-icon-registry", "shared/icon-registry.js", replacePortalIcons);
     observeDeviceWorkspace();
     loadScript("sirk-platform-portal-terminal-connect", "portal-terminal-connect.js");

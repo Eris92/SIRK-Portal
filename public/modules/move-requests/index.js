@@ -88,12 +88,12 @@
         return String(nodeId || "Device");
     }
 
-    function currentMeshId(nodeId) {
-        if (window.currentNode && window.currentNode.meshid) {
-            return String(window.currentNode.meshid);
+    function currentGroupId(nodeId) {
+        if (window.currentNode && window.currentNode.groupId) {
+            return String(window.currentNode.groupId);
         }
-        if (window.nodes && window.nodes[nodeId] && window.nodes[nodeId].meshid) {
-            return String(window.nodes[nodeId].meshid);
+        if (window.nodes && window.nodes[nodeId] && window.nodes[nodeId].groupId) {
+            return String(window.nodes[nodeId].groupId);
         }
         return "";
     }
@@ -109,7 +109,7 @@
             return;
         }
 
-        module.api.api("meshes", { nodeId: nodeId }).then(function (result) {
+        module.api.api("groups", { nodeId: nodeId }).then(function (result) {
             var overlay = document.createElement("div");
             overlay.className = "sirk-move-dialog-overlay";
 
@@ -132,16 +132,16 @@
 
             var select = document.createElement("select");
             select.className = "sirk-move-dialog-input";
-            var sourceMeshId = currentMeshId(nodeId);
+            var sourceGroupId = currentGroupId(nodeId);
 
-            (result.meshes || [])
-                .filter(function (mesh) {
-                    return !sourceMeshId || String(mesh.id) !== sourceMeshId;
+            (result.groups || [])
+                .filter(function (group) {
+                    return !sourceGroupId || String(group.id) !== sourceGroupId;
                 })
-                .forEach(function (mesh) {
+                .forEach(function (group) {
                     var option = document.createElement("option");
-                    option.value = mesh.id;
-                    option.textContent = mesh.name;
+                    option.value = group.id;
+                    option.textContent = group.name;
                     select.appendChild(option);
                 });
 
@@ -193,9 +193,9 @@
                 module.api.post("submit", {
                     nodeId: nodeId,
                     nodeName: nodeName(nodeId),
-                    sourceMeshId: sourceMeshId,
-                    targetMeshId: option.value,
-                    targetMeshName: option.textContent,
+                    sourceGroupId: sourceGroupId,
+                    targetGroupId: option.value,
+                    targetGroupName: option.textContent,
                     note: note.value || ""
                 }).then(function () {
                     closeDialog(overlay);
@@ -319,8 +319,8 @@
 
         button.title = "Submit a device move request";
         button.disabled = false;
-        button.setAttribute("data-meshcentral-plugin-pin", "SirkPlatform");
-        button.setAttribute("data-meshcentral-plugin-click", "Move Request host action");
+        button.setAttribute("data-sirk-module", "device-transfers");
+        button.setAttribute("data-sirk-action", "move-request");
         button.removeAttribute("onclick");
         button.removeAttribute("onmouseup");
         button.onclick = handleHostButtonClick;

@@ -40,6 +40,7 @@ function writeJsonAtomic(fs, path, filePath, value) {
 
 function isSiteAdmin(user) {
     if (!user) return false;
+    if (Array.isArray(user.roles) && user.roles.indexOf("admin") >= 0) return true;
     var value = user.siteadmin, text = String(value).trim().toLowerCase();
     return value === true || value === 0xFFFFFFFF || (Number(value) | 0) === -1 ||
         text === "true" || text === "4294967295" || text === "-1" || text === "0xffffffff";
@@ -50,34 +51,13 @@ function userName(user) {
         user.displayname || user.name || user._id) || "unknown", 300);
 }
 
-function getWebServer(parent) {
-    var candidates = [
-        parent && parent.parent && parent.parent.webserver,
-        parent && parent.parent,
-        parent && parent.webServer,
-        parent && parent.webserver,
-        parent && parent.parent && parent.parent.parent && parent.parent.parent.webserver
-    ];
-    for (var i = 0; i < candidates.length; i++) {
-        var candidate = candidates[i];
-        if (candidate && (candidate.users || candidate.userGroups || candidate.meshes ||
-            typeof candidate.GetNodeWithRights === "function")) return candidate;
-    }
-    return null;
-}
-
 function getUserGroups(parent) {
-    var web = getWebServer(parent), result = Object.create(null);
-    [web && web.userGroups, web && web.usergroups, parent && parent.userGroups].forEach(function (groups) {
-        if (!groups || typeof groups !== "object") return;
-        Object.keys(groups).forEach(function (id) {
-            var group = groups[id];
-            if (!group || group.deleted != null) return;
-            var key = String(group._id || group.id || id);
-            result[key] = { id: key, name: cleanText(group.name || group.displayName || key, 300) };
-        });
-    });
-    return Object.keys(result).map(function (id) { return result[id]; }).sort(function (a, b) {
+    var result = parent && parent.identity && typeof parent.identity.groups === "function"
+        ? parent.identity.groups()
+        : [];
+    return result.map(function (group) {
+        return { id: String(group.id), name: cleanText(group.name || group.id, 300) };
+    }).sort(function (a, b) {
         return a.name.localeCompare(b.name, "pl", { sensitivity: "base" });
     });
 }
@@ -99,46 +79,18 @@ function isUserInAnyGroup(user, groupIds) {
     });
 }
 
-function getDomain(parent, user, fallback) {
-    if (fallback) return fallback;
-    var id = String(user && user.domain || "");
-    if (!id && user && user._id) id = String(user._id).split("/")[1] || "";
-    var web = getWebServer(parent), mesh = parent && parent.parent;
-    var configs = [
-        mesh && mesh.config,
-        mesh && mesh.parent && mesh.parent.config,
-        web && web.parent && web.parent.config
-    ];
-    for (var i = 0; i < configs.length; i++) {
-        if (configs[i] && configs[i].domains && configs[i].domains[id]) return configs[i].domains[id];
-    }
-    return id ? { id: id } : null;
-}
-
 function findUser(parent, userId) {
     userId = String(userId || "");
-    var web = getWebServer(parent), users = web && web.users || {};
-    if (users[userId]) return users[userId];
-    var ids = Object.keys(users);
-    for (var i = 0; i < ids.length; i++) {
-        if (String(users[ids[i]] && users[ids[i]]._id || ids[i]) === userId) return users[ids[i]];
-    }
-    return null;
-}
-
-function dispatch(parent, source, targets, event) {
-    try {
-        var web = getWebServer(parent);
-        var candidates = [web, web && web.parent, parent && parent.parent,
-            parent && parent.parent && parent.parent.parent];
-        for (var i = 0; i < candidates.length; i++) {
-            if (candidates[i] && typeof candidates[i].DispatchEvent === "function") {
-                candidates[i].DispatchEvent(targets || ["*", "server-users"], source || parent, event);
-                return true;
-            }
-        }
-    } catch (error) {}
-    return false;
+    var user = parent && parent.identity && typeof parent.identity.findUser === "function"
+        ? parent.identity.findUser(userId)
+        : null;
+    if (!user) return null;
+    return Object.assign({}, user, {
+        _id: user.id,
+        name: user.username,
+        realname: user.displayName,
+        siteadmin: user.roles.indexOf("admin") >= 0
+    });
 }
 
 function normalizeRelativePath(path, root, relativePath) {
@@ -182,8 +134,8 @@ function sendJson(res, status, value) {
 function randomId(bytes) { return crypto.randomBytes(bytes || 16).toString("hex"); }
 
 module.exports = {
-    cleanText: cleanText, copy: copy, dispatch: dispatch, findUser: findUser,
-    getDomain: getDomain, getUserGroups: getUserGroups, getWebServer: getWebServer,
+    cleanText: cleanText, copy: copy, findUser: findUser,
+    getUserGroups: getUserGroups,
     isSiteAdmin: isSiteAdmin, isUserInAnyGroup: isUserInAnyGroup,
     isUserInGroup: isUserInGroup, normalizeRelativePath: normalizeRelativePath,
     parseJsonArray: parseJsonArray, parseJsonObject: parseJsonObject,

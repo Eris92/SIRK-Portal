@@ -91,7 +91,7 @@
             overlay.innerHTML = '<div style="width:min(620px,100%);padding:28px;border:1px solid var(--sirk-border,#dce3ec);border-radius:14px;background:var(--sirk-panel,#fff);box-shadow:0 24px 70px rgba(15,23,42,.2)">' +
                 '<h1 id="sirkUpdateConfirmTitle" style="margin:0 0 12px;font-size:26px">Czy na pewno chcesz zaktualizować system?</h1>' +
                 '<p style="margin:0 0 12px;line-height:1.55">Przed aktualizacją zostanie utworzony backup bezpieczeństwa.</p>' +
-                '<p style="margin:0 0 22px;line-height:1.55;font-weight:700">Po zakończeniu aktualizacji usługa serwera MeshCentral zostanie automatycznie zrestartowana. Użytkownicy mogą zostać chwilowo rozłączeni.</p>' +
+                '<p style="margin:0 0 22px;line-height:1.55;font-weight:700">Po zakończeniu aktualizacji usługa SIRK Portal zostanie automatycznie zrestartowana. Użytkownicy mogą zostać chwilowo rozłączeni.</p>' +
                 '<div style="display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap">' +
                 '<button type="button" class="sirk-button" data-update-confirm-cancel>Anuluj</button>' +
                 '<button type="button" class="sirk-button" data-update-confirm-accept>Tak, aktualizuj system</button>' +
@@ -114,7 +114,7 @@
 
     function waitForRestart() {
         clearTimeout(state.timer);
-        fullScreen("Ponowne uruchamianie MeshCentral…", "Usługa jest restartowana. Portal czeka na jej powrót, a następnie otworzy panel logowania.", 100, "Aktualizacja zakończona.\nRestart usługi MeshCentral…", false);
+        fullScreen("Ponowne uruchamianie SIRK Portal…", "Usługa jest restartowana. Portal czeka na jej powrót, a następnie otworzy panel logowania.", 100, "Aktualizacja zakończona.\nRestart usługi SIRK Portal…", false);
         var started = Date.now();
         function poll() {
             if (Date.now() - started < 4500) { state.timer = setTimeout(poll, 800); return; }
@@ -123,7 +123,7 @@
                 loginRedirect();
             }).catch(function () {
                 if (Date.now() - started > 120000) {
-                    fullScreen("Nie udało się potwierdzić powrotu usługi", "Sprawdź stan MeshCentral i odśwież stronę.", 100, "Przekroczono czas oczekiwania na usługę.", true);
+                    fullScreen("Nie udało się potwierdzić powrotu usługi", "Sprawdź stan SIRK Portal i odśwież stronę.", 100, "Przekroczono czas oczekiwania na usługę.", true);
                     return;
                 }
                 state.timer = setTimeout(poll, 1200);
@@ -215,7 +215,7 @@
         });
         Array.prototype.forEach.call(host.querySelectorAll("[data-restore-id]"), function (button) {
             button.onclick = function () {
-                if (!window.confirm("Przywrócić wybrany backup? Usługa MeshCentral zostanie zrestartowana.")) return;
+                if (!window.confirm("Przywrócić wybrany backup? Usługa SIRK Portal zostanie zrestartowana.")) return;
                 fullScreen("Przywracanie backupu…", "Przywracanie plików i przygotowanie restartu usługi.", 10, "Rozpoczynanie przywracania backupu…", false);
                 api("restore", "POST", { id: button.getAttribute("data-restore-id") }).then(waitForRestart).catch(function (error) { fullScreen("Nie udało się przywrócić backupu", error.message, 0, error.message, true); });
             };

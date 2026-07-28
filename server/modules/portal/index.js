@@ -4,7 +4,6 @@ var fs = require("fs");
 var path = require("path");
 var shared = require("../../core/shared.js");
 var folderAccess = require("../../core/folder-access.js");
-var sessionPersistenceFactory = require("../../core/session-persistence.js");
 
 var VENDOR_VERSION = "0.3.17";
 var BUNDLED_FILES = ["sirk-portal.css"];
@@ -44,7 +43,6 @@ function updateViews(current, input, knownGroups) {
 }
 
 module.exports.createModule = function (context) {
-    var sessionPersistence = sessionPersistenceFactory.createManager(context);
     var vendorState = {
         version: VENDOR_VERSION,
         ready: false,
@@ -90,16 +88,8 @@ module.exports.createModule = function (context) {
         if (!shared.isSiteAdmin(user)) throw new Error("Permission denied.");
     }
 
-    function standalonePortalActive() {
-        var plugins = context.parent && context.parent.plugins || {};
-        return Object.keys(plugins).some(function (key) {
-            var normalized = String(key || "").replace(/[^a-z0-9]/gi, "").toLowerCase();
-            return normalized === "sirkportal";
-        });
-    }
-
     function vendorDirectory() {
-        return path.join(context.pluginRoot, "public", "vendor", "sirk-portal");
+        return path.join(context.pluginRoot, "public", "portal", "vendor");
     }
 
     function validBundledFile(filePath) {
@@ -130,7 +120,6 @@ module.exports.createModule = function (context) {
         canAccessView: viewAllowed,
         clientConfig: function (user) {
             var value = settings();
-            var persistence = sessionPersistence.status(value);
             var views = visibleViews(user);
             var defaultView = String(value.defaultView || "overview");
             if (!views[defaultView] || views[defaultView].enabled !== true) {
@@ -148,9 +137,6 @@ module.exports.createModule = function (context) {
                 showLauncher: value.showLauncher === true,
                 forceNewLogin: value.forceNewLogin === true,
                 forcePortalInterface: value.forcePortalInterface === true,
-                keepSessionsAfterRestart: persistence.enabled,
-                sessionKeyManagedBySirkPlatform: persistence.managedBySirkPlatform,
-                standaloneConflict: standalonePortalActive(),
                 vendorVersion: VENDOR_VERSION,
                 vendorReady: vendorState.ready,
                 earlyOverlay: false
@@ -175,13 +161,25 @@ module.exports.createModule = function (context) {
                     };
                 });
             }
+            if (asset === "devices") {
+                requireView(user, "devices");
+                if (!context.parent.devices || typeof context.parent.devices.list !== "function") {
+                    throw new Error("Device inventory is unavailable.");
+                }
+                return Promise.resolve(context.parent.devices.list(user)).then(function (value) {
+                    return {
+                        ok: true,
+                        nodes: value && value.nodes || [],
+                        groups: value && value.groups || []
+                    };
+                });
+            }
             if (asset === "settings") requireAdmin(user);
             if (asset === "status" || asset === "settings") {
                 return {
                     ok: true,
                     module: asset === "settings" ? settings() : this.clientConfig(user),
                     siteAdmin: shared.isSiteAdmin(user),
-                    standaloneConflict: standalonePortalActive(),
                     vendor: vendorState
                 };
             }
@@ -191,13 +189,6 @@ module.exports.createModule = function (context) {
             requireAdmin(user);
             var value = req && req.body || {};
             if (asset !== "settings") throw new Error("Unknown Portal action.");
-            if (value.enabled === true && standalonePortalActive()) {
-                throw new Error("Disable or uninstall the standalone SirKPortal plugin before enabling the SirkPlatform Portal.");
-            }
-            var portalBefore = settings();
-            var persistence = typeof value.keepSessionsAfterRestart === "boolean"
-                ? sessionPersistence.configure(value.keepSessionsAfterRestart, portalBefore)
-                : sessionPersistence.status(portalBefore);
             return context.settings.update(function (current) {
                 current.modules.portal = current.modules.portal || {};
                 if (typeof value.enabled === "boolean") current.modules.portal.enabled = value.enabled;
@@ -207,13 +198,13 @@ module.exports.createModule = function (context) {
                 current.modules.portal.showLauncher = value.showLauncher === true;
                 if (typeof value.forceNewLogin === "boolean") current.modules.portal.forceNewLogin = value.forceNewLogin;
                 if (typeof value.forcePortalInterface === "boolean") current.modules.portal.forcePortalInterface = value.forcePortalInterface;
-                current.modules.portal.keepSessionsAfterRestart = persistence.enabled;
-                current.modules.portal.sessionKeyManaged = persistence.managedBySirkPlatform;
-                current.modules.portal.sessionKeyHash = persistence.sessionKeyHash || "";
                 if (current.modules.portal.forceNewLogin === true || current.modules.portal.forcePortalInterface === true) {
                     current.modules.portal.enabled = true;
                 }
-                current.modules.portal.views = updateViews(current.modules.portal.views, value.views, shared.getUserGroups(context.parent).map(function (group) { return group.id; }));
+                var knownGroups = context.parent.identity && typeof context.parent.identity.groups === "function"
+                    ? context.parent.identity.groups()
+                    : [];
+                current.modules.portal.views = updateViews(current.modules.portal.views, value.views, knownGroups.map(function (group) { return group.id; }));
                 if (current.modules.portal.views[current.modules.portal.defaultView].enabled === false) {
                     current.modules.portal.defaultView = VIEW_KEYS.find(function (key) {
                         return current.modules.portal.views[key].enabled !== false;
@@ -222,18 +213,11 @@ module.exports.createModule = function (context) {
                 return current;
             }).then(function () {
                 var moduleSettings = settings();
-                moduleSettings.keepSessionsAfterRestart = persistence.enabled;
                 return {
                     ok: true,
                     module: moduleSettings,
                     reloadRequired: true,
-                    serviceRestartRequired: persistence.restartRequired,
-                    sessionPersistence: {
-                        enabled: persistence.enabled,
-                        managedBySirkPlatform: persistence.managedBySirkPlatform,
-                        managedExternally: persistence.managedExternally,
-                        backupCreated: persistence.backupCreated === true
-                    },
+                    serviceRestartRequired: false,
                     vendor: vendorState
                 };
             });

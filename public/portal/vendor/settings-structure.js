@@ -75,16 +75,7 @@
     }
 
     function apiUrl(action) {
-        var url = new URL(window.__SIRK_PLATFORM_API_BASE__ || "/api", window.location.href);
-        var clean = url.pathname.replace(/\/+$/, "");
-        if (/\/api$/.test(clean)) {
-            url.pathname = clean + "/admin/settings";
-            url.search = "";
-            return url.href;
-        }
-        url.searchParams.set("pin", "SIRKPortal");
-        url.searchParams.set("action", action);
-        return url.href;
+        return new URL("/api/admin/settings", window.location.href).href;
     }
 
     function parse(response) {
@@ -112,29 +103,14 @@
     }
 
     function save(modules, options, integrations) {
-        var base = new URL(window.__SIRK_PLATFORM_API_BASE__ || "/api", window.location.href);
-        var clean = base.pathname.replace(/\/+$/, "");
-        if (/\/api$/.test(clean)) {
-            var standalone = new URLSearchParams();
-            standalone.set("payload", JSON.stringify({
-                modules: modules,
-                moduleOptions: options,
-                portal: options.portal || {},
-                integrations: integrations,
-                secrets: {}
-            }));
-            return fetch(clean + "/admin/settings", {
-                method: "POST",
-                credentials: "same-origin",
-                headers: { "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8", Accept: "application/json" },
-                body: standalone.toString()
-            }).then(parse).then(function () { return load(); });
-        }
         var body = new URLSearchParams();
-        body.set("modules", JSON.stringify(modules));
-        body.set("moduleOptions", JSON.stringify(options));
-        body.set("integrations", JSON.stringify(integrations));
-        body.set("secrets", "{}");
+        body.set("payload", JSON.stringify({
+            modules: modules,
+            moduleOptions: options,
+            portal: options.portal || {},
+            integrations: integrations,
+            secrets: {}
+        }));
         return fetch(apiUrl("save-settings"), {
             method: "POST",
             credentials: "same-origin",
@@ -300,7 +276,7 @@
                 field(form, "Włącz akceptacje", provider.enabled !== false, function (value) { provider.enabled = value; }, { type: "boolean" });
                 saveButton.onclick = saveHandler(saveButton, message, modules, options, integrations, function () { renderMove(root, mode, button); });
             } else {
-                var access = selector("Dostęp grup MeshCentral", snapshot.userGroups || [], (move.accessGroupIds || []).map(String));
+                var access = selector("Dostęp grup Portalu", snapshot.userGroups || [], (move.accessGroupIds || []).map(String));
                 form.appendChild(access.card);
                 saveButton.onclick = function () {
                     move.accessGroupIds = access.values();
@@ -517,7 +493,6 @@
                     maintenance.allowedIps = String(value || "").split(/[\n,;]+/).map(function (item) { return item.trim(); }).filter(Boolean);
                 }, { multiline: true, rows: 5, description: "Jeden adres lub zakres CIDR w wierszu." });
                 field(form, "Pokaż informację dozwolonym IP", maintenance.showNoticeToAllowed !== false, function (value) { maintenance.showNoticeToAllowed = value; }, { type: "boolean" });
-                field(form, "Blokuj również natywny MeshCentral", maintenance.blockNative !== false, function (value) { maintenance.blockNative = value; }, { type: "boolean" });
             } else if (section === "animations") {
                 var animations = portal.animations = animationDefaults(portal.animations);
                 field(form, "Włącz animacje", animations.enabled === true, function (value) { animations.enabled = value; }, { type: "boolean" });

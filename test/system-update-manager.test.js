@@ -24,8 +24,7 @@ function waitForJob(manager, jobId) {
     var dataRoot = fs.mkdtempSync(path.join(os.tmpdir(), "sirk-update-manager-data-"));
     fs.mkdirSync(path.join(root, "server"), { recursive: true });
     fs.writeFileSync(path.join(root, "package.json"), JSON.stringify({ version: "0.9.0" }));
-    fs.writeFileSync(path.join(root, "config.json"), JSON.stringify({ shortName: "SIRKPortal", version: "1.0.0" }));
-    fs.writeFileSync(path.join(root, "SIRKPortal.js"), "module.exports = {};\n");
+    fs.writeFileSync(path.join(root, "config.json"), JSON.stringify({ applicationId: "sirk-portal", version: "1.0.0" }));
     fs.writeFileSync(path.join(root, "server", "standalone.js"), "module.exports = {};\n");
     fs.writeFileSync(path.join(root, "server", "update-helper.js"), "module.exports = {};\n");
 

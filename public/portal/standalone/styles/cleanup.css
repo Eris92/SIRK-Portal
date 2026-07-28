@@ -1,4 +1,4 @@
-/* Final standalone Portal normalization. This file is loaded last and never by native MeshCentral. */
+/* Final standalone Portal normalization. This file is loaded last. */
 #sirkPortalRoot {
     --portal-surface-radius: 11px;
     --portal-surface-padding: 14px;

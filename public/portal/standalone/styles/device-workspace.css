@@ -1,4 +1,4 @@
-/* Standalone SirK Portal device workspace. Never loaded by native MeshCentral. */
+/* Standalone SIRK Portal device workspace. */
 .sirk-device-workspace {
     display: grid;
     grid-template-rows: auto auto minmax(0, 1fr);

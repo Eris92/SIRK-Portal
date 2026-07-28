@@ -1,10 +1,8 @@
 "use strict";
 
-var fs = require("fs");
-var path = require("path");
 var shared = require("./shared.js");
 var baseFactory = require("./runtime.js");
-var portalFactory = require("../modules/portal/safe.js");
+var portalFactory = require("../modules/portal/index.js");
 var VERSION = require("../../config.json").version;
 
 var VIEW_DEFAULTS = {
@@ -35,11 +33,7 @@ var BANNER_DEFAULTS = {
 var PORTAL_DEFAULTS = {
     enabled: true,
     defaultView: "overview",
-    showLauncher: true,
-    showNativeLink: true,
     forceNewLogin: false,
-    forcePortalInterface: false,
-    keepSessionsAfterRestart: false,
     showPasswordReset: true,
     passwordResetUrl: "https://passwordreset.microsoftonline.com/",
     siteName: "SIRK Platform",
@@ -51,9 +45,6 @@ var PORTAL_DEFAULTS = {
 module.exports.createRuntime = function (options) {
     var runtime = baseFactory.createRuntime(options);
     var context = runtime.context;
-    var pluginRoot = options && options.pluginRoot || path.resolve(__dirname, "..", "..");
-    var publicBrandingPath = path.join(pluginRoot, "public", "portal", "standalone", "branding.json");
-
     context.settings.defaults.modules = context.settings.defaults.modules || {};
     context.settings.defaults.modules.portal = shared.copy(PORTAL_DEFAULTS);
     runtime.modules.portal = portalFactory.createModule(context);
@@ -89,26 +80,10 @@ module.exports.createRuntime = function (options) {
         };
     }
 
-    function publicPortalConfig(portal) {
-        portal = portal && typeof portal === "object" ? portal : {};
-        return {
-            siteName: String(portal.siteName || PORTAL_DEFAULTS.siteName),
-            siteIconUrl: String(portal.siteIconUrl || ""),
-            showPasswordReset: portal.showPasswordReset !== false,
-            passwordResetUrl: String(portal.passwordResetUrl || PORTAL_DEFAULTS.passwordResetUrl),
-            banner: normalizeBanner(portal.banner)
-        };
-    }
-
-    function syncPublicPortalConfig(portal) {
-        try {
-            fs.writeFileSync(publicBrandingPath, JSON.stringify(publicPortalConfig(portal), null, 2) + "\n", "utf8");
-        } catch (error) {
-            if (console && console.warn) console.warn("Unable to synchronize public Portal banner configuration", error.message || error);
-        }
-    }
-
     function knownGroups() {
+        if (context.parent && context.parent.identity && typeof context.parent.identity.groups === "function") {
+            return context.parent.identity.groups();
+        }
         return shared.getUserGroups(context.parent);
     }
 
@@ -222,8 +197,6 @@ module.exports.createRuntime = function (options) {
                 return current;
             });
         }).then(function () {
-            var current = context.settings.read();
-            syncPublicPortalConfig(current.modules && current.modules.portal);
             return runtime.adminSnapshot(user);
         });
     };
@@ -284,8 +257,6 @@ module.exports.createRuntime = function (options) {
         return baseRequest(method, moduleName, asset, req, res, user);
     };
 
-    var initial = context.settings.read();
-    syncPublicPortalConfig(initial.modules && initial.modules.portal);
     runtime.version = VERSION;
     return runtime;
 };

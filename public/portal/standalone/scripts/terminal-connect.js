@@ -224,19 +224,7 @@
     }
 
     function settingsApiUrl(action) {
-        var url = new URL(window.__SIRK_PLATFORM_API_BASE__ || "/api", window.location.href);
-        var pathname = url.pathname.replace(/\/+$/, "");
-        if (/\/api$/i.test(pathname)) {
-            if (action === "snapshot") {
-                url.pathname = pathname + "/admin/settings";
-                url.search = "";
-            }
-            return url.href;
-        }
-        url.searchParams.set("pin", "SIRKPortal");
-        if (action === "snapshot") url.searchParams.set("action", "portal-admin-snapshot");
-        else if (action) url.searchParams.set("action", action);
-        return url.href;
+        return new URL(action === "snapshot" ? "/api/admin/settings" : "/api", window.location.href).href;
     }
 
     function parseSettingsResponse(response) {
@@ -252,7 +240,7 @@
     }
 
     function selectedPermissionGroups(workspace) {
-        var card = workspace.querySelector("[data-mesh-group-permissions]");
+        var card = workspace.querySelector("[data-group-permissions]");
         if (!card) return null;
         return Array.prototype.filter.call(card.querySelectorAll('input[type="checkbox"]'), function (input) {
             return input.checked;
@@ -279,31 +267,15 @@
                 moduleOptions.portal.views[target.view] = moduleOptions.portal.views[target.view] || {};
                 moduleOptions.portal.views[target.view].accessGroupIds = groupIds;
             }
-            var apiBase = new URL(window.__SIRK_PLATFORM_API_BASE__ || "/api", window.location.href);
-            var apiPath = apiBase.pathname.replace(/\/+$/, "");
-            if (/\/api$/i.test(apiPath)) {
-                var standalone = new URLSearchParams();
-                standalone.set("payload", JSON.stringify({
-                    modules: modules,
-                    moduleOptions: moduleOptions,
-                    portal: moduleOptions.portal || {},
-                    integrations: snapshot.integrations && snapshot.integrations.values || {},
-                    secrets: {}
-                }));
-                apiBase.pathname = apiPath + "/admin/settings";
-                apiBase.search = "";
-                return fetch(apiBase.href, {
-                    method: "POST", credentials: "same-origin",
-                    headers: { "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8", Accept: "application/json" },
-                    body: standalone.toString()
-                }).then(parseSettingsResponse);
-            }
             var form = new URLSearchParams();
-            form.set("modules", JSON.stringify(modules));
-            form.set("moduleOptions", JSON.stringify(moduleOptions));
-            form.set("integrations", JSON.stringify(snapshot.integrations && snapshot.integrations.values || {}));
-            form.set("secrets", "{}");
-            return fetch(settingsApiUrl("save-settings"), {
+            form.set("payload", JSON.stringify({
+                modules: modules,
+                moduleOptions: moduleOptions,
+                portal: moduleOptions.portal || {},
+                integrations: snapshot.integrations && snapshot.integrations.values || {},
+                secrets: {}
+            }));
+            return fetch("/api/admin/settings", {
                 method: "POST", credentials: "same-origin",
                 headers: { "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8", Accept: "application/json" },
                 body: form.toString()

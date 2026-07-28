@@ -21,10 +21,8 @@ assert.ok(server.assets["approvalcenter.js"]);
 assert.ok(registry.descriptors(temp).length >= 6);
 assert.ok(fs.existsSync(path.join(temp, "extensions")));
 
-var transport = fs.readFileSync(path.join(root, "public/portal/standalone/scripts/core-standalone.js"), "utf8");
+var transport = fs.readFileSync(path.join(root, "public/portal/standalone/scripts/core.js"), "utf8");
 assert.ok(transport.indexOf("/api") >= 0);
-assert.ok(transport.indexOf("pluginadmin.ashx") < 0);
-assert.ok(transport.indexOf("pin=SIRKPortal") < 0);
 
 fs.rmSync(temp, { recursive: true, force: true });
 console.log("Standalone host boundary: OK");

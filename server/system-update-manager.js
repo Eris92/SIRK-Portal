@@ -119,8 +119,7 @@ function create(options) {
             catch (error) { checks.push({ name: name, ok: false, error: String(error.message || error) }); }
         }
         check("package", function () { if (!readJson(path.join(target, "package.json")).version) throw new Error("version missing"); });
-        check("config", function () { if (readJson(path.join(target, "config.json")).shortName !== "SIRKPortal") throw new Error("identity mismatch"); });
-        check("entrypoint", function () { if (!fs.existsSync(path.join(target, "SIRKPortal.js"))) throw new Error("entrypoint missing"); });
+        check("config", function () { if (readJson(path.join(target, "config.json")).applicationId !== "sirk-portal") throw new Error("identity mismatch"); });
         check("standalone", function () { if (!fs.existsSync(path.join(target, "server", "standalone.js"))) throw new Error("standalone server missing"); });
         check("update-helper", function () { if (!fs.existsSync(path.join(target, "server", "update-helper.js"))) throw new Error("update helper missing"); });
         return { ok: checks.every(function (item) { return item.ok; }), checks: checks };
@@ -222,7 +221,7 @@ function create(options) {
         return Promise.all([request(base + "package.json?" + cacheToken), request(base + "config.json?" + cacheToken)]).then(function (values) {
             var packageJson = JSON.parse(values[0].toString("utf8"));
             var config = JSON.parse(values[1].toString("utf8"));
-            if (config.shortName !== "SIRKPortal") throw new Error("Remote package identity mismatch.");
+            if (config.applicationId !== "sirk-portal") throw new Error("Remote package identity mismatch.");
             var installed = current();
             var remoteVersion = String(config.version || packageJson.version || "");
             return {

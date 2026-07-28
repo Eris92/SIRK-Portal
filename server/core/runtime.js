@@ -80,11 +80,9 @@ module.exports.createRuntime = function (options) {
     var pluginRoot = options.pluginRoot;
     var fs = parent.fs || require("fs");
     var nativePath = parent.path || require("path");
-    var meshServer = parent.parent;
-    var dataBase = meshServer && meshServer.datapath
-        ? meshServer.datapath
-        : nativePath.dirname(parent.pluginPath || pluginRoot);
-    var dataRoot = nativePath.join(dataBase, "sirk-platform-data");
+    var dataRoot = options.dataRoot
+        ? nativePath.resolve(options.dataRoot)
+        : nativePath.join(nativePath.dirname(parent.pluginPath || pluginRoot), "sirk-platform-data");
 
     fs.mkdirSync(dataRoot, { recursive: true });
 

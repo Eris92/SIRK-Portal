@@ -1,8 +1,7 @@
 "use strict";
 
-// Stable boundary for the independent Portal application. MeshCentral is only
-// an adapter behind these ports; feature modules must not depend on its DOM,
-// globals or pluginadmin endpoint.
+// Stable boundary for the independent Portal application. Feature modules
+// depend only on these host-neutral ports.
 var PORTS = {
     identity: ["currentUser", "login", "logout"],
     devices: ["list", "resolve"],

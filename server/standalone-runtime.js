@@ -9,10 +9,13 @@ module.exports.createRuntime = function (host, pluginRoot) {
         fs: host.fs,
         path: host.path,
         pluginPath: pluginRoot,
+        identity: host.identity || null,
+        devices: host.devices,
         parent: { datapath: path.dirname(host.dataRoot) }
     };
     var runtime = runtimeFactory.createRuntime({
         parent: syntheticParent,
+        dataRoot: host.dataRoot,
         pluginRoot: pluginRoot,
         source: { shortName: "SIRKPortalStandalone" }
     });

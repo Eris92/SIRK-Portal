@@ -4,19 +4,39 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="color-scheme" content="light dark">
-  <title>SirK Portal — logowanie</title>
+  <title>SIRK Portal — logowanie</title>
   <link rel="stylesheet" href="__ASSET_BASE__/portal-login.css?v=__VERSION__">
-  <style>.sirk-login-card{max-width:430px;margin:10vh auto;padding:36px;border:1px solid #dce3ec;border-radius:18px;background:#fff;box-shadow:0 20px 60px #0002;font:16px Segoe UI,Arial;color:#172033}.sirk-login-card h1{margin:14px 0 8px}.sirk-login-mark{display:grid;place-items:center;width:48px;height:48px;border-radius:12px;background:#6346ed;color:#fff;font-weight:800;font-size:24px}.sirk-login-card p{color:#657187}</style>
 </head>
 <body>
-  <main class="sirk-login-frame-shell">
-    <iframe id="sirkLoginFrame" title="Logowanie MeshCentral" src="__NATIVE_LOGIN_URL__"></iframe><div id="sirkLoginLoading" class="sirk-login-frame-loading"><span></span><p>Ładowanie logowania MeshCentral…</p></div>
+  <main class="sirk-login-page">
+    <section class="sirk-login-brand" aria-label="SIRK Management Platform">
+      <div class="sirk-login-mark">S</div>
+      <p class="sirk-login-eyebrow">SIRK MANAGEMENT PLATFORM</p>
+      <h1>Zarządzaj bezpiecznie.<br>Pracuj niezależnie.</h1>
+      <p>Urządzenia, automatyzacja, bezpieczeństwo i zdalna obsługa w jednym Portalu.</p>
+    </section>
+    <section class="sirk-login-panel">
+      <form id="sirkLoginForm" class="sirk-login-card" autocomplete="on">
+        <header>
+          <span>Dostęp do Portalu</span>
+          <h2>Zaloguj się</h2>
+          <p>Użyj konta utworzonego przez administratora SIRK Portal.</p>
+        </header>
+        <label>Nazwa użytkownika
+          <input name="username" type="text" autocomplete="username" required autofocus maxlength="64">
+        </label>
+        <label>Hasło
+          <input name="password" type="password" autocomplete="current-password" required maxlength="256">
+        </label>
+        <div id="sirkLoginError" class="sirk-login-error" role="alert" hidden></div>
+        <button type="submit">Zaloguj się</button>
+        <footer>SIRK Portal działa niezależnie od zewnętrznego hosta zarządzającego.</footer>
+      </form>
+    </section>
   </main>
   <script>
     window.__SIRK_PLATFORM_LOGIN_ASSET_BASE__ = __ASSET_BASE_JSON__;
     window.__SIRK_PLATFORM_LOGIN_PORTAL_URL__ = __PORTAL_URL_JSON__;
-    window.__SIRK_PLATFORM_LOGIN_NATIVE_URL__ = __NATIVE_URL_JSON__;
-    window.__SIRK_PLATFORM_FORCE_PORTAL__ = __FORCE_PORTAL_JSON__;
     window.__SIRK_PLATFORM_PORTAL_VERSION__ = __VERSION_JSON__;
   </script>
   <script src="__ASSET_BASE__/portal-login.js?v=__VERSION__"></script>

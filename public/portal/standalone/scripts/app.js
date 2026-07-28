@@ -21,14 +21,14 @@
             overview: "Przegląd", devices: "Urządzenia", approvals: "Akceptacje",
             automation: "Automatyzacja", monitoring: "Monitoring", assets: "Zasoby",
             management: "Zarządzanie", reports: "Raporty", security: "Bezpieczeństwo",
-            settings: "Ustawienia", meshCentral: "MeshCentral", logout: "Wyloguj się",
+            settings: "Ustawienia", logout: "Wyloguj się",
             collapse: "Zwiń menu", expand: "Rozwiń menu", theme: "Zmień motyw",
             switchToDark: "Włącz ciemny motyw", switchToLight: "Włącz jasny motyw",
             languageTitle: "Switch to English", loading: "Ładowanie…",
             loadingModules: "Ładowanie modułów SirkPlatform…", loadingDevices: "Ładowanie urządzeń…",
             unknownError: "Nieznany błąd Portalu.", moduleDisabled: "moduł jest wyłączony albo użytkownik nie ma dostępu.",
             loadFailed: "nie udało się załadować danych.",
-            overviewDevicesTitle: "Urządzenia", overviewDevicesSuffix: "urządzeń dostępnych w MeshCentral.",
+            overviewDevicesTitle: "Urządzenia", overviewDevicesSuffix: "urządzeń połączonych z SIRK Portal.",
             overviewDevicesLoading: "Pobieranie listy urządzeń…",
             overviewApprovalsTitle: "Akceptacje",
             overviewApprovalsDescription: "Move Requests, Commands i Scripts wymagające zatwierdzenia.",
@@ -43,7 +43,7 @@
             noFilteredDevices: "Brak urządzeń zgodnych z aktualnym filtrem.",
             devicesCount: "urządzeń", open: "Otwórz", unknownHost: "Nieznany host", noGroup: "Bez grupy",
             noOs: "Brak danych o systemie", noIp: "Brak IP", deviceDetails: "Szczegóły urządzenia",
-            backToDevices: "Wróć do urządzeń", openMesh: "Otwórz w MeshCentral",
+            backToDevices: "Wróć do urządzeń",
             name: "Nazwa", status: "Status", group: "Grupa", system: "System",
             ipAddress: "Adres IP", lastSeen: "Ostatnio widziany", agentVersion: "Wersja agenta", nodeId: "Node ID",
             settingsAdminOnly: "Ustawienia są dostępne tylko dla Site Admin.",
@@ -56,14 +56,14 @@
             overview: "Overview", devices: "Devices", approvals: "Approval",
             automation: "Automation", monitoring: "Monitoring", assets: "Assets",
             management: "Management", reports: "Reports", security: "Security",
-            settings: "Settings", meshCentral: "MeshCentral", logout: "Sign out",
+            settings: "Settings", logout: "Sign out",
             collapse: "Collapse menu", expand: "Expand menu", theme: "Change theme",
             switchToDark: "Switch to dark theme", switchToLight: "Switch to light theme",
             languageTitle: "Przełącz na polski", loading: "Loading…",
             loadingModules: "Loading SirkPlatform modules…", loadingDevices: "Loading devices…",
             unknownError: "Unknown Portal error.", moduleDisabled: "module is disabled or the user does not have access.",
             loadFailed: "failed to load data.",
-            overviewDevicesTitle: "Devices", overviewDevicesSuffix: "devices available in MeshCentral.",
+            overviewDevicesTitle: "Devices", overviewDevicesSuffix: "devices connected to SIRK Portal.",
             overviewDevicesLoading: "Loading the device list…",
             overviewApprovalsTitle: "Approval",
             overviewApprovalsDescription: "Move Requests, Commands and Scripts awaiting approval.",
@@ -78,7 +78,7 @@
             noFilteredDevices: "No devices match the current filter.",
             devicesCount: "devices", open: "Open", unknownHost: "Unknown host", noGroup: "No group",
             noOs: "No operating system data", noIp: "No IP", deviceDetails: "Device details",
-            backToDevices: "Back to devices", openMesh: "Open in MeshCentral",
+            backToDevices: "Back to devices",
             name: "Name", status: "Status", group: "Group", system: "Operating system",
             ipAddress: "IP address", lastSeen: "Last seen", agentVersion: "Agent version", nodeId: "Node ID",
             settingsAdminOnly: "Settings are available only to Site Admin.",
@@ -204,8 +204,6 @@
             if (label) label.textContent = viewName(key);
             button.title = viewName(key);
         });
-        var nativeLabel = root.querySelector(".sirk-standalone-native b");
-        if (nativeLabel) nativeLabel.textContent = t("meshCentral");
         var logoutButton = root.querySelector('[data-action="logout"]');
         if (logoutButton) logoutButton.textContent = t("logout");
         var languageButton = root.querySelector('[data-action="language"]');
@@ -309,22 +307,22 @@
         return request.then(function (value) {
             deviceInventory = {
                 nodes: Array.isArray(value.nodes) ? value.nodes : [],
-                meshes: Array.isArray(value.meshes) ? value.meshes : []
+                groups: Array.isArray(value.groups) ? value.groups : []
             };
             return deviceInventory;
         });
     }
 
-    function meshMap(inventory) {
+    function groupMap(inventory) {
         var result = Object.create(null);
-        (inventory.meshes || []).forEach(function (mesh) { result[String(mesh.id || "")] = mesh; });
+        (inventory.groups || []).forEach(function (group) { result[String(group.id || "")] = group; });
         return result;
     }
 
     function nodeOnline(node) { return Number(node && node.conn || 0) > 0; }
     function nodeGroup(node, map) {
-        var mesh = map[String(node && node.meshId || "")];
-        return String(mesh && mesh.name || t("noGroup"));
+        var group = map[String(node && node.groupId || "")];
+        return String(group && group.name || t("noGroup"));
     }
 
     function formatLastSeen(value) {
@@ -459,7 +457,7 @@
         outerHost.appendChild(host);
         var timer = window.setTimeout(function () {
             if (isCurrent(sequence) && !host.querySelector(".sirk-standalone-view-scroll,.sirk-error,.sirk-card")) {
-                showError("MyScripts did not finish initialization.", "pluginadmin.ashx?pin=SIRKPortal&module=myscripts&asset=scripts");
+                showError("Automation did not finish initialization.", "/api/modules/myscripts/scripts");
             }
         }, 12000);
         Promise.resolve(window.SirkPlatformPortalManagement.mount(host)).then(function () {
@@ -535,7 +533,7 @@
         var panel = document.createElement("section"); panel.className = "sirk-card";
         var title = document.createElement("h2"); title.textContent = "Portal settings"; panel.appendChild(title);
         var tabs = document.createElement("nav"); tabs.className = "sirk-settings-tabs"; tabs.hidden = true;
-        ["Overview", "Settings", "Plugins", "Server", "Debug", "System"].forEach(function (name, index) { var tab = document.createElement("button"); tab.type = "button"; tab.className = "sirk-admin-secondary" + (index === 1 ? " is-active" : ""); tab.textContent = name; if (index !== 1) tab.title = "Ta sekcja jest zarządzana przez hosta MeshCentral."; tabs.appendChild(tab); });
+        ["Overview", "Settings", "Server", "Debug", "System"].forEach(function (name, index) { var tab = document.createElement("button"); tab.type = "button"; tab.className = "sirk-admin-secondary" + (index === 1 ? " is-active" : ""); tab.textContent = name; tabs.appendChild(tab); });
         panel.appendChild(tabs);
         var status = document.createElement("p"); status.className = "sirk-shared-muted"; status.textContent = "Loading…"; panel.appendChild(status);
         var output = document.createElement("pre"); output.className = "sirk-settings-output"; output.hidden = true; panel.appendChild(output);
@@ -561,11 +559,10 @@
             portalFields.setAttribute("data-settings-pane", "Portal");
             [["defaultView", "Domyślny widok", portalSettings.defaultView || "overview"], ["siteName", "Nazwa portalu", portalSettings.siteName || "SirK Portal"], ["passwordResetUrl", "Adres resetu hasła", portalSettings.passwordResetUrl || ""]].forEach(function (item) { var label = document.createElement("label"); label.className = "sirk-card"; label.textContent = item[1]; var input = document.createElement("input"); input.type = "text"; input.name = "portal." + item[0]; input.value = item[2]; label.appendChild(input); portalFields.appendChild(label); });
             form.appendChild(portalFields);
-            ["showLauncher", "showNativeLink", "forceNewLogin", "forcePortalInterface", "keepSessionsAfterRestart"].forEach(function (key) { var row = document.createElement("label"); row.className = "sirk-card"; var input = document.createElement("input"); input.type = "checkbox"; input.name = "portal." + key; input.checked = portalSettings[key] === true; row.appendChild(input); row.appendChild(document.createTextNode(" " + key)); portalControls.appendChild(row); });
+            ["forceNewLogin"].forEach(function (key) { var row = document.createElement("label"); row.className = "sirk-card"; var input = document.createElement("input"); input.type = "checkbox"; input.name = "portal." + key; input.checked = portalSettings[key] === true; row.appendChild(input); row.appendChild(document.createTextNode(" " + key)); portalControls.appendChild(row); });
             Object.keys(snapshot.moduleSettings || {}).forEach(function (key) { if (key === "portal") return; var row = document.createElement("label"); row.className = "sirk-card"; var input = document.createElement("input"); input.type = "checkbox"; input.name = "module." + key; input.checked = snapshot.moduleSettings[key] && snapshot.moduleSettings[key].enabled === true; row.appendChild(input); row.appendChild(document.createTextNode(" " + key)); modules.appendChild(row); });
-            var oldLink = document.createElement("a"); oldLink.href = String(window.__SIRK_PLATFORM_NATIVE_URL__ || "/meshcentral/"); oldLink.textContent = "Przejdź do starego Portalu"; oldLink.className = "sirk-admin-secondary"; modules.appendChild(oldLink);
             var sections = document.createElement("div"); sections.className = "sirk-admin-settings-sections";
-            [["Portal", "Ustawienia przejścia między nowym i starym portalem oraz sesji."], ["Moduły", "Włączanie niezależnych modułów nowego portalu."], ["Integracje", "Stan połączeń z usługami zewnętrznymi (bez ujawniania sekretów)."], ["Uprawnienia", "Konfiguracja dostępu i uprawnień folderów."], ["Diagnostyka", "Ostatni stan diagnostyki i błędów API."], ["Aktualizacje", "Wersja portalu i stan wdrożenia."]].forEach(function (item) { var section = document.createElement("section"); section.className = "sirk-card sirk-settings-section"; section.setAttribute("data-settings-pane", item[0]); section.hidden = item[0] !== "Portal"; var heading = document.createElement("h3"); heading.textContent = item[0]; section.appendChild(heading); var description = document.createElement("p"); description.className = "sirk-shared-muted"; description.textContent = item[1]; section.appendChild(description); sections.appendChild(section); });
+            [["Portal", "Ustawienia samodzielnego Portalu i sesji."], ["Moduły", "Włączanie niezależnych modułów Portalu."], ["Integracje", "Stan połączeń z usługami zewnętrznymi (bez ujawniania sekretów)."], ["Uprawnienia", "Konfiguracja dostępu i uprawnień folderów."], ["Diagnostyka", "Ostatni stan diagnostyki i błędów API."], ["Aktualizacje", "Wersja portalu i stan wdrożenia."]].forEach(function (item) { var section = document.createElement("section"); section.className = "sirk-card sirk-settings-section"; section.setAttribute("data-settings-pane", item[0]); section.hidden = item[0] !== "Portal"; var heading = document.createElement("h3"); heading.textContent = item[0]; section.appendChild(heading); var description = document.createElement("p"); description.className = "sirk-shared-muted"; description.textContent = item[1]; section.appendChild(description); sections.appendChild(section); });
             var integrations = snapshot.integrations || {}; var integrationSection = sections.children[2]; Object.keys(integrations).forEach(function (key) { var value = integrations[key]; var line = document.createElement("div"); line.textContent = key + ": " + (value && typeof value === "object" ? (value.enabled ? "włączona" : "wyłączona") : "—"); integrationSection.appendChild(line); });
             var permissions = snapshot.folderPermissions || {}; var permissionSection = sections.children[3]; var permissionText = document.createElement("pre"); permissionText.textContent = JSON.stringify(permissions, null, 2); permissionSection.appendChild(permissionText);
             var diagnostics = snapshot.diagnostics || {}; var diagnosticSection = sections.children[4]; var diagnosticText = document.createElement("pre"); diagnosticText.textContent = JSON.stringify(diagnostics, null, 2); diagnosticSection.appendChild(diagnosticText);
@@ -580,21 +577,14 @@
         host.appendChild(shell);
     }
 
-    function nativeDeviceUrl(node) {
-        var url = new URL(String(window.__SIRK_PLATFORM_NATIVE_URL__ || "/meshcentral/"), window.location.href);
-        url.searchParams.set("viewmode", "10");
-        url.searchParams.set("gotonode", String(node.id || ""));
-        return url.href;
-    }
-
     function detailItem(label, value) {
         return '<div class="sirk-device-detail-item"><span>' + escapeHtml(label) + '</span><strong>' + escapeHtml(value == null || value === "" ? "—" : value) + '</strong></div>';
     }
 
     function renderDeviceDetails(node) {
-        var map = meshMap(deviceInventory || { meshes: [] });
+        var map = groupMap(deviceInventory || { groups: [] });
         var online = nodeOnline(node);
-        content.innerHTML = '<div class="sirk-standalone-view-scroll">' +
+        content.innerHTML = '<div class="sirk-standalone-view-scroll" data-sirk-device-detail>' +
             '<div class="sirk-device-detail-head"><button type="button" class="sirk-device-back" data-device-back="1">← ' + escapeHtml(t("backToDevices")) + '</button></div>' +
             '<section class="sirk-device-hero"><span class="sirk-device-hero-icon">' + DEVICE_ICON + '</span><div><h2>' + escapeHtml(node.name || t("unknownHost")) + '</h2><p>' + escapeHtml(nodeGroup(node, map)) + ' · ' + escapeHtml(node.os || t("noOs")) + '</p></div><span class="sirk-device-connection ' + (online ?"is-online" : "is-offline") + '"><i></i>' + escapeHtml(online ? t("online") : t("offline")) + '</span></section>' +
             '<div class="sirk-device-detail-grid">' +
@@ -602,7 +592,7 @@
             detailItem(t("group"), nodeGroup(node, map)) + detailItem(t("system"), node.os || t("noOs")) +
             detailItem(t("ipAddress"), node.ip || t("noIp")) + detailItem(t("lastSeen"), formatLastSeen(node.lastSeen)) +
             detailItem(t("agentVersion"), node.agentVersion || "—") + detailItem(t("nodeId"), node.id) +
-            '</div><section class="sirk-standalone-card sirk-device-native-card"><h2>' + escapeHtml(t("deviceDetails")) + '</h2><a class="sirk-device-native-button" href="' + escapeHtml(nativeDeviceUrl(node)) + '">' + escapeHtml(t("openMesh")) + '</a></section></div>';
+            '</div></div>';
     }
 
     function renderDeviceGroups(inventory) {
@@ -611,7 +601,7 @@
         var onlineElement = document.getElementById("sirkDeviceOnline");
         var offlineElement = document.getElementById("sirkDeviceOffline");
         if (!host) return;
-        var map = meshMap(inventory);
+        var map = groupMap(inventory);
         var allNodes = inventory.nodes || [];
         var onlineCount = allNodes.filter(nodeOnline).length;
         if (total) total.textContent = String(allNodes.length);

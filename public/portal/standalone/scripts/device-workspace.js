@@ -1,3 +1,4 @@
+
 (function () {
     "use strict";
 
@@ -10,21 +11,11 @@
     var selectedNode = null;
     var inventory = null;
     var activeTab = "general";
-    var bridge = null;
-    var bridgeSequence = 0;
     var transformScheduled = false;
     var quickCommands = { data: null, category: "", selected: null, search: "" };
     var DEVICE_ICON = '<svg class="sirk-device-computer-svg" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4"/><path d="M6.5 7.5h11v6h-11z" class="sirk-device-computer-screen"/></svg>';
 
-    var VIEWMODES = { desktop: 11, terminal: 12, files: 13, registry: 9, software: 18, amt: 14 };
-    var PANEL_IDS = {
-        desktop: ["p11"],
-        terminal: ["p12"],
-        files: ["p13"],
-        registry: ["p9", "p9registry", "p9Registry"],
-        software: ["p18", "p18software", "p18Software"],
-        amt: ["p14", "p14amt", "p14Amt"]
-    };
+    var REMOTE_TABS = ["desktop", "terminal", "files"];
 
     var TEXT = {
         pl: {
@@ -33,14 +24,6 @@
             back: "Wróć do urządzeń", online: "Online", offline: "Offline",
             name: "Nazwa", status: "Status", group: "Grupa", system: "System",
             ip: "Adres IP", lastSeen: "Ostatnio widziany", agent: "Wersja agenta", nodeId: "Node ID",
-            openMesh: "Otwórz w MeshCentral", noGroup: "Bez grupy", noOs: "Brak danych o systemie",
-            method: "Metoda połączenia", meshAgent: "MeshAgent", amtKvm: "Intel AMT KVM",
-            connect: "Połącz", disconnect: "Rozłącz", ready: "Pulpit nie jest połączony. Wybierz metodę i kliknij Połącz.",
-            connectOptions: "Opcje połączenia", requestApprovalWithBar: "Zapytaj o zgodę + Bar", requestApprovalOnly: "Zapytaj o zgodę", privacyNotice: "Pasek Prywatności",
-            loadingNative: "Ładowanie natywnej sesji MeshCentral…", preparing: "Przygotowanie modułu MeshCentral…",
-            connecting: "Łączenie…", connected: "Połączono.", disconnected: "Rozłączono.",
-            nativeReady: "Natywny moduł MeshCentral jest gotowy.", sessionError: "Nie udało się uruchomić natywnego modułu MeshCentral.",
-            sessionMissing: "Sesja MeshCentral nie jest dostępna albo host nie został odnaleziony.", clickCanvas: "Kliknij ekran, aby przejąć klawiaturę.",
             quickCommands: "Szybkie polecenia", close: "Zamknij", loadingCommands: "Ładowanie poleceń…", noCommands: "Brak poleceń.",
             searchCommands: "Szukaj poleceń…", variables: "Parametry", runCommand: "Uruchom", requestCommand: "Wyślij wniosek",
             commandSent: "Polecenie zostało wysłane.", commandPending: "Polecenie oczekuje na akceptację.", commandFailed: "Nie udało się wysłać polecenia.", confirmCommand: "Uruchomić polecenie"
@@ -51,14 +34,6 @@
             back: "Back to devices", online: "Online", offline: "Offline",
             name: "Name", status: "Status", group: "Group", system: "Operating system",
             ip: "IP address", lastSeen: "Last seen", agent: "Agent version", nodeId: "Node ID",
-            openMesh: "Open in MeshCentral", noGroup: "No group", noOs: "No operating system data",
-            method: "Connection method", meshAgent: "MeshAgent", amtKvm: "Intel AMT KVM",
-            connect: "Connect", disconnect: "Disconnect", ready: "Desktop is not connected. Choose a method and click Connect.",
-            connectOptions: "Connect options", requestApprovalWithBar: "Request approval + Bar", requestApprovalOnly: "Request approval", privacyNotice: "Privacy notice",
-            loadingNative: "Loading the native MeshCentral session…", preparing: "Preparing the MeshCentral module…",
-            connecting: "Connecting…", connected: "Connected.", disconnected: "Disconnected.",
-            nativeReady: "The native MeshCentral module is ready.", sessionError: "The native MeshCentral module could not be started.",
-            sessionMissing: "The MeshCentral session is unavailable or the host could not be found.", clickCanvas: "Click the screen to capture the keyboard.",
             quickCommands: "Quick commands", close: "Close", loadingCommands: "Loading commands…", noCommands: "No commands.",
             searchCommands: "Search commands…", variables: "Variables", runCommand: "Run", requestCommand: "Request",
             commandSent: "Command submitted.", commandPending: "Command is waiting for approval.", commandFailed: "Command could not be submitted.", confirmCommand: "Run command"
@@ -107,30 +82,26 @@
 
     function nodeOnline(node) { return Number(node && node.conn || 0) > 0; }
 
-    function meshMap(value) {
+    function groupMap(value) {
         var map = Object.create(null);
-        ((value && value.meshes) || []).forEach(function (mesh) {
-            map[String(mesh.id || mesh._id || "")] = mesh;
+        ((value && value.groups) || []).forEach(function (group) {
+            map[String(group.id || "")] = group;
         });
         return map;
     }
 
     function nodeGroup(node) {
-        var map = meshMap(inventory);
-        var mesh = map[String(node && (node.meshId || node.meshid) || "")];
-        return String(mesh && mesh.name || t("noGroup"));
+        var map = groupMap(inventory);
+        var group = map[String(node && node.groupId || "")];
+        return String(group && group.name || t("noGroup"));
     }
 
     function getInventory() {
         if (inventory) return Promise.resolve(inventory);
-        var apiBase = new URL(String(window.__SIRK_PLATFORM_API_BASE__ || ""), window.location.href);
-        var request = apiBase.pathname.replace(/\/+$/, "") === "/api"
-            ? fetch("/api/devices", { credentials: "same-origin", cache: "no-store" }).then(function (response) { return response.json().then(function (value) { if (!response.ok || value.ok === false) throw new Error(value.error || "Device inventory unavailable."); return value.value || value; }); })
-            : core.api("portal", "devices");
-        return request.then(function (value) {
+        return fetch("/api/devices", { credentials: "same-origin", cache: "no-store" }).then(function (response) { return response.json().then(function (value) { if (!response.ok || value.ok === false) throw new Error(value.error || "Device inventory unavailable."); return value.value || value; }); }).then(function (value) {
             inventory = {
                 nodes: Array.isArray(value && value.nodes) ? value.nodes : [],
-                meshes: Array.isArray(value && value.meshes) ? value.meshes : []
+                groups: Array.isArray(value && value.groups) ? value.groups : []
             };
             return inventory;
         });
@@ -144,427 +115,6 @@
         return null;
     }
 
-    function nativeRootUrl(node, type) {
-        var url = new URL(String(window.__SIRK_PLATFORM_NATIVE_URL__ || "/meshcentral/"), window.location.href);
-        url.searchParams.set("sirkNative", "1");
-        if (node && type && VIEWMODES[type]) {
-            url.searchParams.set("viewmode", String(VIEWMODES[type]));
-            url.searchParams.set("gotonode", String(node.id || node._id || ""));
-        }
-        return url.href;
-    }
-
-    function nativeDeviceUrl(node) {
-        var url = new URL(String(window.__SIRK_PLATFORM_NATIVE_URL__ || "/meshcentral/"), window.location.href);
-        url.pathname = url.pathname.replace(/meshcentral\/?$/i, "");
-        if (!url.pathname) url.pathname = "/";
-        if (url.pathname.charAt(url.pathname.length - 1) !== "/") url.pathname += "/";
-        url.search = "";
-        url.hash = "";
-        url.searchParams.set("viewmode", "10");
-        url.searchParams.set("gotonode", String(node.id || node._id || ""));
-        return url.href;
-    }
-
-    function detailItem(label, value) {
-        return '<div class="sirk-device-detail-item"><span>' + esc(label) + '</span><strong>' + esc(value == null || value === "" ? "—" : value) + '</strong></div>';
-    }
-
-    function fakeEvent() {
-        return { shiftKey: false, preventDefault: function () {}, stopPropagation: function () {}, target: null, currentTarget: null };
-    }
-
-    function setBridgeStatus(value) {
-        var element = document.getElementById("sirkNativeBridgeStatus");
-        if (element) element.textContent = String(value || "");
-    }
-
-    function showBridgeOverlay(value, error) {
-        var overlay = document.getElementById("sirkNativeBridgeOverlay");
-        if (!overlay) return;
-        overlay.hidden = false;
-        overlay.innerHTML = '<div class="' + (error ?"sirk-native-bridge-error" : "") + '">' + esc(value) + '</div>';
-    }
-
-    function hideBridgeOverlay() {
-        var overlay = document.getElementById("sirkNativeBridgeOverlay");
-        if (overlay) overlay.hidden = true;
-    }
-
-    function activeNativeObject(win, type) {
-        if (!win) return null;
-        if (type === "desktop") return win.desktop;
-        if (type === "terminal") return win.terminal;
-        if (type === "files") return win.files;
-        if (type === "registry") return win.registry || win.regedit || win.registryConnection;
-        return null;
-    }
-
-    function stopBridge(removeFrame) {
-        var current = bridge;
-        bridge = null;
-        bridgeSequence += 1;
-        if (!current) return;
-        if (current.closeMenuListener) {
-            document.removeEventListener("click", current.closeMenuListener);
-            current.closeMenuListener = null;
-        }
-        if (current.timer) clearInterval(current.timer);
-        if (current.timeout) clearTimeout(current.timeout);
-        try {
-            var object = activeNativeObject(current.win, current.type);
-            if (object && typeof object.Stop === "function") object.Stop();
-        } catch (error) {}
-        if (removeFrame !== false && current.frame && current.frame.parentNode) current.frame.parentNode.removeChild(current.frame);
-    }
-
-    function nativeNode(win, nodeId) {
-        var sets = [win && win.nodes, win && win.xxnodes];
-        for (var s = 0; s < sets.length; s += 1) {
-            var set = sets[s];
-            if (!set || typeof set !== "object") continue;
-            if (set[nodeId]) return set[nodeId];
-            if (set[shortId(nodeId)]) return set[shortId(nodeId)];
-            var keys = Object.keys(set);
-            for (var i = 0; i < keys.length; i += 1) {
-                var node = set[keys[i]];
-                var id = String(node && (node._id || node.id || keys[i]) || "");
-                if (sameNodeId(id, nodeId)) return node;
-            }
-        }
-        return null;
-    }
-
-    function injectNativeNode(win, node) {
-        win.currentNode = node;
-        win.xxcurrentNode = node;
-        win.currentNodeId = node._id || node.id;
-        win.currentNodeid = node._id || node.id;
-        win.desktopNode = node;
-        win.terminalNode = node;
-        win.filesNode = node;
-        var meshId = node.meshid || node.meshId;
-        if (win.meshes && meshId && win.meshes[meshId]) {
-            win.currentMesh = win.meshes[meshId];
-            win.xxcurrentMesh = win.meshes[meshId];
-        }
-    }
-
-    function findPanel(doc, type) {
-        var ids = PANEL_IDS[type] || [];
-        for (var i = 0; i < ids.length; i += 1) {
-            var panel = doc.getElementById(ids[i]);
-            if (panel) return panel;
-        }
-        return null;
-    }
-
-    function nativeAnchor(panel, type) {
-        if (!panel) return null;
-        if (type === "desktop") return panel.querySelector("#Desk") || panel.querySelector("canvas");
-        if (type === "terminal") return panel.querySelector("#termarea3xdiv") || panel.querySelector(".xterm");
-        if (type === "files") return panel.querySelector("#p13toolbar") || panel.querySelector("#fileArea4") || panel.querySelector("#p13files");
-        return null;
-    }
-
-    function hideChromeBefore(panel, anchor) {
-        if (!panel || !anchor || !panel.contains(anchor)) return;
-        var current = anchor;
-        while (current && current !== panel) {
-            var parent = current.parentElement;
-            if (!parent) break;
-            var child = parent.firstElementChild;
-            while (child && child !== current) {
-                if (!child.contains(anchor)) child.classList.add("sirk-platform-native-bridge-hidden");
-                child = child.nextElementSibling;
-            }
-            current = parent;
-        }
-    }
-
-    function installNativeStage(win, panel, type) {
-        var doc = win.document;
-        var style = doc.getElementById("sirkPlatformNativeBridgeStyle");
-        if (!style) {
-            style = doc.createElement("style");
-            style.id = "sirkPlatformNativeBridgeStyle";
-            style.textContent = [
-                "html,body{width:100%!important;height:100%!important;margin:0!important;overflow:hidden!important;background:#111!important}",
-                "#sirkPlatformNativeBridgeStage{position:fixed!important;inset:0!important;z-index:2147483640!important;display:block!important;width:100%!important;height:100%!important;overflow:hidden!important;background:#111!important}",
-                ".sirk-platform-native-bridge-panel{position:relative!important;inset:auto!important;left:auto!important;top:auto!important;right:auto!important;bottom:auto!important;display:block!important;width:100%!important;height:100%!important;min-height:0!important;overflow:hidden!important;margin:0!important}",
-                ".sirk-platform-native-bridge-information{overflow:auto!important;background:#fff!important;color:#111!important}",
-                ".sirk-platform-native-bridge-hidden{display:none!important}",
-                ".sirk-platform-native-bridge-panel #termarea3xdiv{top:0!important;bottom:30px!important}",
-                ".sirk-platform-native-bridge-panel #p13toolbar{top:0!important}",
-                ".sirk-platform-native-bridge-panel #fileArea4{height:calc(100% - 54px)!important}",
-                ".sirk-platform-native-bridge-panel #Desk{max-width:100%!important;max-height:100%!important}"
-            ].join("");
-            (doc.head || doc.documentElement).appendChild(style);
-        }
-        var stage = doc.getElementById("sirkPlatformNativeBridgeStage");
-        if (!stage) {
-            stage = doc.createElement("div");
-            stage.id = "sirkPlatformNativeBridgeStage";
-            doc.body.appendChild(stage);
-        }
-        hideChromeBefore(panel, nativeAnchor(panel, type));
-        stage.appendChild(panel);
-        panel.classList.add("sirk-platform-native-bridge-panel");
-        if (type === "registry" || type === "software" || type === "amt") panel.classList.add("sirk-platform-native-bridge-information");
-        return panel;
-    }
-
-    function waitForNative(frame, nodeId, type, sequence) {
-        return new Promise(function (resolve, reject) {
-            var started = Date.now();
-            function poll() {
-                if (sequence !== bridgeSequence || !frame.parentNode) { reject(new Error("Native bridge was cancelled.")); return; }
-                try {
-                    var win = frame.contentWindow;
-                    var doc = win && win.document;
-                    var node = nativeNode(win, nodeId);
-                    if (win && doc && doc.body && typeof win.go === "function" && node) {
-                        resolve({ win: win, doc: doc, node: node });
-                        return;
-                    }
-                } catch (error) {
-                    reject(new Error("Same-origin access to MeshCentral was blocked: " + (error.message || error)));
-                    return;
-                }
-                if (Date.now() - started > 25000) { reject(new Error(t("sessionMissing"))); return; }
-                setTimeout(poll, 200);
-            }
-            poll();
-        });
-    }
-
-    function waitForPanel(win, type, sequence) {
-        return new Promise(function (resolve, reject) {
-            var started = Date.now();
-            function poll() {
-                if (sequence !== bridgeSequence) { reject(new Error("Native bridge was cancelled.")); return; }
-                var panel = findPanel(win.document, type);
-                if (panel) { resolve(panel); return; }
-                if (Date.now() - started > 12000) { reject(new Error("Native panel " + type + " was not found.")); return; }
-                setTimeout(poll, 120);
-            }
-            poll();
-        });
-    }
-
-    function nativeDiagnostics(current) {
-        var object = activeNativeObject(current.win, current.type);
-        var state = object && (object.State != null ? object.State : object.state);
-        var socket = object && object.socket;
-        return [
-            "type=" + current.type,
-            "node=" + (current.node && (current.node._id || current.node.id) || "BRAK"),
-            "view=" + VIEWMODES[current.type],
-            "object=" + (object ? "OK" : "BRAK"),
-            "state=" + (state != null ? state : "n/a"),
-            "socket=" + (socket ? socket.readyState : "BRAK")
-        ].join(" | ");
-    }
-
-    function prepareNative(frame, node, type, sequence) {
-        setBridgeStatus(t("preparing"));
-        showBridgeOverlay(t("preparing"), false);
-        return waitForNative(frame, node.id || node._id, type, sequence).then(function (native) {
-            if (sequence !== bridgeSequence) throw new Error("Native bridge was cancelled.");
-            injectNativeNode(native.win, native.node);
-            native.win.go(VIEWMODES[type]);
-            return waitForPanel(native.win, type, sequence).then(function (panel) {
-                installNativeStage(native.win, panel, type);
-                if (!bridge || sequence !== bridgeSequence) throw new Error("Native bridge was cancelled.");
-                bridge.win = native.win;
-                bridge.node = native.node;
-                bridge.panel = panel;
-                frame.classList.add("is-session-visible");
-                hideBridgeOverlay();
-                return bridge;
-            });
-        });
-    }
-
-    function connectNative(method) {
-        var current = bridge;
-        if (!current || !current.frame) return;
-        var sequence = current.sequence;
-        var connectButton = document.getElementById("sirkNativeConnect");
-        var disconnectButton = document.getElementById("sirkNativeDisconnect");
-        if (connectButton) connectButton.disabled = true;
-        setBridgeStatus(t("connecting"));
-        prepareNative(current.frame, current.portalNode, current.type, sequence).then(function (prepared) {
-            var win = prepared.win;
-            if (prepared.type === "desktop") {
-                if (typeof win.connectDesktop !== "function") throw new Error("connectDesktop is unavailable.");
-                win.connectDesktop(fakeEvent(), Number(method || 3));
-            } else if (prepared.type === "terminal") {
-                if (typeof win.setupTerminal === "function") win.setupTerminal();
-                if (typeof win.connectTerminal !== "function") throw new Error("connectTerminal is unavailable.");
-                win.connectTerminal(fakeEvent(), 1);
-            } else if (prepared.type === "files") {
-                if (typeof win.setupFiles === "function") win.setupFiles();
-                if (typeof win.connectFiles !== "function") throw new Error("connectFiles is unavailable.");
-                win.connectFiles(fakeEvent());
-            }
-            if (disconnectButton) disconnectButton.disabled = false;
-            prepared.timer = setInterval(function () {
-                if (!bridge || bridge.sequence !== sequence) return;
-                var object = activeNativeObject(win, prepared.type);
-                var state = object && (object.State != null ? object.State : object.state);
-                if (state === 3 || state === 4) {
-                    setBridgeStatus(t("connected") + (prepared.type === "desktop" ? " " + t("clickCanvas") : ""));
-                    var quickToggle = document.getElementById("sirkQuickCommandsToggle");
-                    if (quickToggle && prepared.type === "desktop") quickToggle.hidden = false;
-                    if (prepared.type === "terminal" && win.xterm) { try { win.xterm.focus(); } catch (error) {} }
-                } else setBridgeStatus(t("connecting") + (state != null ? " [" + state + "]" : ""));
-            }, 250);
-            prepared.timeout = setTimeout(function () {
-                if (!bridge || bridge.sequence !== sequence) return;
-                var object = activeNativeObject(win, prepared.type);
-                var state = object && (object.State != null ? object.State : object.state);
-                if (!object || (state !== 3 && state !== 4)) showBridgeOverlay(t("sessionError") + "\n" + nativeDiagnostics(prepared), true);
-            }, 22000);
-        }).catch(function (error) {
-            if (connectButton) connectButton.disabled = false;
-            if (disconnectButton) disconnectButton.disabled = true;
-            showBridgeOverlay(t("sessionError") + "\n" + (error && (error.stack || error.message) || error), true);
-            setBridgeStatus(t("sessionError"));
-        });
-    }
-
-    function disconnectNative() {
-        if (!bridge) return;
-        try {
-            var object = activeNativeObject(bridge.win, bridge.type);
-            if (object && typeof object.Stop === "function") object.Stop();
-        } catch (error) {}
-        if (bridge.timer) { clearInterval(bridge.timer); bridge.timer = null; }
-        if (bridge.timeout) { clearTimeout(bridge.timeout); bridge.timeout = null; }
-        var connectButton = document.getElementById("sirkNativeConnect");
-        var disconnectButton = document.getElementById("sirkNativeDisconnect");
-        if (connectButton) connectButton.disabled = false;
-        if (disconnectButton) disconnectButton.disabled = true;
-        var quickToggle = document.getElementById("sirkQuickCommandsToggle");
-        var quickPanel = document.getElementById("sirkQuickCommandsPanel");
-        if (quickToggle) { quickToggle.hidden = true; quickToggle.setAttribute("aria-expanded", "false"); }
-        if (quickPanel) quickPanel.hidden = true;
-        if (bridge.frame) bridge.frame.classList.remove("is-session-visible");
-        showBridgeOverlay(t("ready"), false);
-        setBridgeStatus(t("disconnected"));
-    }
-
-    function renderNativeTab(host, node, type) {
-        stopBridge(true);
-        var nativeBase = new URL(String(window.__SIRK_PLATFORM_NATIVE_URL__ || "/meshcentral/"), window.location.href);
-        if (nativeBase.origin !== window.location.origin) {
-            var externalUrl = new URL(nativeDeviceUrl(node));
-            externalUrl.searchParams.set("viewmode", String(VIEWMODES[type] || 10));
-            externalUrl.searchParams.set("gotonode", String(node.id || node._id || ""));
-            host.innerHTML = '<div class="sirk-native-bridge-shell"><div class="sirk-native-bridge-toolbar"><a class="sirk-native-bridge-button" target="_blank" rel="noopener noreferrer" href="' + esc(externalUrl.href) + '">' + esc(t("openMesh")) + '</a><span class="sirk-native-bridge-status">' + esc(t(type)) + '</span></div><div class="sirk-native-bridge-stage"><iframe class="sirk-native-bridge-frame is-session-visible" title="MeshCentral ' + esc(t(type)) + '" allow="clipboard-read; clipboard-write; fullscreen" src="' + esc(externalUrl.href) + '"></iframe></div></div>';
-            return;
-        }
-        var interactive = type === "desktop" || type === "terminal" || type === "files";
-        var selector = type === "desktop"
-            ? '<div class="sirk-native-bridge-button-group">' +
-              '<button id="sirkNativeConnect" class="sirk-native-bridge-button sirk-native-bridge-split-main" type="button">' + esc(t("connect")) + '</button>' +
-              '<button id="sirkNativeConnectDropdown" class="sirk-native-bridge-button sirk-native-bridge-split-toggle" type="button" aria-expanded="false" aria-haspopup="menu" title="' + esc(t("connectOptions")) + '">▼</button>' +
-              '<div id="sirkNativeConnectMenu" class="sirk-native-bridge-menu" hidden>' +
-              '<button type="button" class="sirk-native-bridge-menu-item" data-connect-option="3">' + esc(t("requestApprovalWithBar")) + '</button>' +
-              '<button type="button" class="sirk-native-bridge-menu-item" data-connect-option="3">' + esc(t("requestApprovalOnly")) + '</button>' +
-              '<button type="button" class="sirk-native-bridge-menu-item" data-connect-option="1">' + esc(t("privacyNotice")) + '</button>' +
-              '</div>' +
-              '</div>' +
-              '<button id="sirkNativeAMT" class="sirk-native-bridge-button" type="button">' + esc(t("amtKvm")) + '</button>'
-            : '<span class="sirk-native-bridge-label">' + esc(t(type)) + '</span>';
-        var controls = type === "desktop"
-            ? '<button id="sirkNativeDisconnect" class="sirk-native-bridge-button" type="button" disabled>' + esc(t("disconnect")) + '</button>'
-            : interactive
-            ? '<button id="sirkNativeConnect" class="sirk-native-bridge-button" type="button">' + esc(t("connect")) + '</button><button id="sirkNativeDisconnect" class="sirk-native-bridge-button" type="button" disabled>' + esc(t("disconnect")) + '</button>'
-            : "";
-        var quickPanel = type === "desktop" ? '<button id="sirkQuickCommandsToggle" class="sirk-quick-commands-toggle" type="button" aria-expanded="false" title="' + esc(t("quickCommands")) + '" hidden><span>›_</span></button><aside id="sirkQuickCommandsPanel" class="sirk-quick-commands-panel" hidden></aside>' : "";
-        host.innerHTML = '<div class="sirk-native-bridge-shell"><div class="sirk-native-bridge-toolbar">' + selector + controls + '<span id="sirkNativeBridgeStatus" class="sirk-native-bridge-status">' + esc(interactive ? t("ready") : t("loadingNative")) + '</span></div><div class="sirk-native-bridge-stage"><iframe id="sirkNativeBridgeFrame" class="sirk-native-bridge-frame" title="MeshCentral native module" allow="clipboard-read; clipboard-write; fullscreen"></iframe><div id="sirkNativeBridgeOverlay" class="sirk-native-bridge-overlay"><div>' + esc(interactive ? t("ready") : t("loadingNative")) + '</div></div>' + quickPanel + '</div></div>';
-        var frame = document.getElementById("sirkNativeBridgeFrame");
-        var sequence = ++bridgeSequence;
-        bridge = { sequence: sequence, frame: frame, portalNode: node, type: type, win: null, node: null, panel: null, timer: null, timeout: null };
-        frame.addEventListener("load", function () {
-            if (!bridge || bridge.sequence !== sequence) return;
-            setBridgeStatus(interactive ? t("ready") : t("preparing"));
-            if (!interactive) {
-                prepareNative(frame, node, type, sequence).then(function () {
-                    setBridgeStatus(t("nativeReady"));
-                }).catch(function (error) {
-                    showBridgeOverlay(t("sessionError") + "\n" + (error && (error.stack || error.message) || error), true);
-                    setBridgeStatus(t("sessionError"));
-                });
-            }
-        });
-        frame.src = nativeRootUrl(node, type);
-        if (interactive) {
-            var selectedConnectOption = type === "desktop" ? 3 : 1;
-            
-            document.getElementById("sirkNativeConnect").addEventListener("click", function () {
-                var method = type === "desktop" ? selectedConnectOption : 1;
-                connectNative(method);
-            });
-            
-            if (type === "desktop") {
-                var connectDropdown = document.getElementById("sirkNativeConnectDropdown");
-                var connectMenu = document.getElementById("sirkNativeConnectMenu");
-                var buttonGroup = connectDropdown.closest(".sirk-native-bridge-button-group");
-                
-                connectDropdown.addEventListener("click", function (event) {
-                    event.stopPropagation();
-                    connectMenu.hidden = !connectMenu.hidden;
-                    connectDropdown.setAttribute("aria-expanded", connectMenu.hidden ? "false" : "true");
-                });
-                
-                var menuItems = connectMenu.querySelectorAll("[data-connect-option]");
-                menuItems.forEach(function (item) {
-                    item.addEventListener("click", function () {
-                        selectedConnectOption = parseInt(this.getAttribute("data-connect-option"), 10);
-                        connectMenu.hidden = true;
-                        connectDropdown.setAttribute("aria-expanded", "false");
-                    });
-                });
-                
-                var amtButton = document.getElementById("sirkNativeAMT");
-                amtButton.addEventListener("click", function () {
-                    connectNative(2);
-                });
-                
-                var closeMenuOnClickOutside = function (event) {
-                    if (buttonGroup && !buttonGroup.contains(event.target)) {
-                        connectMenu.hidden = true;
-                        connectDropdown.setAttribute("aria-expanded", "false");
-                    }
-                };
-                document.addEventListener("click", closeMenuOnClickOutside);
-                
-                if (bridge) bridge.closeMenuListener = closeMenuOnClickOutside;
-            }
-            
-            document.getElementById("sirkNativeDisconnect").addEventListener("click", disconnectNative);
-        }
-        if (type === "desktop") {
-            document.getElementById("sirkQuickCommandsToggle").addEventListener("click", function () {
-                var panel = document.getElementById("sirkQuickCommandsPanel");
-                if (!panel) return;
-                panel.hidden = !panel.hidden;
-                this.setAttribute("aria-expanded", panel.hidden ? "false" : "true");
-                if (panel.hidden) return;
-                panel.innerHTML = '<div class="sirk-quick-command-loading">' + esc(t("loadingCommands")) + '</div>';
-                if (quickCommands.data) { renderCompactCommands(); return; }
-                core.api("mycommands", "scripts").then(function (response) {
-                    quickCommands.data = response;
-                    renderCompactCommands();
-                }).catch(function (error) {
-                    panel.innerHTML = '<div class="sirk-device-command-error">' + esc(error.message || String(error)) + '</div>';
-                });
-            });
-        }
-    }
 
     function agentOperation(node, type, parameters) {
         var body = new URLSearchParams();
@@ -575,11 +125,12 @@
             parameters: parameters || {}
         }));
         var endpoint = agentOperationUrl("agent-operation-create");
+        var runtime = window.SirkPlatformRuntime && window.SirkPlatformRuntime.state;
+        var csrfToken = runtime && runtime.bootstrap && runtime.bootstrap.csrfToken || "";
         return fetch(endpoint, {
-            method: "POST",
             credentials: "same-origin",
             cache: "no-store",
-            headers: { "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8" },
+            headers: { "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8", "X-SIRK-CSRF": csrfToken },
             body: body.toString()
         }).then(function (response) {
             return response.json().then(function (value) {
@@ -590,15 +141,7 @@
     }
 
     function agentOperationUrl(action, parameters) {
-        var configured = String(window.__SIRK_PLATFORM_API_BASE__ || "");
-        var endpoint;
-        if (configured.indexOf("pluginadmin.ashx") >= 0) {
-            endpoint = new URL(configured, window.location.href);
-            endpoint.searchParams.set("pin", "SIRKPortal");
-            endpoint.searchParams.set("action", action);
-        } else {
-            endpoint = new URL("/api/agent-operations", window.location.href);
-        }
+        var endpoint = new URL("/api/agent-operations", window.location.href);
         Object.keys(parameters || {}).forEach(function (key) {
             endpoint.searchParams.set(key, parameters[key]);
         });
@@ -716,6 +259,7 @@
             if (file.size > 1024 * 1024) { status.textContent = "Plik przekracza limit 1 MiB."; status.classList.add("is-error"); return; }
             file.arrayBuffer().then(function (buffer) {
                 var bytes = new Uint8Array(buffer), binary = "";
+
                 for (var index = 0; index < bytes.length; index += 1) binary += String.fromCharCode(bytes[index]);
                 var separator = /[\\/]$/.test(input.value) ? "" : "\\";
                 return runAgentOperation(node, "files.write", {
@@ -786,25 +330,22 @@
     }
 
     function renderAgentTab(host, node, type) {
-        stopBridge(true);
         if (type === "terminal") renderAgentTerminal(host, node);
         else if (type === "files") renderAgentFiles(host, node);
         else renderAgentDesktop(host, node);
     }
 
     function renderGeneral(host, node) {
-        stopBridge(true);
         var online = nodeOnline(node);
         host.innerHTML = '<div class="sirk-device-general"><div class="sirk-device-detail-grid">' +
             detailItem(t("name"), node.name) + detailItem(t("status"), online ? t("online") : t("offline")) +
             detailItem(t("group"), nodeGroup(node)) + detailItem(t("system"), node.os || t("noOs")) +
             detailItem(t("ip"), node.ip || "—") + detailItem(t("lastSeen"), formatLastSeen(node.lastSeen)) +
             detailItem(t("agent"), node.agentVersion || "—") + detailItem(t("nodeId"), node.id || node._id) +
-            '</div><div class="sirk-device-general-actions"><a href="' + esc(nativeDeviceUrl(node)) + '">' + esc(t("openMesh")) + '</a></div></div>';
+            '</div></div>';
     }
 
     function renderCommandsTab(host, node) {
-        stopBridge(true);
         var module = commandModule();
         if (!module || typeof module.mount !== "function") {
             host.innerHTML = '<div class="sirk-device-command-error">' + esc(t("noCommands")) + '</div>';
@@ -866,6 +407,7 @@
                     option.value = String(choice.value == null ? choice : choice.value);
                     option.textContent = choice.labels && choice.labels[language()] || choice.label || option.value;
                     input.appendChild(option);
+
                 });
             } else {
                 input = document.createElement("input");
@@ -933,7 +475,7 @@
     }
 
     function renderTab(node, type) {
-        activeTab = VIEWMODES[type] || type === "commands" ? type : "general";
+        activeTab = REMOTE_TABS.indexOf(type) >= 0 || type === "commands" ? type : "general";
         var body = document.getElementById("sirkDeviceTabBody");
         if (!body) return;
         Array.prototype.forEach.call(document.querySelectorAll("[data-device-tab]"), function (button) {
@@ -943,9 +485,7 @@
         });
         if (activeTab === "general") renderGeneral(body, node);
         else if (activeTab === "commands") renderCommandsTab(body, node);
-        else if (node.source === "sirk-agent" && (activeTab === "desktop" || activeTab === "terminal" || activeTab === "files"))
-            renderAgentTab(body, node, activeTab);
-        else renderNativeTab(body, node, activeTab);
+        else if (REMOTE_TABS.indexOf(activeTab) >= 0) renderAgentTab(body, node, activeTab);
     }
 
     function renderWorkspace(node) {
@@ -953,7 +493,7 @@
         selectedNode = node;
         var online = nodeOnline(node);
         content.innerHTML = '<div class="sirk-device-workspace"><header class="sirk-device-compact-header"><button type="button" class="sirk-device-compact-back" data-device-back="1" title="' + esc(t("back")) + '">‹</button><span class="sirk-device-compact-icon" aria-hidden="true">' + DEVICE_ICON + '</span><div class="sirk-device-compact-main"><strong>' + esc(node.name || shortId(node.id)) + '</strong><small>' + esc(nodeGroup(node)) + ' · ' + esc(node.os || t("noOs")) + '</small></div><div class="sirk-device-compact-meta"><span class="sirk-device-connection ' + (online ?"is-online" : "is-offline") + '"><i></i>' + esc(online ? t("online") : t("offline")) + '</span><small>' + esc(node.ip || "—") + '</small></div></header><nav class="sirk-device-tabs" role="tablist">' +
-            ["general", "desktop", "terminal", "commands", "files", "registry", "software", "amt"].map(function (type) {
+            ["general", "desktop", "terminal", "commands", "files"].map(function (type) {
                 return '<button type="button" role="tab" data-device-tab="' + type + '">' + esc(t(type)) + '</button>';
             }).join("") + '</nav><section id="sirkDeviceTabBody" class="sirk-device-tab-body"></section></div>';
         renderTab(node, activeTab);
@@ -961,23 +501,18 @@
 
     function extractNodeId() {
         if (selectedNodeId) return selectedNodeId;
-        var link = content && content.querySelector(".sirk-device-native-button[href]");
-        if (link) {
-            try { return new URL(link.href, window.location.href).searchParams.get("gotonode") || ""; }
-            catch (error) {}
-        }
         return "";
     }
 
     function transformDetail() {
         transformScheduled = false;
         if (!content || content.querySelector(".sirk-device-workspace")) return;
-        if (!content.querySelector(".sirk-device-native-card")) return;
+        if (!content.querySelector("[data-sirk-device-detail]")) return;
         var nodeId = extractNodeId();
         if (!nodeId) return;
         getInventory().then(function (value) {
             var node = findNode(value, nodeId);
-            if (!node || !content.querySelector(".sirk-device-native-card")) return;
+            if (!node || !content.querySelector("[data-sirk-device-detail]")) return;
             selectedNodeId = String(node.id || node._id || nodeId);
             renderWorkspace(node);
         }).catch(function () {});
@@ -995,7 +530,6 @@
             selectedNodeId = row.getAttribute("data-device-id") || "";
             selectedNode = null;
             activeTab = "general";
-            stopBridge(true);
             scheduleTransform();
             return;
         }
@@ -1011,7 +545,6 @@
             selectedNodeId = "";
             selectedNode = null;
             activeTab = "general";
-            stopBridge(true);
             return;
         }
         var navigation = event.target && event.target.closest && event.target.closest(".sirk-standalone-nav [data-view]");
@@ -1019,7 +552,6 @@
             selectedNodeId = "";
             selectedNode = null;
             activeTab = "general";
-            stopBridge(true);
         }
         var quickClose = event.target && event.target.closest && event.target.closest("[data-quick-command-close]");
         if (quickClose) {
@@ -1055,7 +587,6 @@
         if (selectedNode && content && content.querySelector(".sirk-device-workspace")) renderWorkspace(selectedNode);
     });
 
-    window.addEventListener("beforeunload", function () { stopBridge(true); });
 
     if (content) {
         new MutationObserver(scheduleTransform).observe(content, { childList: true, subtree: true });

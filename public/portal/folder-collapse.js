@@ -198,10 +198,10 @@
         ["Aktualizuj", "Update"], ["Przywróć", "Restore"], ["Usuń", "Delete"], ["Włącz", "Enable"], ["Wyłącz", "Disable"],
         ["Utwórz backup", "Create backup"], ["Restartuj usługę", "Restart service"],
         ["Widok domyślny", "Default view"], ["Włącz i pokaż", "Enable and show"],
-        ["Włącz akceptacje", "Enable approvals"], ["Dostęp grup MeshCentral", "MeshCentral group access"],
+        ["Włącz akceptacje", "Enable approvals"], ["Dostęp grup Portalu", "Portal group access"],
         ["Wybrane grupy widzą tę zakładkę. Brak wyboru oznacza dostęp dla wszystkich. Site administrator ma dostęp zawsze.", "Selected groups can see this tab. No selection means access for everyone. Site administrator always has access."],
         ["Brak wyboru oznacza dostęp dla wszystkich. Site administrator ma dostęp zawsze.", "No selection means access for everyone. Site administrator always has access."],
-        ["Nie znaleziono grup użytkowników w MeshCentral.", "No MeshCentral user groups were found."],
+        ["Nie utworzono jeszcze grup użytkowników Portalu.", "No Portal user groups have been created yet."],
         ["Pokaż Devices", "Show Devices"], ["Pokaż stan systemu", "Show system status"], ["Pokaż Integrations", "Show Integrations"],
         ["Włącz baner", "Enable banner"], ["Pokaż w Portalu", "Show in Portal"], ["Pokaż na stronie logowania", "Show on login page"],
         ["Aktywny szablon", "Active template"], ["Zielony — aktualizacja", "Green — update"],
@@ -212,7 +212,6 @@
         ["Planowane zakończenie", "Planned end"], ["Dozwolone adresy IP", "Allowed IP addresses"],
         ["Jeden adres lub zakres CIDR w wierszu.", "One address or CIDR range per line."],
         ["Pokaż informację dozwolonym IP", "Show notice to allowed IPs"],
-        ["Blokuj również natywny MeshCentral", "Also block native MeshCentral"],
         ["Blokuje dostęp użytkownikom spoza listy dozwolonych adresów IP.", "Blocks users outside the allowed IP list."],
         ["Włącz animacje", "Enable animations"], ["Ogranicz ruch zgodnie z ustawieniami użytkownika", "Respect the user's reduced motion setting"],
         ["Wyłącza animacje, gdy system użytkownika ma włączone ograniczenie ruchu.", "Disables animations when the user's system requests reduced motion."],
@@ -248,7 +247,7 @@
         ["Włączona", "Enabled"], ["Wyłączona", "Disabled"], ["Wykonywanie operacji…", "Performing operation…"],
         ["Operacja zakończona.", "Operation completed."], ["Dodawanie…", "Adding…"],
         ["Wtyczka została zainstalowana i włączona.", "The plugin was installed and enabled."],
-        ["Aktualizacja zakończona.", "Update completed."], ["Restart usługi MeshCentral…", "Restarting the MeshCentral service…"],
+        ["Aktualizacja zakończona.", "Update completed."], ["Restart usługi SIRK Portal…", "Restarting the SIRK Portal service…"],
         ["Aktualizacja", "Update"], ["Ostrzeżenie", "Warning"], ["Awaria", "Outage"],
         ["System został pomyślnie zaktualizowany.", "The system was updated successfully."],
         ["W systemie występują drobne problemy. Trwają prace nad ich usunięciem.", "The system has minor issues. Work is underway to resolve them."],
@@ -264,7 +263,6 @@
     pairs.forEach(function (pair) { plToEn[pair[0]] = pair[1]; enToPl[pair[1]] = pair[0]; });
 
     var technical = {
-        showLauncher: ["Pokaż launcher", "Show launcher"], showNativeLink: ["Pokaż link do MeshCentral", "Show MeshCentral link"],
         forceNewLogin: ["Wymuś nowe logowanie", "Force new login"], forcePortalInterface: ["Wymuś interfejs Portalu", "Force Portal interface"],
         keepSessionsAfterRestart: ["Zachowaj sesje po restarcie", "Keep sessions after restart"],
         accessGroupIds: ["Grupy dostępu", "Access groups"], retentionDays: ["Dni przechowywania", "Retention days"],

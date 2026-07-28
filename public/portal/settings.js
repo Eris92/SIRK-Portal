@@ -10,6 +10,8 @@
         pluginView: "installed",
         plugins: [],
         marketplace: [],
+        identity: null,
+        csrfToken: "",
         search: "",
         resumeMessage: ""
     };
@@ -42,6 +44,10 @@
 
     function clear(node) { while (node.firstChild) node.removeChild(node.firstChild); }
     function clone(value) { return JSON.parse(JSON.stringify(value == null ? {} : value)); }
+    function csrfToken() {
+        var runtime = window.SirkPlatformRuntime && window.SirkPlatformRuntime.state;
+        return state.csrfToken || runtime && runtime.bootstrap && runtime.bootstrap.csrfToken || "";
+    }
 
     function serviceRestartState() {
         try {
@@ -82,9 +88,7 @@
     }
 
     function apiUrl(action, extra) {
-        var url = new URL(window.__SIRK_PLATFORM_API_BASE__, window.location.href);
-        if (url.pathname.replace(/\/+$/, "") === "/api" && action === "portal-admin-snapshot") url.pathname = "/api/admin/settings";
-        url.searchParams.set("pin", "SIRKPortal");
+        var url = new URL(action === "portal-admin-snapshot" ? "/api/admin/settings" : "/api/admin/runtime", window.location.href);
         if (action) url.searchParams.set("action", action);
         Object.keys(extra || {}).forEach(function (key) { url.searchParams.set(key, extra[key]); });
         return url.href;
@@ -110,43 +114,61 @@
         });
     }
 
+    function identityRequest(action, payload) {
+        if (!action) {
+            return fetch(new URL("/api/admin/identity", window.location.href).href, {
+                credentials: "same-origin",
+                cache: "no-store",
+                headers: { "Accept": "application/json" }
+            }).then(parse);
+        }
+        function send() {
+            return fetch(new URL("/api/admin/identity", window.location.href).href, {
+                method: "POST",
+                credentials: "same-origin",
+                headers: {
+                    "Content-Type": "application/json; charset=UTF-8",
+                    "Accept": "application/json",
+                    "X-SIRK-CSRF": state.csrfToken
+                },
+                body: JSON.stringify(Object.assign({ action: action }, payload || {}))
+            }).then(parse);
+        }
+        if (state.csrfToken) return send();
+        return fetch(new URL("/api/bootstrap", window.location.href).href, {
+            credentials: "same-origin",
+            cache: "no-store",
+            headers: { "Accept": "application/json" }
+        }).then(parse).then(function (value) {
+            state.csrfToken = String(value.csrfToken || "");
+            return send();
+        });
+    }
+
     function post(action, payload) {
         var body = new URLSearchParams();
         body.set("payload", JSON.stringify(payload || {}));
         return fetch(apiUrl(action), {
             method: "POST",
             credentials: "same-origin",
-            headers: { "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8" },
+            headers: { "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8", "X-SIRK-CSRF": csrfToken() },
             body: body.toString()
         }).then(parse);
     }
 
     function postSettings(payload) {
-        var base = new URL(window.__SIRK_PLATFORM_API_BASE__, window.location.href);
-        if (base.pathname.replace(/\/+$/, "") === "/api") {
-            var standaloneBody = new URLSearchParams();
-            var standalonePayload = clone(payload || {});
-            standalonePayload.modules = clone(payload && payload.modules || {});
-            standalonePayload.moduleOptions = clone(payload && payload.moduleOptions || {});
-            standalonePayload.portal = clone(standalonePayload.moduleOptions.portal || {});
-            standaloneBody.set("payload", JSON.stringify(standalonePayload));
-            return fetch(new URL("/api/admin/settings", window.location.href).href, {
-                method: "POST",
-                credentials: "same-origin",
-                headers: { "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8" },
-                body: standaloneBody.toString()
-            }).then(parse).then(function (value) { return { snapshot: value.value || value.snapshot || value }; });
-        }
         var body = new URLSearchParams();
-        ["modules", "moduleOptions", "integrations", "secrets"].forEach(function (key) {
-            body.set(key, JSON.stringify(payload[key] || {}));
-        });
-        return fetch(apiUrl("save-settings"), {
+        var standalonePayload = clone(payload || {});
+        standalonePayload.modules = clone(payload && payload.modules || {});
+        standalonePayload.moduleOptions = clone(payload && payload.moduleOptions || {});
+        standalonePayload.portal = clone(standalonePayload.moduleOptions.portal || {});
+        body.set("payload", JSON.stringify(standalonePayload));
+        return fetch(new URL("/api/admin/settings", window.location.href).href, {
             method: "POST",
             credentials: "same-origin",
-            headers: { "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8" },
+            headers: { "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8", "X-SIRK-CSRF": csrfToken() },
             body: body.toString()
-        }).then(parse);
+        }).then(parse).then(function (value) { return { snapshot: value.value || value.snapshot || value }; });
     }
 
     function status(host, text, error) {
@@ -623,12 +645,204 @@
         else if (window.SirkSystemUpdates) window.SirkSystemUpdates.mount(details, state.serverKey.slice(7));
     }
 
+    function selectedValues(select) {
+        return Array.prototype.filter.call(select.options, function (option) { return option.selected; })
+            .map(function (option) { return option.value; });
+    }
+
+    function identitySelect(values, options) {
+        var select = el("select");
+        select.multiple = true;
+        select.size = Math.max(3, Math.min(8, options.length || 3));
+        options.forEach(function (item) {
+            var option = el("option", "", item.label);
+            option.value = item.value;
+            option.selected = values.indexOf(item.value) >= 0;
+            select.appendChild(option);
+        });
+        return select;
+    }
+
+    function identityAction(host, action, payload, message) {
+        host.querySelectorAll("button").forEach(function (button) { button.disabled = true; });
+        identityRequest(action, payload).then(function (result) {
+            state.identity = result.value;
+            renderIdentity(host);
+        }).catch(function (error) {
+            host.querySelectorAll("button").forEach(function (button) { button.disabled = false; });
+            window.alert(error.message || message || "Operacja nie powiodła się.");
+        });
+    }
+
+    function renderIdentity(host) {
+        clear(host);
+        if (!state.identity) {
+            host.appendChild(el("div", "sirk-card", "Ładowanie użytkowników i grup…"));
+            identityRequest().then(function (result) {
+                state.identity = result.value;
+                renderIdentity(host);
+            }).catch(function (error) {
+                clear(host);
+                host.appendChild(el("div", "sirk-card", error.message));
+            });
+            return;
+        }
+        var snapshot = state.identity;
+        var groupOptions = (snapshot.groups || []).map(function (group) { return { value: group.id, label: group.name }; });
+
+        var userCard = el("section", "sirk-card");
+        userCard.appendChild(el("h2", "", "Użytkownicy"));
+        userCard.appendChild(el("p", "", "Konta, role oraz członkostwo w grupach SIRK Portal."));
+        var userTable = el("table", "sirk-settings-table");
+        userTable.innerHTML = "<thead><tr><th>Użytkownik</th><th>Role</th><th>Grupy</th><th>Stan</th><th>Akcje</th></tr></thead>";
+        var userBody = el("tbody");
+        (snapshot.users || []).forEach(function (user) {
+            var row = el("tr");
+            var identity = el("td");
+            identity.appendChild(el("strong", "", user.displayName || user.username));
+            identity.appendChild(el("small", "", " " + user.username));
+            row.appendChild(identity);
+            row.appendChild(el("td", "", (user.roles || []).join(", ")));
+            row.appendChild(el("td", "", (user.groups || []).map(function (id) {
+                var group = (snapshot.groups || []).find(function (item) { return item.id === id; });
+                return group ? group.name : id;
+            }).join(", ") || "—"));
+            row.appendChild(el("td", "", user.enabled === false ? "Wyłączony" : "Aktywny"));
+            var actions = el("td");
+            var edit = el("button", "sirk-button", "Edytuj");
+            edit.type = "button";
+            edit.onclick = function () {
+                var displayName = window.prompt("Nazwa wyświetlana:", user.displayName || user.username);
+                if (displayName == null) return;
+                var roles = identitySelect(user.roles || [], [
+                    { value: "admin", label: "Administrator" },
+                    { value: "operator", label: "Operator" },
+                    { value: "viewer", label: "Odczyt" }
+                ]);
+                var groups = identitySelect(user.groups || [], groupOptions);
+                var editor = el("div", "sirk-card");
+                editor.appendChild(el("h3", "", "Role i grupy: " + user.username));
+                editor.appendChild(el("label", "", "Role"));
+                editor.appendChild(roles);
+                editor.appendChild(el("label", "", "Grupy"));
+                editor.appendChild(groups);
+                var password = el("input");
+                password.type = "password";
+                password.placeholder = "Nowe hasło (opcjonalnie, min. 10 znaków)";
+                editor.appendChild(password);
+                var enabled = el("label");
+                var enabledInput = el("input");
+                enabledInput.type = "checkbox";
+                enabledInput.checked = user.enabled !== false;
+                enabled.appendChild(enabledInput);
+                enabled.appendChild(document.createTextNode(" Konto aktywne"));
+                editor.appendChild(enabled);
+                var save = el("button", "sirk-button", "Zapisz użytkownika");
+                save.type = "button";
+                save.onclick = function () {
+                    identityAction(host, "update-user", {
+                        id: user.id,
+                        value: {
+                            displayName: displayName,
+                            roles: selectedValues(roles),
+                            groups: selectedValues(groups),
+                            enabled: enabledInput.checked,
+                            password: password.value
+                        }
+                    });
+                };
+                editor.appendChild(save);
+                host.insertBefore(editor, host.firstChild);
+                editor.scrollIntoView({ behavior: "smooth", block: "start" });
+            };
+            var remove = el("button", "sirk-button sirk-button-danger", "Usuń");
+            remove.type = "button";
+            remove.onclick = function () {
+                if (window.confirm("Usunąć konto " + user.username + "?")) identityAction(host, "delete-user", { id: user.id });
+            };
+            actions.appendChild(edit);
+            actions.appendChild(remove);
+            row.appendChild(actions);
+            userBody.appendChild(row);
+        });
+        userTable.appendChild(userBody);
+        userCard.appendChild(userTable);
+
+        var newUser = el("details", "sirk-card");
+        newUser.appendChild(el("summary", "", "Dodaj użytkownika"));
+        var username = el("input"); username.placeholder = "Nazwa użytkownika";
+        var displayName = el("input"); displayName.placeholder = "Nazwa wyświetlana";
+        var password = el("input"); password.type = "password"; password.placeholder = "Hasło (min. 10 znaków)";
+        var roles = identitySelect(["viewer"], [
+            { value: "admin", label: "Administrator" },
+            { value: "operator", label: "Operator" },
+            { value: "viewer", label: "Odczyt" }
+        ]);
+        var groups = identitySelect([], groupOptions);
+        [username, displayName, password, roles, groups].forEach(function (node) { newUser.appendChild(node); });
+        var addUser = el("button", "sirk-button", "Utwórz użytkownika");
+        addUser.type = "button";
+        addUser.onclick = function () {
+            identityAction(host, "create-user", { value: {
+                username: username.value,
+                displayName: displayName.value,
+                password: password.value,
+                roles: selectedValues(roles),
+                groups: selectedValues(groups),
+                enabled: true
+            } });
+        };
+        newUser.appendChild(addUser);
+
+        var groupCard = el("section", "sirk-card");
+        groupCard.appendChild(el("h2", "", "Grupy"));
+        (snapshot.groups || []).forEach(function (group) {
+            var row = el("div", "sirk-toolbar");
+            row.appendChild(el("strong", "", group.name));
+            row.appendChild(el("span", "", group.description || ""));
+            var edit = el("button", "sirk-button", "Edytuj");
+            edit.type = "button";
+            edit.onclick = function () {
+                var name = window.prompt("Nazwa grupy:", group.name);
+                if (name == null) return;
+                var description = window.prompt("Opis grupy:", group.description || "");
+                if (description == null) return;
+                identityAction(host, "update-group", { id: group.id, value: { name: name, description: description } });
+            };
+            var remove = el("button", "sirk-button sirk-button-danger", "Usuń");
+            remove.type = "button";
+            remove.onclick = function () {
+                if (window.confirm("Usunąć grupę " + group.name + "?")) identityAction(host, "delete-group", { id: group.id });
+            };
+            row.appendChild(edit);
+            row.appendChild(remove);
+            groupCard.appendChild(row);
+        });
+        var groupName = el("input"); groupName.placeholder = "Nazwa nowej grupy";
+        var groupDescription = el("input"); groupDescription.placeholder = "Opis";
+        var addGroup = el("button", "sirk-button", "Dodaj grupę");
+        addGroup.type = "button";
+        addGroup.onclick = function () {
+            identityAction(host, "create-group", { value: { name: groupName.value, description: groupDescription.value } });
+        };
+        groupCard.appendChild(groupName);
+        groupCard.appendChild(groupDescription);
+        groupCard.appendChild(addGroup);
+        host.appendChild(userCard);
+        host.appendChild(newUser);
+        host.appendChild(groupCard);
+    }
+
     function renderActive(layout, secondary, details) {
         clear(secondary);
         clear(details);
         secondary.hidden = false;
         layout.classList.remove("sirk-settings-overview");
         if (state.active === "server") renderServerSections(layout, secondary, details);
+        else if (state.active === "identity") {
+            secondary.hidden = true;
+            renderIdentity(details);
+        }
         else renderSettings(layout, details, secondary);
         applySearch(details);
     }
@@ -671,7 +885,7 @@
             });
         };
 
-        [["settings", "Settings"], ["server", "Server"]].forEach(function (item) {
+        [["settings", "Settings"], ["identity", "Użytkownicy i grupy"], ["server", "Server"]].forEach(function (item) {
             var button = el("button", item[0] === state.active ? "sirk-nav-item active" : "sirk-nav-item", item[1]);
             button.type = "button";
             button.onclick = function () {

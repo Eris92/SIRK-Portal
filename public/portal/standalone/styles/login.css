@@ -1,58 +1,23 @@
-html,
-body {
-    width: 100%;
-    height: 100%;
-    margin: 0;
-    overflow: hidden;
-    background: #0b1220;
-}
-
-.sirk-login-frame-shell,
-#sirkLoginFrame {
-    position: fixed;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    margin: 0;
-    border: 0;
-}
-
-#sirkLoginFrame {
-    z-index: 1;
-    visibility: hidden;
-    background: #0b1220;
-}
-
-#sirkLoginFrame.is-ready {
-    visibility: visible;
-}
-
-.sirk-login-frame-loading {
-    position: fixed;
-    inset: 0;
-    z-index: 2;
-    display: grid;
-    place-items: center;
-    align-content: center;
-    gap: 14px;
-    color: #e7edf7;
-    font: 500 15px Segoe UI, Arial, sans-serif;
-    background: #0b1220;
-}
-
-.sirk-login-frame-loading span {
-    width: 36px;
-    height: 36px;
-    border: 3px solid #31415a;
-    border-top-color: #8b7cf6;
-    border-radius: 50%;
-    animation: sirk-login-spin .8s linear infinite;
-}
-
-.sirk-login-frame-loading[hidden] {
-    display: none;
-}
-
-@keyframes sirk-login-spin {
-    to { transform: rotate(360deg); }
-}
+:root{color-scheme:light;font-family:Inter,"Segoe UI",Arial,sans-serif;background:#f7f9fc;color:#172033}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh}
+.sirk-login-page{display:grid;grid-template-columns:minmax(360px,1.1fr) minmax(380px,.9fr);min-height:100vh}
+.sirk-login-brand{display:flex;flex-direction:column;justify-content:center;padding:clamp(48px,8vw,120px);background:radial-gradient(circle at 15% 15%,#7b61ff55,transparent 36%),linear-gradient(145deg,#111936,#222f68);color:#fff}
+.sirk-login-mark{display:grid;place-items:center;width:58px;height:58px;border-radius:17px;background:#7657ff;font-size:30px;font-weight:800;box-shadow:0 16px 44px #0005}
+.sirk-login-eyebrow{margin:28px 0 10px!important;color:#b8c6ff!important;font-size:12px;font-weight:700;letter-spacing:.18em}
+.sirk-login-brand h1{margin:0;max-width:700px;font-size:clamp(38px,5vw,72px);line-height:1.03;letter-spacing:-.04em}
+.sirk-login-brand p{max-width:620px;color:#dbe3ff;font-size:18px;line-height:1.7}
+.sirk-login-panel{display:grid;place-items:center;padding:36px;background:#f7f9fc}
+.sirk-login-card{width:min(440px,100%);padding:42px;border:1px solid #dce3ec;border-radius:22px;background:#fff;box-shadow:0 24px 80px #1d2c5218}
+.sirk-login-card header span{color:#7256e8;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.12em}
+.sirk-login-card h2{margin:10px 0 8px;font-size:34px}
+.sirk-login-card header p,.sirk-login-card footer{color:#667085;line-height:1.55}
+.sirk-login-card label{display:grid;gap:8px;margin-top:22px;font-size:14px;font-weight:650}
+.sirk-login-card input{width:100%;padding:13px 14px;border:1px solid #cfd8e6;border-radius:10px;background:#fff;color:#172033;font:inherit}
+.sirk-login-card input:focus{border-color:#7657ff;outline:3px solid #7657ff22}
+.sirk-login-card button{width:100%;margin-top:26px;padding:14px;border:0;border-radius:10px;background:#6947ed;color:#fff;font:700 15px inherit;cursor:pointer}
+.sirk-login-card button:disabled{opacity:.6;cursor:wait}
+.sirk-login-card footer{margin-top:28px;padding-top:22px;border-top:1px solid #e8edf4;font-size:12px}
+.sirk-login-error{margin-top:16px;padding:11px 13px;border-radius:9px;background:#fee2e2;color:#991b1b;font-size:13px}
+.sirk-login-public-banner{position:fixed;inset:0 0 auto;z-index:10;padding:12px 18px;text-align:center;box-shadow:0 1px 0 #0f172a24}
+@media(max-width:840px){.sirk-login-page{grid-template-columns:1fr}.sirk-login-brand{display:none}.sirk-login-panel{min-height:100vh;padding:20px}.sirk-login-card{padding:30px}}

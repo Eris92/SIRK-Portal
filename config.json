@@ -1,10 +1,10 @@
 {
   "name": "SIRK Management Platform",
-  "shortName": "SIRKPortal",
-  "version": "1.8.36-dev.87",
+  "applicationId": "sirk-portal",
+  "version": "2.0.0-dev.1",
   "author": "Eris92",
   "description": "SIRK Management Platform with one unified transparent Portal layout and an independent lifecycle manager.",
-  "hasAdminPanel": true,
+  "hasAdminPanel": false,
   "homepage": "https://github.com/Eris92/SIRK-Portal",
   "changelogUrl": "https://raw.githubusercontent.com/Eris92/SIRK-Portal/main/changelog.md",
   "configUrl": "https://raw.githubusercontent.com/Eris92/SIRK-Portal/main/config.json",
@@ -18,6 +18,5 @@
     "stable": "main",
     "beta": "beta",
     "dev": "develop"
-  },
-  "meshCentralCompat": ">=1.1.18"
+  }
 }

@@ -170,20 +170,10 @@
     }
 
     core.assetUrl = function (moduleName, assetName, parameters) {
-        var configuredBase = String(window.__SIRK_PLATFORM_API_BASE__ || "");
-        if (configuredBase && configuredBase.indexOf("pluginadmin.ashx") < 0) {
-            var standaloneBase = configuredBase.replace(/\/$/, "");
-            var standaloneEndpoint = !moduleName && assetName === "bootstrap"
-                ? new URL(standaloneBase + "/bootstrap", window.location.href)
-                : new URL(standaloneBase + "/modules/" + encodeURIComponent(moduleName || "_runtime") + "/" + encodeURIComponent(assetName || "index"), window.location.href);
-            standaloneEndpoint.searchParams.set("v", core.assetVersion);
-            Object.keys(parameters || {}).forEach(function (key) { if (parameters[key] != null) standaloneEndpoint.searchParams.set(key, parameters[key]); });
-            return standaloneEndpoint.href;
-        }
-        var endpoint = new URL(configuredBase || "pluginadmin.ashx", window.location.href);
-        endpoint.searchParams.set("pin", "SIRKPortal");
-        if (moduleName) endpoint.searchParams.set("module", moduleName);
-        if (assetName) endpoint.searchParams.set("asset", assetName);
+        var base = String(window.__SIRK_PLATFORM_API_BASE__ || "/api").replace(/\/$/, "");
+        var endpoint = !moduleName && assetName === "bootstrap"
+            ? new URL(base + "/bootstrap", window.location.href)
+            : new URL(base + "/modules/" + encodeURIComponent(moduleName || "_runtime") + "/" + encodeURIComponent(assetName || "index"), window.location.href);
         endpoint.searchParams.set("v", core.assetVersion);
         Object.keys(parameters || {}).forEach(function (key) {
             if (parameters[key] != null) endpoint.searchParams.set(key, parameters[key]);

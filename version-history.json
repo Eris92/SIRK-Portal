@@ -1,6 +1,6 @@
 [
   {
-    "version": "1.8.36-dev.87",
+    "version": "2.0.0-dev.1",
     "date": "2026-07-28",
     "changes": [
       "Bootstrap embedded MeshCentral sessions with the target device and native view before opening a remote tunnel",

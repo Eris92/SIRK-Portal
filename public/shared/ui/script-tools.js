@@ -285,7 +285,7 @@
                 var card = shell.card("Multi-device execution", script.label || script.name);
                 card.classList.add("sirk-multi-editor-card");
                 if (!devices.length) {
-                    card.appendChild(document.createTextNode("Select devices in MeshCentral before using this action.")); host.appendChild(card); return;
+                    card.appendChild(document.createTextNode("Select devices in SIRK Portal before using this action.")); host.appendChild(card); return;
                 }
                 var list = document.createElement("div"); list.className = "sirk-multi-device-list";
                 devices.forEach(function (device) {

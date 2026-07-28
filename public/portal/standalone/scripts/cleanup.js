@@ -43,16 +43,7 @@
     }
 
     function apiUrl(action) {
-        var url = new URL(window.__SIRK_PLATFORM_API_BASE__ || "/api", window.location.href);
-        var clean = url.pathname.replace(/\/+$/, "");
-        if (/\/api$/i.test(clean) && action === "portal-admin-snapshot") {
-            url.pathname = clean + "/admin/settings";
-            url.search = "";
-            return url.href;
-        }
-        url.searchParams.set("pin", "SIRKPortal");
-        if (action) url.searchParams.set("action", action);
-        return url.href;
+        return new URL(action === "portal-admin-snapshot" ? "/api/admin/settings" : "/api", window.location.href).href;
     }
 
     function parseResponse(response) {
@@ -149,21 +140,21 @@
         var selected = currentGroupIds(snapshot, target);
         var card = document.createElement("section");
         card.className = "sirk-card";
-        card.setAttribute("data-mesh-group-permissions", target.id);
+        card.setAttribute("data-group-permissions", target.id);
         card.setAttribute("data-search-item", "1");
         var title = document.createElement("strong");
-        title.textContent = "Dostęp grup MeshCentral";
+        title.textContent = "Dostęp grup Portalu";
         card.appendChild(title);
         var info = document.createElement("small");
         info.textContent = "Wybrane grupy widzą tę zakładkę. Brak wyboru oznacza dostęp dla wszystkich. Site administrator ma dostęp zawsze.";
         card.appendChild(info);
         var list = document.createElement("div");
         list.style.cssText = "display:grid;gap:8px;margin-top:12px";
-        list.setAttribute("data-mesh-group-list", "1");
+        list.setAttribute("data-group-list", "1");
         var groups = snapshot.userGroups || [];
         if (!groups.length) {
             var empty = document.createElement("div");
-            empty.textContent = "Nie znaleziono grup użytkowników w MeshCentral.";
+            empty.textContent = "Nie utworzono jeszcze grup użytkowników Portalu.";
             list.appendChild(empty);
         }
         groups.forEach(function (group) {
@@ -189,17 +180,17 @@
         var form = workspace.querySelector("[data-settings-form]");
         if (!target || !form) return;
         removeLegacyPermissionContent(form);
-        if (form.querySelector("[data-mesh-group-permissions]")) return;
+        if (form.querySelector("[data-group-permissions]")) return;
         loadPermissionSnapshot().then(function (snapshot) {
             if (!form.isConnected || isCustomSettings(workspace)) return;
             removeLegacyPermissionContent(form);
-            if (!form.querySelector("[data-mesh-group-permissions]")) form.insertBefore(permissionCard(snapshot, target), form.firstChild);
+            if (!form.querySelector("[data-group-permissions]")) form.insertBefore(permissionCard(snapshot, target), form.firstChild);
         }).catch(function (error) {
-            if (!form.isConnected || form.querySelector("[data-mesh-permission-error]")) return;
+            if (!form.isConnected || form.querySelector("[data-group-permission-error]")) return;
             var card = document.createElement("div");
             card.className = "sirk-card";
             card.setAttribute("data-error", "1");
-            card.setAttribute("data-mesh-permission-error", "1");
+            card.setAttribute("data-group-permission-error", "1");
             card.textContent = error.message || String(error);
             form.insertBefore(card, form.firstChild);
         });
@@ -223,23 +214,9 @@
                 delete view.accessGroupIds;
             }
             var integrations = snapshot.integrations && snapshot.integrations.values || {};
-            var base = new URL(window.__SIRK_PLATFORM_API_BASE__ || "/api", window.location.href);
-            var clean = base.pathname.replace(/\/+$/, "");
-            if (/\/api$/i.test(clean)) {
-                var standalone = new URLSearchParams();
-                standalone.set("payload", JSON.stringify({ modules: modules, moduleOptions: moduleOptions, portal: moduleOptions.portal || {}, integrations: integrations, secrets: {} }));
-                return fetch(clean + "/admin/settings", {
-                    method: "POST", credentials: "same-origin", cache: "no-store",
-                    headers: { "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8", Accept: "application/json" },
-                    body: standalone.toString()
-                }).then(parseResponse);
-            }
             var body = new URLSearchParams();
-            body.set("modules", JSON.stringify(modules));
-            body.set("moduleOptions", JSON.stringify(moduleOptions));
-            body.set("integrations", JSON.stringify(integrations));
-            body.set("secrets", "{}");
-            return fetch(apiUrl("save-settings"), {
+            body.set("payload", JSON.stringify({ modules: modules, moduleOptions: moduleOptions, portal: moduleOptions.portal || {}, integrations: integrations, secrets: {} }));
+            return fetch("/api/admin/settings", {
                 method: "POST", credentials: "same-origin", cache: "no-store",
                 headers: { "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8", Accept: "application/json" },
                 body: body.toString()
@@ -251,13 +228,13 @@
     }
 
     function bindPermissionSave(workspace) {
-        if (workspace.getAttribute("data-mesh-permission-save-bound") === "1") return;
-        workspace.setAttribute("data-mesh-permission-save-bound", "1");
+        if (workspace.getAttribute("data-group-permission-save-bound") === "1") return;
+        workspace.setAttribute("data-group-permission-save-bound", "1");
         workspace.addEventListener("click", function (event) {
             var button = event.target && event.target.closest("button");
             var target = activePermissionTarget(workspace);
             if (!button || !target || isCustomSettings(workspace) || String(button.textContent || "").trim() !== "Zapisz") return;
-            var list = workspace.querySelector("[data-mesh-group-list]");
+            var list = workspace.querySelector("[data-group-list]");
             if (!list || permissionState.saving) return;
             event.preventDefault();
             event.stopPropagation();

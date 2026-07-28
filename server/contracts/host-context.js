@@ -8,6 +8,7 @@ function normalizeUser(user) {
         tenantId: String(user.tenantId || user.domain || ""),
         roles: Array.isArray(user.roles) ? user.roles.map(String) : [],
         groups: Array.isArray(user.groups) ? user.groups.map(String) : [],
+        csrfToken: String(user.csrfToken || ""),
         isAdmin: user.isAdmin === true || user.siteadmin === true || Number(user.siteadmin) === 0xFFFFFFFF || (Number(user.siteadmin) | 0) === -1,
         raw: user.raw || user
     };
