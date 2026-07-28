@@ -1,5 +1,6 @@
-## 1.8.36-dev.80
+## 1.8.36-dev.81
 
+- Fix the MeshCentral login iframe when `Referrer-Policy: no-referrer` suppresses its Referer header.
 - Add authenticated per-device SIRK Agent enrollment and check-in credentials.
 - Persist only SHA-256 device credential hashes in the Portal registry.
 - Add a live Windows service enrollment/check-in E2E harness.

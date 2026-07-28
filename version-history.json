@@ -1,8 +1,9 @@
 [
   {
-    "version": "1.8.36-dev.80",
+    "version": "1.8.36-dev.81",
     "date": "2026-07-28",
     "changes": [
+      "Fix the MeshCentral login iframe under the no-referrer policy",
       "Add authenticated per-device SIRK Agent enrollment and check-in credentials",
       "Persist only SHA-256 device credential hashes in the Portal registry",
       "Add a live Windows service enrollment and check-in E2E harness",

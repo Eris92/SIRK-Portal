@@ -103,10 +103,16 @@ function validLoginFrame(req, policy, requestUrl) {
     if (requestUrl.searchParams.get("sirkAuth") !== "1") return false;
     var destination = String(req && req.headers && req.headers["sec-fetch-dest"] || "").toLowerCase();
     var referer = String(req && req.headers && req.headers.referer || "");
+    if (destination !== "iframe") return false;
+    // MeshCentral sends Referrer-Policy: no-referrer, so a genuine iframe
+    // navigation normally has no Referer header. The fetch destination is the
+    // reliable browser signal; when a Referer is available, still constrain it
+    // to the SIRK login page.
+    if (!referer) return true;
     var fromLogin = false;
     try { fromLogin = new URL(referer || "http://invalid.local").pathname === policy.login; }
     catch (error) {}
-    return destination === "iframe" && fromLogin;
+    return fromLogin;
 }
 
 function moveFirst(app, middleware) {
