@@ -1,7 +1,7 @@
 {
   "name": "SIRK Management Platform",
   "applicationId": "sirk-portal",
-  "version": "2.0.0-dev.4",
+  "version": "2.0.0-dev.5",
   "author": "Eris92",
   "description": "SIRK Management Platform with one unified transparent Portal layout and an independent lifecycle manager.",
   "hasAdminPanel": false,

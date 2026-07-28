@@ -128,6 +128,7 @@
         var runtime = window.SirkPlatformRuntime && window.SirkPlatformRuntime.state;
         var csrfToken = runtime && runtime.bootstrap && runtime.bootstrap.csrfToken || "";
         return fetch(endpoint, {
+            method: "POST",
             credentials: "same-origin",
             cache: "no-store",
             headers: { "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8", "X-SIRK-CSRF": csrfToken },

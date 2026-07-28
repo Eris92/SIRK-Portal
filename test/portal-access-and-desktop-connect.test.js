@@ -19,4 +19,5 @@ assert(portal.indexOf("pendingConsent") >= 0);
 assert(workspace.indexOf('url.searchParams.set("viewmode", String(VIEWMODES[type]))') >= 0);
 assert(workspace.indexOf('url.searchParams.set("gotonode", String(node.id || node._id || ""))') >= 0);
 assert(workspace.indexOf("frame.src = nativeRootUrl(node, type)") >= 0);
+assert(workspace.indexOf('return fetch(endpoint, {\n            method: "POST",') >= 0);
 console.log("Portal allowAll save and Desktop connection controls: OK");

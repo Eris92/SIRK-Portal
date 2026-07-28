@@ -1,3 +1,8 @@
+## 2.0.0-dev.5
+
+- Fix standalone Agent Terminal and Files operations to use the authenticated POST command contract.
+- Add the Agent workspace connection contract to the default regression suite.
+
 ## 2.0.0-dev.4
 
 - Preserve verified device proof with each uploaded event batch.
