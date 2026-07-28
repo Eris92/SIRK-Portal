@@ -11,7 +11,7 @@ module.exports.createHost = function (options) {
     var dataRoot = path.resolve(options.dataRoot || process.env.SIRK_DATA_ROOT || defaultDataRoot);
     fs.mkdirSync(path.join(dataRoot, "extensions"), { recursive: true });
     function localMeshInventory() {
-        var databasePath = process.env.SIRK_MESHCENTRAL_DB || "C:\\Program Files\\Open Source\\MeshCentral\\meshcentral-data\\meshcentral.db";
+        var databasePath = process.env.SIRK_MESHCENTRAL_DB || "";
         if (!fs.existsSync(databasePath)) return { meshes: [], nodes: localAgentInventory() };
         var records = Object.create(null);
         fs.readFileSync(databasePath, "utf8").split(/\r?\n/).forEach(function (line) {
