@@ -57,6 +57,36 @@ service.save({ siteadmin: 0xFFFFFFFF }, {
     assert.strictEqual(summary.items.find(function (item) { return item.key === "entra"; }).messagePl, "Problemy z hostami");
     assert.strictEqual(summary.items.find(function (item) { return item.key === "jira"; }).status, "ok");
     assert.strictEqual(summary.items.find(function (item) { return item.key === "jira"; }).messagePl, "test");
+    var healthy = service.assessManagementPlane(
+        { value: [{ id: "tenant", displayName: "Test", onPremisesSyncEnabled: false }] },
+        { value: [
+            {
+                displayName: "Require MFA", state: "enabled",
+                grantControls: { operator: "OR", builtInControls: ["mfa"] },
+                conditions: { clientAppTypes: ["all"] }
+            },
+            {
+                displayName: "Block legacy", state: "enabled",
+                grantControls: { operator: "OR", builtInControls: ["block"] },
+                conditions: { clientAppTypes: ["exchangeActiveSync", "other"] }
+            }
+        ] },
+        { value: [] },
+        ["Require MFA", "Block legacy"]
+    );
+    assert.strictEqual(healthy.status, "ok");
+    assert.strictEqual(healthy.hostType, "Entra");
+    var unhealthy = service.assessManagementPlane(
+        { value: [{ id: "tenant", displayName: "Hybrid", onPremisesSyncEnabled: true }] },
+        { value: [] },
+        { value: [{}] },
+        ["Corporate MFA"]
+    );
+    assert.strictEqual(unhealthy.status, "critical");
+    assert.strictEqual(unhealthy.hostType, "Hybrid");
+    assert.ok(unhealthy.issues.some(function (item) { return item.code === "CA_MFA_MISSING"; }));
+    assert.ok(unhealthy.issues.some(function (item) { return item.code === "HYBRID_SYNC_PROTECTION_MISSING"; }));
+    assert.strictEqual(unhealthy.issues[0].repairAttempt.attempted, false);
     console.log("Integration health checks passed.");
 }).catch(function (error) {
     console.error(error && error.stack || error);

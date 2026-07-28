@@ -1,5 +1,14 @@
 [
   {
+    "version": "2.0.0-dev.2",
+    "date": "2026-07-28",
+    "changes": [
+      "Add live Entra and hybrid management-plane health assessment through Microsoft Graph",
+      "Detect missing enforced MFA, legacy authentication blocking, required Conditional Access policies, and hybrid synchronization protection",
+      "Return controlled remediation guidance without applying unsafe tenant-wide access changes"
+    ]
+  },
+  {
     "version": "2.0.0-dev.1",
     "date": "2026-07-28",
     "changes": [

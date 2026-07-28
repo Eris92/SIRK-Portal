@@ -1,6 +1,7 @@
 "use strict";
 
 var shared = require("./shared.js");
+var http = require("./http-client.js");
 
 function asBoolean(value, fallback) {
     if (value === true || value === false) return value;
@@ -41,6 +42,7 @@ module.exports.createIntegrationService = function (options) {
     var secrets = options.secrets;
     var parent = options.parent;
     var secretNamespace = "integration-secrets";
+    var entraTokenCache = { token: "", expiresAt: 0 };
 
     function readSettings() {
         var current = settings.read();
@@ -126,6 +128,156 @@ module.exports.createIntegrationService = function (options) {
         return { status: status, items: items };
     }
 
+    function entraToken() {
+        if (entraTokenCache.token && entraTokenCache.expiresAt > Date.now() + 60000) {
+            return Promise.resolve(entraTokenCache.token);
+        }
+        var value = get("entra");
+        if (!value.tenantId || !value.clientId || !value.clientSecret) {
+            return Promise.reject(new Error("Entra integration is not configured."));
+        }
+        return http.requestJson({
+            method: "POST",
+            url: "https://login.microsoftonline.com/" + encodeURIComponent(value.tenantId) + "/oauth2/v2.0/token",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: "client_id=" + encodeURIComponent(value.clientId) +
+                "&client_secret=" + encodeURIComponent(value.clientSecret) +
+                "&scope=" + encodeURIComponent("https://graph.microsoft.com/.default") +
+                "&grant_type=client_credentials",
+            errorPrefix: "Microsoft identity"
+        }).then(function (result) {
+            entraTokenCache.token = result.access_token;
+            entraTokenCache.expiresAt = Date.now() + Math.max(300, Number(result.expires_in) || 3600) * 1000;
+            return entraTokenCache.token;
+        });
+    }
+
+    function entraGraph(endpoint) {
+        return entraToken().then(function (accessToken) {
+            return http.requestJson({
+                method: "GET",
+                url: "https://graph.microsoft.com/v1.0" + endpoint,
+                headers: { Authorization: "Bearer " + accessToken },
+                errorPrefix: "Microsoft Graph"
+            });
+        });
+    }
+
+    function assessManagementPlane(organization, conditionalAccess, synchronization, requiredNames) {
+        var organizationRow = array(organization && organization.value)[0] || {};
+        var policies = array(conditionalAccess && conditionalAccess.value);
+        var enabled = policies.filter(function (policy) {
+            return policy && (policy.state === "enabled" || policy.state === "enabledForReportingButNotEnforced");
+        });
+        var enforced = enabled.filter(function (policy) { return policy.state === "enabled"; });
+        var issues = [];
+        var hasMfa = enforced.some(function (policy) {
+            return array(policy.grantControls && policy.grantControls.builtInControls).indexOf("mfa") >= 0;
+        });
+        var hasLegacyBlock = enforced.some(function (policy) {
+            var clients = array(policy.conditions && policy.conditions.clientAppTypes);
+            return policy.grantControls && policy.grantControls.operator === "OR" &&
+                array(policy.grantControls.builtInControls).indexOf("block") >= 0 &&
+                (clients.indexOf("exchangeActiveSync") >= 0 || clients.indexOf("other") >= 0);
+        });
+        var missingRequired = requiredNames.filter(function (name) {
+            return !enforced.some(function (policy) {
+                return String(policy.displayName || "").toLowerCase() === name.toLowerCase();
+            });
+        });
+        var hybrid = organizationRow.onPremisesSyncEnabled === true;
+        var syncRows = array(synchronization && synchronization.value);
+        var syncConfigured = !hybrid || syncRows.some(function (item) {
+            return item && item.configuration && item.configuration.accidentalDeletionPrevention &&
+                item.configuration.accidentalDeletionPrevention.synchronizationPreventionType;
+        });
+
+        if (!enforced.length) issues.push({
+            code: "CA_NONE_ENFORCED", severity: "critical",
+            problem: "No enforced Conditional Access policy was found.",
+            remediation: "Create and validate Conditional Access in report-only mode before enforcement.",
+            repairAttempt: { attempted: false, safe: false, reason: "Tenant-wide access changes can lock out administrators." }
+        });
+        if (!hasMfa) issues.push({
+            code: "CA_MFA_MISSING", severity: "critical",
+            problem: "No enforced Conditional Access policy requiring MFA was found.",
+            remediation: "Deploy an MFA policy with emergency access account exclusions.",
+            repairAttempt: { attempted: false, safe: false, reason: "Emergency access exclusions require operator review." }
+        });
+        if (!hasLegacyBlock) issues.push({
+            code: "CA_LEGACY_AUTH_NOT_BLOCKED", severity: "warning",
+            problem: "No enforced policy blocking legacy authentication was found.",
+            remediation: "Validate sign-in impact, then deploy a legacy authentication block policy.",
+            repairAttempt: { attempted: false, safe: false, reason: "Legacy application compatibility must be reviewed." }
+        });
+        missingRequired.forEach(function (name) {
+            issues.push({
+                code: "CA_REQUIRED_POLICY_MISSING", severity: "warning",
+                problem: "Required Conditional Access policy is not enforced: " + name,
+                remediation: "Create or enable the named policy after impact analysis.",
+                repairAttempt: { attempted: false, safe: false, reason: "Named tenant policy changes require approval." }
+            });
+        });
+        if (!syncConfigured) issues.push({
+            code: "HYBRID_SYNC_PROTECTION_MISSING", severity: "critical",
+            problem: "Hybrid synchronization protection is not configured.",
+            remediation: "Configure accidental deletion prevention and verify synchronization health.",
+            repairAttempt: { attempted: false, safe: false, reason: "Directory synchronization changes require AD and Entra approval." }
+        });
+        return {
+            checkedAtUtc: new Date().toISOString(),
+            hostType: hybrid ? "Hybrid" : "Entra",
+            tenant: {
+                id: String(organizationRow.id || ""),
+                displayName: String(organizationRow.displayName || ""),
+                onPremisesSyncEnabled: hybrid
+            },
+            conditionalAccess: {
+                total: policies.length,
+                enabled: enabled.length,
+                enforced: enforced.length,
+                mfaEnforced: hasMfa,
+                legacyAuthenticationBlocked: hasLegacyBlock,
+                missingRequiredPolicies: missingRequired
+            },
+            synchronization: { configured: syncConfigured, connectors: syncRows.length },
+            status: issues.some(function (issue) { return issue.severity === "critical"; })
+                ? "critical" : issues.length ? "warning" : "ok",
+            issues: issues
+        };
+    }
+
+    function managementPlaneHealth() {
+        if (!configured().entra) {
+            return Promise.resolve({
+                checkedAtUtc: new Date().toISOString(),
+                hostType: "Unknown",
+                status: "critical",
+                issues: [{
+                    code: "ENTRA_NOT_CONFIGURED",
+                    severity: "critical",
+                    problem: "Entra integration is not configured.",
+                    remediation: "Configure tenant ID, client ID and the protected client secret.",
+                    repairAttempt: { attempted: false, safe: false, reason: "Credentials are required." }
+                }]
+            });
+        }
+        var requiredNames = array(get("entra").requiredConditionalAccessPolicies)
+            .map(function (value) { return text(value, 300); }).filter(Boolean).slice(0, 100);
+        return Promise.all([
+            entraGraph("/organization?$select=id,displayName,onPremisesSyncEnabled"),
+            entraGraph("/identity/conditionalAccess/policies")
+        ]).then(function (results) {
+            var organization = array(results[0] && results[0].value)[0] || {};
+            if (organization.onPremisesSyncEnabled !== true) {
+                return assessManagementPlane(results[0], results[1], { value: [] }, requiredNames);
+            }
+            return entraGraph("/directory/onPremisesSynchronization").then(function (synchronization) {
+                return assessManagementPlane(results[0], results[1], synchronization, requiredNames);
+            });
+        });
+    }
+
     function publicSettings(user) {
         if (!shared.isSiteAdmin(user)) return null;
         return {
@@ -158,6 +310,8 @@ module.exports.createIntegrationService = function (options) {
         result.entra = {
             tenantId: text(entra.tenantId, 200),
             clientId: text(entra.clientId, 200),
+            requiredConditionalAccessPolicies: array(entra.requiredConditionalAccessPolicies)
+                .map(function (value) { return text(value, 300); }).filter(Boolean).slice(0, 100),
             health: normalizeHealth(entra.health)
         };
         result.jira = {
@@ -282,6 +436,8 @@ module.exports.createIntegrationService = function (options) {
         configured: configured,
         get: get,
         healthSummary: healthSummary,
+        managementPlaneHealth: managementPlaneHealth,
+        assessManagementPlane: assessManagementPlane,
         importValues: importValues,
         publicSettings: publicSettings,
         readSettings: readSettings,

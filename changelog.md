@@ -1,3 +1,9 @@
+## 2.0.0-dev.2
+
+- Add live Entra and hybrid management-plane health assessment through Microsoft Graph.
+- Detect missing enforced MFA, legacy authentication blocking, required Conditional Access policies, and hybrid synchronization protection.
+- Return controlled remediation guidance without applying tenant-wide access changes that could lock out administrators.
+
 ## 2.0.0-dev.1
 
 - Bootstrap embedded MeshCentral sessions with the target device and native view before opening a remote tunnel.

@@ -154,11 +154,24 @@ module.exports.createModule = function (context) {
             if (asset === "overview") {
                 requireView(user, "overview");
                 return context.approval.list(user, { status: "pending", page: 1, perPage: 10 }).then(function (requests) {
-                    return {
+                    return context.integrations.managementPlaneHealth().catch(function (error) {
+                        return { checkedAtUtc: new Date().toISOString(), hostType: "Unknown", status: "critical",
+                            issues: [{ code: "MANAGEMENT_PLANE_CHECK_FAILED", severity: "critical",
+                                problem: String(error && error.message || "Management plane check failed."),
+                                remediation: "Verify Entra credentials and Microsoft Graph application permissions.",
+                                repairAttempt: { attempted: false, safe: false, reason: "Connectivity or authorization failed." } }] };
+                    }).then(function (managementPlane) { return {
                         ok: true,
                         pendingApprovals: Number(requests && requests.total) || 0,
-                        integrations: context.integrations.healthSummary()
-                    };
+                        integrations: context.integrations.healthSummary(),
+                        managementPlane: managementPlane
+                    }; });
+                });
+            }
+            if (asset === "management-plane-health") {
+                requireView(user, "security");
+                return context.integrations.managementPlaneHealth().then(function (value) {
+                    return { ok: true, managementPlane: value };
                 });
             }
             if (asset === "devices") {
