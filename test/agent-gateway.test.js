@@ -7,6 +7,7 @@ var fs = require("fs");
 var os = require("os");
 var path = require("path");
 var gatewayFactory = require("../server/core/agent-gateway.js");
+var commandBrokerFactory = require("../server/core/agent-command-broker.js");
 
 function request(token, body, url, privateKey) {
     var req = new events.EventEmitter();
@@ -51,10 +52,12 @@ async function invoke(gateway, token, body, url, privateKey) {
 (async function () {
     var root = fs.mkdtempSync(path.join(os.tmpdir(), "sirk-agent-gateway-"));
     try {
+        var commandBroker = commandBrokerFactory.create({ dataRoot: root });
         var gateway = gatewayFactory.create({
             dataRoot: root,
             token: "test-agent-token",
-            enrollmentToken: "test-enrollment-token"
+            enrollmentToken: "test-enrollment-token",
+            commandBroker: commandBroker
         });
         var denied = await invoke(gateway, "wrong-token", { tenantId: "investa", deviceId: "device-1" });
         assert.strictEqual(denied.statusCode, 401);
@@ -112,6 +115,28 @@ async function invoke(gateway, token, body, url, privateKey) {
             agentVersion: "1.0.0"
         }, undefined, deviceKeys.privateKey);
         assert.strictEqual(deviceAccepted.statusCode, 200);
+        var queuedCommand = commandBroker.queue("investa", "device-2", "terminal.execute",
+            { command: "hostname" }, { id: "admin/test" });
+        var commandDelivery = await invoke(gateway, enrolled.body.deviceToken, {
+            tenantId: "investa",
+            deviceId: "device-2",
+            agentVersion: "1.0.0"
+        }, undefined, deviceKeys.privateKey);
+        assert.strictEqual(commandDelivery.body.commands.length, 1);
+        assert.strictEqual(commandDelivery.body.commands[0].commandId, queuedCommand.commandId);
+        var commandResult = await invoke(gateway, enrolled.body.deviceToken, {
+            tenantId: "investa",
+            deviceId: "device-2",
+            agentVersion: "1.0.0",
+            commandResults: [{
+                commandId: queuedCommand.commandId,
+                ok: true,
+                code: "TERMINAL_OK",
+                output: "LAPTOP-2"
+            }]
+        }, undefined, deviceKeys.privateKey);
+        assert.strictEqual(commandResult.body.commands.length, 0);
+        assert.strictEqual(commandBroker.get("investa", "device-2", queuedCommand.commandId).status, "completed");
         var policyDirectory = path.join(root, "agent-policy-outbox", "investa", "device-2");
         fs.mkdirSync(policyDirectory, { recursive: true });
         fs.writeFileSync(path.join(policyDirectory, "policy-1.policy.json"), JSON.stringify({

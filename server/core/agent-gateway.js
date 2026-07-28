@@ -3,6 +3,7 @@
 var crypto = require("crypto");
 var fs = require("fs");
 var path = require("path");
+var commandBrokerFactory = require("./agent-command-broker.js");
 
 function sendJson(res, status, value) {
     res.statusCode = status;
@@ -80,6 +81,7 @@ module.exports.create = function (options) {
     var registryPath = path.join(dataRoot, "agent-registry.json");
     var telemetryPath = path.join(dataRoot, "agent-telemetry.jsonl");
     var policyRoot = path.join(dataRoot, "agent-policy-outbox");
+    var commandBroker = options.commandBroker || commandBrokerFactory.create({ dataRoot: dataRoot });
     fs.mkdirSync(dataRoot, { recursive: true });
 
     function readRegistry() {
@@ -214,6 +216,7 @@ module.exports.create = function (options) {
                 };
                 registry.updatedAtUtc = now;
                 writeJsonAtomic(registryPath, registry);
+                if (commandBroker) commandBroker.acceptResults(tenantId, deviceId, body.commandResults);
                 (Array.isArray(body.events) ? body.events : []).slice(0, 100).forEach(function (event) {
                     fs.appendFileSync(telemetryPath, JSON.stringify({
                         receivedAtUtc: now,
@@ -226,7 +229,8 @@ module.exports.create = function (options) {
                     ok: true,
                     serverTimeUtc: now,
                     acceptedEvents: Math.min(100, Array.isArray(body.events) ? body.events.length : 0),
-                    policies: pendingPolicies(tenantId, deviceId, body.acknowledgedPolicyIds)
+                    policies: pendingPolicies(tenantId, deviceId, body.acknowledgedPolicyIds),
+                    commands: commandBroker ? commandBroker.pending(tenantId, deviceId, 5) : []
                 });
             } catch (error) {
                 sendJson(res, 400, { ok: false, error: "Invalid agent check-in payload." });

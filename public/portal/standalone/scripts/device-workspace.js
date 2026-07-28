@@ -566,6 +566,119 @@
         }
     }
 
+    function agentOperation(node, type, parameters) {
+        var body = new URLSearchParams();
+        body.set("payload", JSON.stringify({
+            tenantId: node.tenantId,
+            deviceId: node.deviceId,
+            type: type,
+            parameters: parameters || {}
+        }));
+        return fetch("/api/agent-operations", {
+            method: "POST",
+            credentials: "same-origin",
+            cache: "no-store",
+            headers: { "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8" },
+            body: body.toString()
+        }).then(function (response) {
+            return response.json().then(function (value) {
+                if (!response.ok || value.ok === false) throw new Error(value.error || "HTTP " + response.status);
+                return value.value;
+            });
+        });
+    }
+
+    function waitForAgentOperation(node, commandId, status) {
+        var deadline = Date.now() + 150000;
+        return new Promise(function (resolve, reject) {
+            function poll() {
+                var endpoint = "/api/agent-operations?tenantId=" + encodeURIComponent(node.tenantId) +
+                    "&deviceId=" + encodeURIComponent(node.deviceId) +
+                    "&commandId=" + encodeURIComponent(commandId);
+                fetch(endpoint, { credentials: "same-origin", cache: "no-store" }).then(function (response) {
+                    return response.json().then(function (value) {
+                        if (!response.ok || value.ok === false) throw new Error(value.error || "HTTP " + response.status);
+                        if (value.value.status === "completed" || value.value.status === "failed") {
+                            resolve(value.value);
+                            return;
+                        }
+                        if (Date.now() >= deadline) throw new Error("Agent nie zwrócił wyniku w wymaganym czasie.");
+                        status.textContent = "Oczekiwanie na SIRK Agenta…";
+                        setTimeout(poll, 1500);
+                    });
+                }).catch(reject);
+            }
+            poll();
+        });
+    }
+
+    function runAgentOperation(node, type, parameters, status) {
+        status.textContent = "Wysyłanie do SIRK Agenta…";
+        status.classList.remove("is-error");
+        return agentOperation(node, type, parameters).then(function (command) {
+            return waitForAgentOperation(node, command.commandId, status);
+        });
+    }
+
+    function renderAgentTerminal(host, node) {
+        host.innerHTML = '<div class="sirk-agent-operation"><header><strong>Terminal SIRK Agent</strong><small>PowerShell uruchamiany przez usługę na urządzeniu</small></header><textarea data-agent-terminal-command spellcheck="false" placeholder="Get-ComputerInfo | Select-Object WindowsProductName, OsVersion"></textarea><div class="sirk-agent-operation-actions"><button type="button" data-agent-terminal-run>Uruchom</button></div><pre data-agent-operation-status>Gotowy.</pre></div>';
+        var command = host.querySelector("[data-agent-terminal-command]");
+        var button = host.querySelector("[data-agent-terminal-run]");
+        var status = host.querySelector("[data-agent-operation-status]");
+        button.addEventListener("click", function () {
+            if (!command.value.trim()) return;
+            button.disabled = true;
+            runAgentOperation(node, "terminal.execute", { command: command.value, timeoutSeconds: 30 }, status)
+                .then(function (value) {
+                    status.textContent = value.result && value.result.output || value.result && value.result.code || "Brak wyniku.";
+                    status.classList.toggle("is-error", value.status === "failed");
+                }).catch(function (error) {
+                    status.textContent = error.message || String(error);
+                    status.classList.add("is-error");
+                }).then(function () { button.disabled = false; });
+        });
+    }
+
+    function renderAgentFiles(host, node) {
+        host.innerHTML = '<div class="sirk-agent-operation"><header><strong>Pliki SIRK Agent</strong><small>Lista jest ograniczona do 1000 pozycji</small></header><div class="sirk-agent-path"><input data-agent-files-path value="C:\\\\" spellcheck="false"><button type="button" data-agent-files-list>Otwórz</button></div><pre data-agent-operation-status>Gotowy.</pre><div class="sirk-agent-file-list" data-agent-file-list></div></div>';
+        var input = host.querySelector("[data-agent-files-path]");
+        var button = host.querySelector("[data-agent-files-list]");
+        var status = host.querySelector("[data-agent-operation-status]");
+        var list = host.querySelector("[data-agent-file-list]");
+        function open(path) {
+            button.disabled = true;
+            runAgentOperation(node, "files.list", { path: path }, status).then(function (value) {
+                var entries = value.result && value.result.data || [];
+                status.textContent = value.status === "failed" ? (value.result.output || value.result.code) : entries.length + " pozycji";
+                status.classList.toggle("is-error", value.status === "failed");
+                list.innerHTML = entries.map(function (entry) {
+                    return '<button type="button" data-agent-file-path="' + esc(entry.path) + '" data-agent-directory="' + (entry.isDirectory ? "1" : "0") + '"><span>' + (entry.isDirectory ? "📁" : "📄") + '</span><strong>' + esc(entry.name) + '</strong><small>' + (entry.isDirectory ? "" : esc(String(entry.length) + " B")) + '</small></button>';
+                }).join("");
+            }).catch(function (error) {
+                status.textContent = error.message || String(error);
+                status.classList.add("is-error");
+            }).then(function () { button.disabled = false; });
+        }
+        button.addEventListener("click", function () { open(input.value); });
+        list.addEventListener("click", function (event) {
+            var item = event.target.closest("[data-agent-file-path]");
+            if (!item || item.getAttribute("data-agent-directory") !== "1") return;
+            input.value = item.getAttribute("data-agent-file-path");
+            open(input.value);
+        });
+    }
+
+    function renderAgentDesktop(host) {
+        host.innerHTML = '<div class="sirk-agent-operation sirk-agent-desktop-pending"><header><strong>Pulpit SIRK Agent</strong></header><p>Usługa SIRK Agent działa w izolowanej sesji systemowej. Bezpieczny broker aktywnej sesji użytkownika jest wymagany do obrazu i sterowania pulpitem.</p><pre>INTERACTIVE_HELPER_REQUIRED</pre></div>';
+    }
+
+    function renderAgentTab(host, node, type) {
+        stopBridge(true);
+        if (type === "terminal") renderAgentTerminal(host, node);
+        else if (type === "files") renderAgentFiles(host, node);
+        else renderAgentDesktop(host, node);
+    }
+
     function renderGeneral(host, node) {
         stopBridge(true);
         var online = nodeOnline(node);
@@ -717,6 +830,8 @@
         });
         if (activeTab === "general") renderGeneral(body, node);
         else if (activeTab === "commands") renderCommandsTab(body, node);
+        else if (node.source === "sirk-agent" && (activeTab === "desktop" || activeTab === "terminal" || activeTab === "files"))
+            renderAgentTab(body, node, activeTab);
         else renderNativeTab(body, node, activeTab);
     }
 

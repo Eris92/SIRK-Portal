@@ -10,6 +10,23 @@
     background: var(--sirk-bg, #f3f6fb);
 }
 
+.sirk-agent-operation { display:flex; flex-direction:column; gap:12px; min-height:420px; padding:18px; }
+.sirk-agent-operation header { display:flex; flex-direction:column; gap:3px; }
+.sirk-agent-operation header small { color:var(--text-muted,#708096); }
+.sirk-agent-operation textarea { min-height:150px; resize:vertical; font:13px/1.5 Consolas,monospace; }
+.sirk-agent-operation input,.sirk-agent-operation textarea { box-sizing:border-box; width:100%; padding:9px 11px; border:1px solid #ccd5e0; border-radius:6px; background:#fff; color:#172033; }
+.sirk-agent-operation button { padding:8px 14px; border:1px solid #9aaabd; border-radius:6px; background:#fff; cursor:pointer; }
+.sirk-agent-operation button:disabled { opacity:.55; cursor:wait; }
+.sirk-agent-operation-actions { display:flex; justify-content:flex-end; }
+.sirk-agent-operation pre { min-height:48px; margin:0; padding:12px; overflow:auto; white-space:pre-wrap; border-radius:6px; background:#111827; color:#d8f3dc; font:13px/1.5 Consolas,monospace; }
+.sirk-agent-operation pre.is-error { color:#fecaca; }
+.sirk-agent-path { display:flex; gap:8px; }
+.sirk-agent-file-list { display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:6px; }
+.sirk-agent-file-list button { display:grid; grid-template-columns:24px 1fr auto; gap:7px; align-items:center; min-width:0; text-align:left; }
+.sirk-agent-file-list strong { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.sirk-agent-file-list small { color:#708096; }
+.sirk-agent-desktop-pending { justify-content:center; text-align:center; }
+
 .sirk-device-compact-header {
     display: flex;
     align-items: center;

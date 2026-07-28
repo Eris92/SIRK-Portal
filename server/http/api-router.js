@@ -1,5 +1,7 @@
 "use strict";
 
+var agentCommandBrokerFactory = require("../core/agent-command-broker.js");
+
 function sendJson(res, status, value) {
     res.statusCode = status;
     res.setHeader("Content-Type", "application/json; charset=utf-8");
@@ -19,6 +21,7 @@ function responseAdapter(res) {
 }
 
 module.exports.createHandler = function (runtime, host) {
+    var agentCommands = host.agentCommands || null;
     return function (req, res) {
         var url = new URL(req.url, "http://sirk.local");
         function readBody() {
@@ -48,6 +51,33 @@ module.exports.createHandler = function (runtime, host) {
                 }).catch(function (error) {
                     sendJson(res, 503, { ok: false, error: String(error && error.message || error) });
                 });
+                return;
+            }
+            if (url.pathname === "/api/agent-operations") {
+                if (!user.isAdmin) { sendJson(res, 403, { ok: false, error: "Permission denied." }); return; }
+                if (!agentCommands) agentCommands = agentCommandBrokerFactory.create({ dataRoot: host.dataRoot });
+                var tenantId = String(url.searchParams.get("tenantId") || state.body.tenantId || "");
+                var deviceId = String(url.searchParams.get("deviceId") || state.body.deviceId || "");
+                if (req.method === "POST") {
+                    try {
+                        var command = agentCommands.queue(tenantId, deviceId,
+                            String(state.body.type || ""), state.body.parameters, user);
+                        sendJson(res, 202, { ok: true, value: command });
+                    } catch (error) {
+                        sendJson(res, 400, { ok: false, error: String(error && error.message || error) });
+                    }
+                    return;
+                }
+                if (req.method === "GET") {
+                    try {
+                        var value = agentCommands.get(tenantId, deviceId, String(url.searchParams.get("commandId") || ""));
+                        sendJson(res, value ? 200 : 404, value ? { ok: true, value: value } : { ok: false, error: "Operation not found." });
+                    } catch (error) {
+                        sendJson(res, 400, { ok: false, error: String(error && error.message || error) });
+                    }
+                    return;
+                }
+                sendJson(res, 405, { ok: false, error: "Method not allowed." });
                 return;
             }
             if (url.pathname === "/api/admin/settings") {
