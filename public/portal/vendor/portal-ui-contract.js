@@ -10,4 +10,15 @@
             if (!node.classList.contains("sirk-button")) node.classList.add("sirk-button");
         });
     };
+
+    if (!document.getElementById("sirk-latest-ui-controller")) {
+        var source = String(window.__SIRK_PLATFORM_ASSET_BASE__ || "").replace(/\/$/, "") +
+            "/vendor/sirk-portal/settings-structure.js?v=" +
+            encodeURIComponent(String(window.__SIRK_PLATFORM_PORTAL_VERSION__ || ""));
+        var script = document.createElement("script");
+        script.id = "sirk-latest-ui-controller";
+        script.src = source;
+        script.async = false;
+        (document.head || document.documentElement).appendChild(script);
+    }
 }());
