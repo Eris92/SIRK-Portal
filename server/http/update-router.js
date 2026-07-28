@@ -63,6 +63,7 @@ module.exports.createHandler = function (manager) {
                 if (action === "update") return manager.install(body.channel);
                 if (action === "restore") return manager.restore(body.backupId);
                 if (action === "restart") return manager.restart();
+                if (action === "clear-interrupted") return manager.clearInterrupted();
                 throw new Error("Endpoint not found.");
             });
         }).then(function (value) {
