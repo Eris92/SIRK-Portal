@@ -11,6 +11,16 @@
         });
     };
 
+    if (!window.__sirkHiddenRendererGuard) {
+        window.__sirkHiddenRendererGuard = true;
+        document.addEventListener("click", function (event) {
+            var button = event.target && event.target.closest && event.target.closest(".sirk-latest-hide.sirk-nav-item");
+            if (!button || event.isTrusted || (!button.classList.contains("active") && !button.classList.contains("is-active"))) return;
+            event.preventDefault();
+            event.stopImmediatePropagation();
+        }, true);
+    }
+
     if (!document.getElementById("sirk-latest-ui-controller")) {
         var source = String(window.__SIRK_PLATFORM_ASSET_BASE__ || "").replace(/\/$/, "") +
             "/vendor/sirk-portal/settings-structure.js?v=" +
