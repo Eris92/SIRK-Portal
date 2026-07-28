@@ -131,7 +131,8 @@ module.exports.create = function (options) {
 
     function handler(req, res) {
         var url = new URL(req.url, "http://sirk.local");
-        if (url.pathname !== "/api/agent/v1/checkin" && url.pathname !== "/api/agent/v1/enroll") return false;
+        if (url.pathname !== "/api/agent/v1/checkin" && url.pathname !== "/api/agent/v1/enroll" &&
+            url.pathname !== "/api/agent/v1/rotate-key") return false;
         if (req.method !== "POST") {
             sendJson(res, 405, { ok: false, error: "Method not allowed." });
             return true;
@@ -208,6 +209,22 @@ module.exports.create = function (options) {
                 }
                 var authNonces = (existing.authNonces || [])
                     .concat(String(req.headers["x-sirk-nonce"] || "")).slice(-100);
+                if (url.pathname === "/api/agent/v1/rotate-key") {
+                    if (!existing.credentialHash || !validPublicKey(body.publicKeySpki)) {
+                        sendJson(res, 400, { ok: false, error: "A valid replacement P-256 public key is required." });
+                        return;
+                    }
+                    registry.devices[registryKey] = Object.assign({}, existing, {
+                        publicKeySpki: String(body.publicKeySpki),
+                        authNonces: authNonces,
+                        keyRotatedAtUtc: now
+                    });
+                    registry.updatedAtUtc = now;
+                    writeJsonAtomic(registryPath, registry);
+                    sendJson(res, 200, { ok: true, tenantId: tenantId, deviceId: deviceId,
+                        keyRotatedAtUtc: now });
+                    return;
+                }
                 registry.devices[registryKey] = {
                     enrolledAtUtc: existing.enrolledAtUtc || null,
                     credentialHash: existing.credentialHash || null,

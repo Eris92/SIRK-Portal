@@ -1,3 +1,8 @@
+## 2.0.0-dev.3
+
+- Add authenticated device public-key rotation without changing Device ID or the device token.
+- Allow SIRK Agent to migrate from a DPAPI-protected exportable key to a non-exportable machine key.
+
 ## 2.0.0-dev.2
 
 - Add live Entra and hybrid management-plane health assessment through Microsoft Graph.

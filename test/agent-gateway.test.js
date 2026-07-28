@@ -137,6 +137,26 @@ async function invoke(gateway, token, body, url, privateKey) {
         }, undefined, deviceKeys.privateKey);
         assert.strictEqual(commandResult.body.commands.length, 0);
         assert.strictEqual(commandBroker.get("investa", "device-2", queuedCommand.commandId).status, "completed");
+        var replacementKeys = crypto.generateKeyPairSync("ec", { namedCurve: "prime256v1" });
+        var replacementPublicKey = replacementKeys.publicKey.export({ format: "der", type: "spki" }).toString("base64");
+        var rotated = await invoke(gateway, enrolled.body.deviceToken, {
+            tenantId: "investa",
+            deviceId: "device-2",
+            publicKeySpki: replacementPublicKey
+        }, "/api/agent/v1/rotate-key", deviceKeys.privateKey);
+        assert.strictEqual(rotated.statusCode, 200);
+        var oldKeyDenied = await invoke(gateway, enrolled.body.deviceToken, {
+            tenantId: "investa",
+            deviceId: "device-2",
+            agentVersion: "1.0.0"
+        }, undefined, deviceKeys.privateKey);
+        assert.strictEqual(oldKeyDenied.statusCode, 401);
+        var replacementAccepted = await invoke(gateway, enrolled.body.deviceToken, {
+            tenantId: "investa",
+            deviceId: "device-2",
+            agentVersion: "1.0.0"
+        }, undefined, replacementKeys.privateKey);
+        assert.strictEqual(replacementAccepted.statusCode, 200);
         var policyDirectory = path.join(root, "agent-policy-outbox", "investa", "device-2");
         fs.mkdirSync(policyDirectory, { recursive: true });
         fs.writeFileSync(path.join(policyDirectory, "policy-1.policy.json"), JSON.stringify({
@@ -149,20 +169,20 @@ async function invoke(gateway, token, body, url, privateKey) {
             tenantId: "investa",
             deviceId: "device-2",
             agentVersion: "1.0.0"
-        }, undefined, deviceKeys.privateKey);
+        }, undefined, replacementKeys.privateKey);
         assert.strictEqual(policyDelivery.body.policies.length, 1);
         var policyAck = await invoke(gateway, enrolled.body.deviceToken, {
             tenantId: "investa",
             deviceId: "device-2",
             agentVersion: "1.0.0",
             acknowledgedPolicyIds: ["policy-1"]
-        }, undefined, deviceKeys.privateKey);
+        }, undefined, replacementKeys.privateKey);
         assert.strictEqual(policyAck.body.policies.length, 0);
         assert.strictEqual(fs.existsSync(path.join(policyDirectory, "policy-1.policy.json")), false);
         var crossDeviceDenied = await invoke(gateway, enrolled.body.deviceToken, {
             tenantId: "investa",
             deviceId: "device-1"
-        }, undefined, deviceKeys.privateKey);
+        }, undefined, replacementKeys.privateKey);
         assert.strictEqual(crossDeviceDenied.statusCode, 401);
         console.log("Authenticated SIRK Agent gateway contract: OK");
     } finally {

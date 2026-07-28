@@ -1,5 +1,13 @@
 [
   {
+    "version": "2.0.0-dev.3",
+    "date": "2026-07-28",
+    "changes": [
+      "Add authenticated device public-key rotation without changing Device ID or the device token",
+      "Support migration of enrolled Agents to non-exportable machine signing keys"
+    ]
+  },
+  {
     "version": "2.0.0-dev.2",
     "date": "2026-07-28",
     "changes": [
