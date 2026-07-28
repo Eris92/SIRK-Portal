@@ -1,7 +1,7 @@
 {
   "name": "SIRK Management Platform",
   "shortName": "SIRKPortal",
-  "version": "1.8.36-dev.85",
+  "version": "1.8.36-dev.86",
   "author": "Eris92",
   "description": "SIRK Management Platform with one unified transparent Portal layout and an independent lifecycle manager.",
   "hasAdminPanel": true,

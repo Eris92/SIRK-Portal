@@ -26,6 +26,8 @@
 .sirk-agent-file-list strong { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .sirk-agent-file-list small { color:#708096; }
 .sirk-agent-desktop-pending { justify-content:center; text-align:center; }
+.sirk-agent-desktop-stage { display:flex; flex:1; min-height:360px; align-items:center; justify-content:center; overflow:auto; border-radius:7px; background:#0b1020; }
+.sirk-agent-desktop-stage img { display:block; max-width:100%; max-height:calc(100vh - 300px); cursor:crosshair; user-select:none; }
 
 .sirk-device-compact-header {
     display: flex;

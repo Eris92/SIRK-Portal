@@ -687,8 +687,46 @@
         });
     }
 
-    function renderAgentDesktop(host) {
-        host.innerHTML = '<div class="sirk-agent-operation sirk-agent-desktop-pending"><header><strong>Pulpit SIRK Agent</strong></header><p>Usługa SIRK Agent działa w izolowanej sesji systemowej. Bezpieczny broker aktywnej sesji użytkownika jest wymagany do obrazu i sterowania pulpitem.</p><pre>INTERACTIVE_HELPER_REQUIRED</pre></div>';
+    function renderAgentDesktop(host, node) {
+        var stopped = false;
+        host.innerHTML = '<div class="sirk-agent-operation sirk-agent-desktop"><header><strong>Pulpit SIRK Agent</strong><small>Bezpieczny broker aktywnej sesji użytkownika</small></header><div class="sirk-agent-desktop-stage"><img data-agent-desktop-image alt="Zdalny pulpit"></div><pre data-agent-operation-status>Łączenie z sesją użytkownika…</pre></div>';
+        var image = host.querySelector("[data-agent-desktop-image]");
+        var status = host.querySelector("[data-agent-operation-status]");
+        var nativeWidth = 0, nativeHeight = 0;
+        function snapshot() {
+            if (stopped || !host.isConnected) return;
+            runAgentOperation(node, "desktop.snapshot", {}, status).then(function (value) {
+                if (stopped || !host.isConnected) return;
+                var data = value.result && value.result.data;
+                if (value.status === "failed" || !data || !data.imageBase64) {
+                    throw new Error(value.result && (value.result.output || value.result.code) || "Brak obrazu.");
+                }
+                nativeWidth = Number(data.width || 0);
+                nativeHeight = Number(data.height || 0);
+                image.src = "data:image/jpeg;base64," + data.imageBase64;
+                status.textContent = "Połączono · " + nativeWidth + " × " + nativeHeight;
+                status.classList.remove("is-error");
+                setTimeout(snapshot, 150);
+            }).catch(function (error) {
+                if (stopped || !host.isConnected) return;
+                status.textContent = error.message || String(error);
+                status.classList.add("is-error");
+                setTimeout(snapshot, 3000);
+            });
+        }
+        image.addEventListener("click", function (event) {
+            if (!nativeWidth || !nativeHeight) return;
+            var bounds = image.getBoundingClientRect();
+            var x = Math.round((event.clientX - bounds.left) / bounds.width * nativeWidth);
+            var y = Math.round((event.clientY - bounds.top) / bounds.height * nativeHeight);
+            agentOperation(node, "desktop.input", { action: event.detail > 1 ? "doubleClick" : "click", x: x, y: y })
+                .catch(function (error) { status.textContent = error.message || String(error); status.classList.add("is-error"); });
+        });
+        var observer = new MutationObserver(function () {
+            if (!host.isConnected) { stopped = true; observer.disconnect(); }
+        });
+        observer.observe(document.body, { childList: true, subtree: true });
+        snapshot();
     }
 
     function renderAgentTab(host, node, type) {

@@ -39,7 +39,7 @@ module.exports.create = function (options) {
     }
 
     function queue(tenantId, deviceId, type, parameters, user) {
-        if (["terminal.execute", "files.list", "files.read", "files.write", "desktop.snapshot"].indexOf(type) < 0)
+        if (["terminal.execute", "files.list", "files.read", "files.write", "desktop.snapshot", "desktop.input"].indexOf(type) < 0)
             throw new Error("Unsupported SIRK Agent operation.");
         var now = new Date();
         var command = {

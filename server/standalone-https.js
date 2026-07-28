@@ -35,9 +35,11 @@ async function start(options) {
     var httpsPort = Number(options.httpsPort || process.env.SIRK_HTTPS_PORT || 9443);
     var certificatePath = options.certificatePath || process.env.SIRK_TLS_CERT;
     var privateKeyPath = options.privateKeyPath || process.env.SIRK_TLS_KEY;
+    var pfxPath = options.pfxPath || process.env.SIRK_TLS_PFX;
+    var pfxPasswordFile = options.pfxPasswordFile || process.env.SIRK_TLS_PFX_PASSWORD_FILE;
     var enrollmentTokenFile = options.enrollmentTokenFile || process.env.SIRK_ENROLLMENT_TOKEN_FILE;
-    if (!certificatePath || !privateKeyPath)
-        throw new Error("SIRK_TLS_CERT and SIRK_TLS_KEY are required.");
+    if (!pfxPath && (!certificatePath || !privateKeyPath))
+        throw new Error("SIRK_TLS_PFX or SIRK_TLS_CERT with SIRK_TLS_KEY is required.");
     var application = await standalone.start({
         host: "127.0.0.1",
         port: internalPort,
@@ -45,11 +47,15 @@ async function start(options) {
         agentEnrollmentToken: options.agentEnrollmentToken ||
             (enrollmentTokenFile ? fs.readFileSync(enrollmentTokenFile, "utf8").trim() : undefined)
     });
-    var gateway = https.createServer({
+    var tlsOptions = pfxPath ? {
+        pfx: fs.readFileSync(pfxPath),
+        passphrase: pfxPasswordFile ? fs.readFileSync(pfxPasswordFile, "utf8").trim() : undefined
+    } : {
         cert: fs.readFileSync(certificatePath),
-        key: fs.readFileSync(privateKeyPath),
-        minVersion: "TLSv1.2"
-    }, function (req, res) { proxyRequest(internalPort, req, res); });
+        key: fs.readFileSync(privateKeyPath)
+    };
+    tlsOptions.minVersion = "TLSv1.2";
+    var gateway = https.createServer(tlsOptions, function (req, res) { proxyRequest(internalPort, req, res); });
     await new Promise(function (resolve, reject) {
         gateway.once("error", reject);
         gateway.listen(httpsPort, "0.0.0.0", resolve);
