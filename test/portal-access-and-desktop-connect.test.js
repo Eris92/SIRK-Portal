@@ -6,6 +6,7 @@ var root = path.resolve(__dirname, "..");
 function read(file) { return fs.readFileSync(path.join(root, file), "utf8"); }
 var admin = read("views/SIRK-Portal.handlebars");
 var portal = read("public/portal/standalone/index.html");
+var workspace = read("public/portal/standalone/scripts/device-workspace.js");
 assert(admin.indexOf("Dostęp dla wszystkich użytkowników") >= 0);
 assert(admin.indexOf('dispatchEvent(new Event("change"') >= 0);
 assert(portal.indexOf('select.value="3"') >= 0);
@@ -15,4 +16,7 @@ assert(portal.indexOf("Zapytaj o zgodę") >= 0);
 assert(portal.indexOf("Pasek Prywatności") >= 0);
 assert(portal.indexOf("Number(amt.state)===2") >= 0);
 assert(portal.indexOf("pendingConsent") >= 0);
+assert(workspace.indexOf('url.searchParams.set("viewmode", String(VIEWMODES[type]))') >= 0);
+assert(workspace.indexOf('url.searchParams.set("gotonode", String(node.id || node._id || ""))') >= 0);
+assert(workspace.indexOf("frame.src = nativeRootUrl(node, type)") >= 0);
 console.log("Portal allowAll save and Desktop connection controls: OK");

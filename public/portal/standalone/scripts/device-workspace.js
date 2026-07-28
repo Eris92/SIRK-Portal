@@ -144,9 +144,13 @@
         return null;
     }
 
-    function nativeRootUrl() {
+    function nativeRootUrl(node, type) {
         var url = new URL(String(window.__SIRK_PLATFORM_NATIVE_URL__ || "/meshcentral/"), window.location.href);
         url.searchParams.set("sirkNative", "1");
+        if (node && type && VIEWMODES[type]) {
+            url.searchParams.set("viewmode", String(VIEWMODES[type]));
+            url.searchParams.set("gotonode", String(node.id || node._id || ""));
+        }
         return url.href;
     }
 
@@ -496,7 +500,7 @@
                 });
             }
         });
-        frame.src = nativeRootUrl();
+        frame.src = nativeRootUrl(node, type);
         if (interactive) {
             var selectedConnectOption = type === "desktop" ? 3 : 1;
             

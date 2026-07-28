@@ -1,5 +1,6 @@
-## 1.8.36-dev.81
+## 1.8.36-dev.82
 
+- Bootstrap embedded MeshCentral sessions with the target device and native view before opening a remote tunnel.
 - Fix the MeshCentral login iframe when `Referrer-Policy: no-referrer` suppresses its Referer header.
 - Add authenticated per-device SIRK Agent enrollment and check-in credentials.
 - Persist only SHA-256 device credential hashes in the Portal registry.
