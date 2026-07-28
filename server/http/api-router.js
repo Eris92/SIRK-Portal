@@ -1,6 +1,7 @@
 "use strict";
 
 var agentCommandBrokerFactory = require("../core/agent-command-broker.js");
+var serviceManagerFactory = require("../windows-service-manager.js");
 
 function sendJson(res, status, value) {
     res.statusCode = status;
@@ -22,6 +23,10 @@ function responseAdapter(res) {
 
 module.exports.createHandler = function (runtime, host) {
     var agentCommands = host.agentCommands || null;
+    var serviceManager = serviceManagerFactory.create({
+        dataRoot: host.dataRoot,
+        serviceName: process.env.SIRK_SERVICE_NAME || "SirkPortalStandalone"
+    });
     return function (req, res) {
         var url = new URL(req.url, "http://sirk.local");
         function readBody() {
@@ -108,6 +113,36 @@ module.exports.createHandler = function (runtime, host) {
                 sendJson(res, 405, { ok: false, error: "Method not allowed." });
                 return;
             }
+            if (url.pathname === "/api/admin/runtime") {
+                if (!user.isAdmin) { sendJson(res, 403, { ok: false, error: "Permission denied." }); return; }
+                var action = String(url.searchParams.get("action") || "");
+                if (req.method === "GET" && action === "server-state") {
+                    try {
+                        sendJson(res, 200, {
+                            ok: true,
+                            services: serviceManager.services(),
+                            generatedAt: new Date().toISOString()
+                        });
+                    } catch (error) {
+                        sendJson(res, 503, { ok: false, error: String(error && error.message || error) });
+                    }
+                    return;
+                }
+                if (req.method === "POST" && action === "server-restart") {
+                    try {
+                        var scheduled = serviceManager.scheduleRestart(state.body.serviceName);
+                        sendJson(res, 202, Object.assign({ ok: true }, scheduled));
+                    } catch (error) {
+                        sendJson(res, 400, { ok: false, error: String(error && error.message || error) });
+                    }
+                    return;
+                }
+                sendJson(res, req.method === "GET" || req.method === "POST" ? 404 : 405, {
+                    ok: false,
+                    error: req.method === "GET" || req.method === "POST" ? "Runtime action not found." : "Method not allowed."
+                });
+                return;
+            }
             if (url.pathname === "/api/admin/identity") {
                 if (!user.isAdmin || !host.identity) { sendJson(res, 403, { ok: false, error: "Permission denied." }); return; }
                 if (req.method === "GET") {
@@ -119,14 +154,14 @@ module.exports.createHandler = function (runtime, host) {
                     return;
                 }
                 try {
-                    var action = String(state.body.action || "");
-                    var value = state.body.value || {};
-                    if (action === "create-user") host.identity.createUser(value);
-                    else if (action === "update-user") host.identity.updateUser(state.body.id, value, user.id);
-                    else if (action === "delete-user") host.identity.deleteUser(state.body.id, user.id);
-                    else if (action === "create-group") host.identity.createGroup(value);
-                    else if (action === "update-group") host.identity.updateGroup(state.body.id, value);
-                    else if (action === "delete-group") host.identity.deleteGroup(state.body.id);
+                    var identityAction = String(state.body.action || "");
+                    var identityValue = state.body.value || {};
+                    if (identityAction === "create-user") host.identity.createUser(identityValue);
+                    else if (identityAction === "update-user") host.identity.updateUser(state.body.id, identityValue, user.id);
+                    else if (identityAction === "delete-user") host.identity.deleteUser(state.body.id, user.id);
+                    else if (identityAction === "create-group") host.identity.createGroup(identityValue);
+                    else if (identityAction === "update-group") host.identity.updateGroup(state.body.id, identityValue);
+                    else if (identityAction === "delete-group") host.identity.deleteGroup(state.body.id);
                     else throw new Error("Unknown identity action.");
                     sendJson(res, 200, { ok: true, value: host.identity.snapshot() });
                 } catch (error) {
