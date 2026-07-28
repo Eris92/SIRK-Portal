@@ -574,7 +574,8 @@
             type: type,
             parameters: parameters || {}
         }));
-        return fetch("/api/agent-operations", {
+        var endpoint = agentOperationUrl("agent-operation-create");
+        return fetch(endpoint, {
             method: "POST",
             credentials: "same-origin",
             cache: "no-store",
@@ -588,13 +589,31 @@
         });
     }
 
+    function agentOperationUrl(action, parameters) {
+        var configured = String(window.__SIRK_PLATFORM_API_BASE__ || "");
+        var endpoint;
+        if (configured.indexOf("pluginadmin.ashx") >= 0) {
+            endpoint = new URL(configured, window.location.href);
+            endpoint.searchParams.set("pin", "SIRKPortal");
+            endpoint.searchParams.set("action", action);
+        } else {
+            endpoint = new URL("/api/agent-operations", window.location.href);
+        }
+        Object.keys(parameters || {}).forEach(function (key) {
+            endpoint.searchParams.set(key, parameters[key]);
+        });
+        return endpoint.href;
+    }
+
     function waitForAgentOperation(node, commandId, status) {
         var deadline = Date.now() + 150000;
         return new Promise(function (resolve, reject) {
             function poll() {
-                var endpoint = "/api/agent-operations?tenantId=" + encodeURIComponent(node.tenantId) +
-                    "&deviceId=" + encodeURIComponent(node.deviceId) +
-                    "&commandId=" + encodeURIComponent(commandId);
+                var endpoint = agentOperationUrl("agent-operation-status", {
+                    tenantId: node.tenantId,
+                    deviceId: node.deviceId,
+                    commandId: commandId
+                });
                 fetch(endpoint, { credentials: "same-origin", cache: "no-store" }).then(function (response) {
                     return response.json().then(function (value) {
                         if (!response.ok || value.ok === false) throw new Error(value.error || "HTTP " + response.status);

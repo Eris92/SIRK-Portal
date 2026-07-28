@@ -83,6 +83,14 @@ module.exports.create = function (options) {
     var policyRoot = path.join(dataRoot, "agent-policy-outbox");
     var commandBroker = options.commandBroker || commandBrokerFactory.create({ dataRoot: dataRoot });
     fs.mkdirSync(dataRoot, { recursive: true });
+    if (!enrollmentToken && options.autoCreateEnrollmentToken === true) {
+        var enrollmentTokenPath = path.join(dataRoot, "agent-enrollment-token.txt");
+        try { enrollmentToken = fs.readFileSync(enrollmentTokenPath, "utf8").trim(); }
+        catch (error) {
+            enrollmentToken = crypto.randomBytes(32).toString("base64url");
+            fs.writeFileSync(enrollmentTokenPath, enrollmentToken + "\n", { encoding: "utf8", mode: 0o600 });
+        }
+    }
 
     function readRegistry() {
         try {

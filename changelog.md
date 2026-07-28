@@ -1,4 +1,4 @@
-## 1.8.36-dev.83
+## 1.8.36-dev.84
 
 - Bootstrap embedded MeshCentral sessions with the target device and native view before opening a remote tunnel.
 - Fix the MeshCentral login iframe when `Referrer-Policy: no-referrer` suppresses its Referer header.
