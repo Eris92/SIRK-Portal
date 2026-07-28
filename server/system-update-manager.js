@@ -85,7 +85,7 @@ function create(options) {
         state.jobs = state.jobs || {};
         Object.keys(state.jobs).forEach(function (id) {
             var job = state.jobs[id];
-            if (job && (job.status === "queued" || job.status === "running")) {
+            if (job && !activeJobs[id] && (job.status === "queued" || job.status === "running")) {
                 state.jobs[id] = Object.assign({}, job, { status: "failed", progress: 100, message: "Operation interrupted by service restart.", error: "Operation interrupted by service restart.", updatedAt: new Date().toISOString() });
                 changed = true;
             }
