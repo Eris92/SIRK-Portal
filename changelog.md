@@ -1,3 +1,8 @@
+## 2.0.0-dev.4
+
+- Preserve verified device proof with each uploaded event batch.
+- Link accepted event batches with SHA-256 hashes and retain public-key history across rotations.
+
 ## 2.0.0-dev.3
 
 - Add authenticated device public-key rotation without changing Device ID or the device token.

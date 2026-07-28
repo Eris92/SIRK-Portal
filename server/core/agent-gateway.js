@@ -80,6 +80,7 @@ module.exports.create = function (options) {
     var enrollmentToken = String(options.enrollmentToken || process.env.SIRK_AGENT_ENROLLMENT_TOKEN || "");
     var registryPath = path.join(dataRoot, "agent-registry.json");
     var telemetryPath = path.join(dataRoot, "agent-telemetry.jsonl");
+    var batchPath = path.join(dataRoot, "agent-event-batches.jsonl");
     var policyRoot = path.join(dataRoot, "agent-policy-outbox");
     var commandBroker = options.commandBroker || commandBrokerFactory.create({ dataRoot: dataRoot });
     fs.mkdirSync(dataRoot, { recursive: true });
@@ -216,6 +217,10 @@ module.exports.create = function (options) {
                     }
                     registry.devices[registryKey] = Object.assign({}, existing, {
                         publicKeySpki: String(body.publicKeySpki),
+                        publicKeyHistory: (existing.publicKeyHistory || []).concat({
+                            publicKeySpki: existing.publicKeySpki,
+                            validUntilUtc: now
+                        }).filter(function (item) { return item.publicKeySpki; }).slice(-20),
                         authNonces: authNonces,
                         keyRotatedAtUtc: now
                     });
@@ -225,11 +230,39 @@ module.exports.create = function (options) {
                         keyRotatedAtUtc: now });
                     return;
                 }
+                var batchHash = null;
+                var batchId = null;
+                var events = (Array.isArray(body.events) ? body.events : []).slice(0, 100);
+                if (existing.credentialHash && events.length) {
+                    batchId = crypto.randomUUID();
+                    var previousBatchHash = existing.lastBatchHash || null;
+                    batchHash = crypto.createHash("sha256")
+                        .update(String(previousBatchHash || "") + "\n")
+                        .update(bodyBytes)
+                        .update(String(req.headers["x-sirk-signature"] || ""))
+                        .digest("hex");
+                    fs.appendFileSync(batchPath, JSON.stringify({
+                        batchId: batchId,
+                        receivedAtUtc: now,
+                        tenantId: tenantId,
+                        deviceId: deviceId,
+                        eventCount: events.length,
+                        previousBatchHash: previousBatchHash,
+                        batchHash: batchHash,
+                        deviceProof: {
+                            timestamp: String(req.headers["x-sirk-timestamp"] || ""),
+                            nonce: String(req.headers["x-sirk-nonce"] || ""),
+                            signature: String(req.headers["x-sirk-signature"] || "")
+                        }
+                    }) + "\n", "utf8");
+                }
                 registry.devices[registryKey] = {
                     enrolledAtUtc: existing.enrolledAtUtc || null,
                     credentialHash: existing.credentialHash || null,
                     publicKeySpki: existing.publicKeySpki || null,
+                    publicKeyHistory: existing.publicKeyHistory || [],
                     authNonces: existing.credentialHash ? authNonces : [],
+                    lastBatchHash: batchHash || existing.lastBatchHash || null,
                     tenantId: tenantId,
                     deviceId: deviceId,
                     machineName: String(body.machineName || deviceId).slice(0, 255),
@@ -242,11 +275,13 @@ module.exports.create = function (options) {
                 registry.updatedAtUtc = now;
                 writeJsonAtomic(registryPath, registry);
                 if (commandBroker) commandBroker.acceptResults(tenantId, deviceId, body.commandResults);
-                (Array.isArray(body.events) ? body.events : []).slice(0, 100).forEach(function (event) {
+                events.forEach(function (event) {
                     fs.appendFileSync(telemetryPath, JSON.stringify({
                         receivedAtUtc: now,
                         tenantId: tenantId,
                         deviceId: deviceId,
+                        batchId: batchId,
+                        batchHash: batchHash,
                         event: event
                     }) + "\n", "utf8");
                 });

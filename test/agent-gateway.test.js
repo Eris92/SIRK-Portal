@@ -154,9 +154,21 @@ async function invoke(gateway, token, body, url, privateKey) {
         var replacementAccepted = await invoke(gateway, enrolled.body.deviceToken, {
             tenantId: "investa",
             deviceId: "device-2",
-            agentVersion: "1.0.0"
+            agentVersion: "1.0.0",
+            events: [{ eventId: "signed-event-1", category: "Evidence" }]
         }, undefined, replacementKeys.privateKey);
         assert.strictEqual(replacementAccepted.statusCode, 200);
+        var batch = JSON.parse(fs.readFileSync(path.join(root, "agent-event-batches.jsonl"), "utf8").trim());
+        assert.strictEqual(batch.eventCount, 1);
+        assert.strictEqual(batch.previousBatchHash, null);
+        assert.match(batch.batchHash, /^[a-f0-9]{64}$/);
+        assert.ok(batch.deviceProof.signature);
+        var signedTelemetry = fs.readFileSync(path.join(root, "agent-telemetry.jsonl"), "utf8")
+            .trim().split(/\r?\n/).map(JSON.parse).find(function (item) {
+                return item.event && item.event.eventId === "signed-event-1";
+            });
+        assert.strictEqual(signedTelemetry.batchHash, batch.batchHash);
+        assert.strictEqual(gateway.readRegistry().devices["investa/device-2"].publicKeyHistory.length, 1);
         var policyDirectory = path.join(root, "agent-policy-outbox", "investa", "device-2");
         fs.mkdirSync(policyDirectory, { recursive: true });
         fs.writeFileSync(path.join(policyDirectory, "policy-1.policy.json"), JSON.stringify({

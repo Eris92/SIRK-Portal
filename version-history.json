@@ -1,5 +1,13 @@
 [
   {
+    "version": "2.0.0-dev.4",
+    "date": "2026-07-28",
+    "changes": [
+      "Preserve verified device proof with each uploaded event batch",
+      "Link accepted event batches with SHA-256 hashes and retain public-key history across rotations"
+    ]
+  },
+  {
     "version": "2.0.0-dev.3",
     "date": "2026-07-28",
     "changes": [
