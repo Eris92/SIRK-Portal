@@ -5,7 +5,7 @@
         snapshot: null,
         active: "settings",
         settingsKey: "module:devices:general",
-        serverKey: "service",
+        serverKey: "system:updates",
         debugKey: "config",
         pluginView: "installed",
         plugins: [],
@@ -625,24 +625,14 @@
     }
 
     function renderServerSections(layout, secondary, details) {
-        navButton(secondary, "service", "Usługa", state.serverKey, function (key) { state.serverKey = key; renderActive(layout, secondary, details); });
-        var debugBody = navGroup(secondary, "Debug", state.serverKey.indexOf("debug:") === 0);
-        [["debug:config", "Config"], ["debug:logs", "Logi"], ["debug:errors", "Błędy"]].forEach(function (item) {
-            navButton(debugBody, item[0], item[1], state.serverKey, function (key) { state.serverKey = key; renderActive(layout, secondary, details); }, "sirk-nav-item sirk-settings-nav-leaf");
-        });
         var updatesBody = navGroup(secondary, "Aktualizacje", state.serverKey.indexOf("system:") === 0 && state.serverKey !== "system:backups");
         [["system:updates", "Sprawdź"], ["system:history", "Historia"], ["system:channel", "Kanał"]].forEach(function (item) {
             navButton(updatesBody, item[0], item[1], state.serverKey, function (key) { state.serverKey = key; renderActive(layout, secondary, details); }, "sirk-nav-item sirk-settings-nav-leaf");
         });
         navButton(secondary, "system:backups", "Backupy", state.serverKey, function (key) { state.serverKey = key; renderActive(layout, secondary, details); });
-        navButton(secondary, "plugins", "Wtyczki", state.serverKey, function (key) { state.serverKey = key; renderActive(layout, secondary, details); });
         secondary.hidden = false;
-        if (state.serverKey === "service") renderServer(details);
-        else if (state.serverKey.indexOf("debug:") === 0) {
-            state.debugKey = state.serverKey.slice(6);
-            renderDebug(details);
-        } else if (state.serverKey === "plugins") renderPlugins(details);
-        else if (window.SirkSystemUpdates) window.SirkSystemUpdates.mount(details, state.serverKey.slice(7));
+        if (state.serverKey.indexOf("system:") !== 0) state.serverKey = "system:updates";
+        if (window.SirkSystemUpdates) window.SirkSystemUpdates.mount(details, state.serverKey.slice(7));
     }
 
     function selectedValues(select) {
@@ -885,7 +875,7 @@
             });
         };
 
-        [["settings", "Settings"], ["identity", "Użytkownicy i grupy"], ["server", "Server"]].forEach(function (item) {
+        [["settings", "Ustawienia"], ["identity", "Użytkownicy i grupy"], ["server", "System"]].forEach(function (item) {
             var button = el("button", item[0] === state.active ? "sirk-nav-item active" : "sirk-nav-item", item[1]);
             button.type = "button";
             button.onclick = function () {
