@@ -284,6 +284,10 @@ module.exports.create = function (options) {
                     heartbeat: body.heartbeat && typeof body.heartbeat === "object" ? body.heartbeat : existing.heartbeat || null,
                     management: body.management && typeof body.management === "object" ? body.management : existing.management || null,
                     runtimeHealth: body.runtimeHealth && typeof body.runtimeHealth === "object" ? body.runtimeHealth : existing.runtimeHealth || null,
+                    watchdog: body.watchdog && typeof body.watchdog === "object" ? body.watchdog : existing.watchdog || null,
+                    network: body.network && typeof body.network === "object" ? body.network : existing.network || null,
+                    remoteAddress: String(req.headers["x-forwarded-for"] ||
+                        req.socket && req.socket.remoteAddress || "").split(",")[0].trim().slice(0, 128),
                     security: body.security && typeof body.security === "object" ? body.security : existing.security || null,
                     quarantine: body.quarantine && typeof body.quarantine === "object" ? body.quarantine : existing.quarantine || null,
                     endurance: body.endurance && typeof body.endurance === "object" ? body.endurance : existing.endurance || null,

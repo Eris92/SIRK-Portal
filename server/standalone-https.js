@@ -13,7 +13,8 @@ function proxyRequest(targetPort, req, res, activeRequests) {
         path: req.url,
         headers: Object.assign({}, req.headers, {
             "x-forwarded-proto": "https",
-            "x-forwarded-host": req.headers.host || ""
+            "x-forwarded-host": req.headers.host || "",
+            "x-forwarded-for": req.socket && req.socket.remoteAddress || ""
         })
     }, function (response) {
         res.writeHead(response.statusCode || 502, response.headers);

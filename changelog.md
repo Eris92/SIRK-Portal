@@ -1,3 +1,8 @@
+## 2.0.0-dev.21
+
+- Record the Agent source address and current interface topology on every check-in.
+- Receive independent Watchdog health and recovery state from managed devices.
+
 ## 2.0.0-dev.20
 
 - Synchronize remote and local text clipboards through Ctrl+C and Ctrl+V.

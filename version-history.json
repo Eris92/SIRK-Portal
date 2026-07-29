@@ -1,5 +1,13 @@
 [
   {
+    "version": "2.0.0-dev.21",
+    "date": "2026-07-29",
+    "changes": [
+      "Record the Agent source address and current interface topology on every check-in",
+      "Receive independent Watchdog health and recovery state from managed devices"
+    ]
+  },
+  {
     "version": "2.0.0-dev.20",
     "date": "2026-07-29",
     "changes": [

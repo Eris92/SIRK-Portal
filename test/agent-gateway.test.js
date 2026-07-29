@@ -14,6 +14,7 @@ function request(token, body, url, privateKey) {
     req.method = "POST";
     req.url = url || "/api/agent/v1/checkin";
     req.headers = token ? { authorization: "Bearer " + token } : {};
+    req.socket = { remoteAddress: "192.0.2.15" };
     var encoded = Buffer.from(JSON.stringify(body || {}), "utf8");
     if (privateKey) {
         var timestamp = String(Math.floor(Date.now() / 1000));
@@ -101,6 +102,8 @@ async function invoke(gateway, token, body, url, privateKey) {
             heartbeat: { stateStatus: "OK" },
             management: { status: "Healthy" },
             runtimeHealth: { heartbeatFresh: true },
+            watchdog: { status: "Healthy", code: "WATCHDOG_HEALTHY" },
+            network: { reason: "AddressChanged", interfaces: [{ name: "Ethernet" }] },
             security: { status: "OK" },
             quarantine: { quarantined: false },
             endurance: { sampleCount: 42 },
@@ -118,6 +121,9 @@ async function invoke(gateway, token, body, url, privateKey) {
         assert.strictEqual(registry.devices["investa/device-1"].machineName, "DELL_K");
         assert.strictEqual(registry.devices["investa/device-1"].endurance.sampleCount, 42);
         assert.strictEqual(registry.devices["investa/device-1"].telemetryQueue.files, 3);
+        assert.strictEqual(registry.devices["investa/device-1"].watchdog.code, "WATCHDOG_HEALTHY");
+        assert.strictEqual(registry.devices["investa/device-1"].network.reason, "AddressChanged");
+        assert.strictEqual(registry.devices["investa/device-1"].remoteAddress, "192.0.2.15");
         assert.strictEqual(fs.readFileSync(path.join(root, "agent-telemetry.jsonl"), "utf8").trim().split(/\r?\n/).length, 1);
 
         var deviceKeys = crypto.generateKeyPairSync("ec", { namedCurve: "prime256v1" });
