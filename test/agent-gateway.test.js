@@ -53,11 +53,19 @@ async function invoke(gateway, token, body, url, privateKey) {
     var root = fs.mkdtempSync(path.join(os.tmpdir(), "sirk-agent-gateway-"));
     try {
         var commandBroker = commandBrokerFactory.create({ dataRoot: root });
+        var assignedGroup = null;
+        var issuedPolicy = null;
         var gateway = gatewayFactory.create({
             dataRoot: root,
             token: "test-agent-token",
             enrollmentToken: "test-enrollment-token",
-            commandBroker: commandBroker
+            commandBroker: commandBroker,
+            enrollmentResolver: function (value) { return value === "group-token" ? { groupId: "warsaw" } : null; },
+            enrollmentAssigned: function (deviceId, groupId) { assignedGroup = deviceId + "/" + groupId; },
+            policyService: { enroll: function (tenantId, deviceId, groupId) {
+                issuedPolicy = tenantId + "/" + deviceId + "/" + (groupId || "");
+                return { trustedPolicyKeys: [{ keyId: "portal-test", publicKeyPem: "public" }] };
+            } }
         });
         var denied = await invoke(gateway, "wrong-token", { tenantId: "investa", deviceId: "device-1" });
         assert.strictEqual(denied.statusCode, 401);
@@ -73,12 +81,23 @@ async function invoke(gateway, token, body, url, privateKey) {
             heartbeat: { stateStatus: "OK" },
             management: { status: "Healthy" },
             runtimeHealth: { heartbeatFresh: true },
+            security: { status: "OK" },
+            quarantine: { quarantined: false },
+            endurance: { sampleCount: 42 },
+            activity: { enabled: true },
+            browserActivity: { tabs: 2 },
+            risk: { level: "Low" },
+            tamper: { detected: false },
+            portalStatus: { ok: true },
+            telemetryQueue: { files: 3, bytes: 1200 },
             events: [{ eventId: "event-1", category: "Agent" }]
         });
         assert.strictEqual(accepted.statusCode, 200);
         assert.strictEqual(accepted.body.acceptedEvents, 1);
         var registry = gateway.readRegistry();
         assert.strictEqual(registry.devices["investa/device-1"].machineName, "DELL_K");
+        assert.strictEqual(registry.devices["investa/device-1"].endurance.sampleCount, 42);
+        assert.strictEqual(registry.devices["investa/device-1"].telemetryQueue.files, 3);
         assert.strictEqual(fs.readFileSync(path.join(root, "agent-telemetry.jsonl"), "utf8").trim().split(/\r?\n/).length, 1);
 
         var deviceKeys = crypto.generateKeyPairSync("ec", { namedCurve: "prime256v1" });
@@ -91,6 +110,7 @@ async function invoke(gateway, token, body, url, privateKey) {
         }, "/api/agent/v1/enroll");
         assert.strictEqual(enrolled.statusCode, 201);
         assert.strictEqual(typeof enrolled.body.deviceToken, "string");
+        assert.strictEqual(enrolled.body.trustedPolicyKeys[0].keyId, "portal-test");
         assert.ok(enrolled.body.deviceToken.length >= 40);
         var registryText = fs.readFileSync(path.join(root, "agent-registry.json"), "utf8");
         assert.ok(!registryText.includes(enrolled.body.deviceToken), "Raw device token must not be persisted.");
@@ -101,6 +121,16 @@ async function invoke(gateway, token, body, url, privateKey) {
             publicKeySpki: devicePublicKey
         }, "/api/agent/v1/enroll");
         assert.strictEqual(duplicateEnrollment.statusCode, 409);
+        var groupEnrollment = await invoke(gateway, "group-token", {
+            tenantId: "investa",
+            deviceId: "device-group",
+            machineName: "GROUP-PC",
+            publicKeySpki: devicePublicKey
+        }, "/api/agent/v1/enroll");
+        assert.strictEqual(groupEnrollment.statusCode, 201);
+        assert.strictEqual(gateway.readRegistry().devices["investa/device-group"].groupId, "warsaw");
+        assert.strictEqual(assignedGroup, "device-group/warsaw");
+        assert.strictEqual(issuedPolicy, "investa/device-group/warsaw");
 
         var missingProof = await invoke(gateway, enrolled.body.deviceToken, {
             tenantId: "investa",
@@ -117,6 +147,8 @@ async function invoke(gateway, token, body, url, privateKey) {
         assert.strictEqual(deviceAccepted.statusCode, 200);
         var queuedCommand = commandBroker.queue("investa", "device-2", "terminal.execute",
             { command: "hostname" }, { id: "admin/test" });
+        assert.strictEqual(commandBroker.queue("investa", "desktop-contract-device", "desktop.sessions", {},
+            { id: "admin/test" }).type, "desktop.sessions");
         var commandDelivery = await invoke(gateway, enrolled.body.deviceToken, {
             tenantId: "investa",
             deviceId: "device-2",

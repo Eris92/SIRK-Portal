@@ -78,6 +78,10 @@ module.exports.create = function (options) {
     var dataRoot = path.resolve(options.dataRoot);
     var token = String(options.token || process.env.SIRK_AGENT_TOKEN || "");
     var enrollmentToken = String(options.enrollmentToken || process.env.SIRK_AGENT_ENROLLMENT_TOKEN || "");
+    var enrollmentResolver = typeof options.enrollmentResolver === "function" ? options.enrollmentResolver : null;
+    var enrollmentAssigned = typeof options.enrollmentAssigned === "function" ? options.enrollmentAssigned : null;
+    var policyService = options.policyService && typeof options.policyService.enroll === "function" ?
+        options.policyService : null;
     var registryPath = path.join(dataRoot, "agent-registry.json");
     var telemetryPath = path.join(dataRoot, "agent-telemetry.jsonl");
     var batchPath = path.join(dataRoot, "agent-event-batches.jsonl");
@@ -166,7 +170,8 @@ module.exports.create = function (options) {
                 var registryKey = tenantId + "/" + deviceId;
                 var existing = registry.devices[registryKey] || {};
                 if (url.pathname === "/api/agent/v1/enroll") {
-                    if (!authorizedToken(req, enrollmentToken)) {
+                    var enrollment = enrollmentResolver ? enrollmentResolver(suppliedToken(req)) : null;
+                    if (!authorizedToken(req, enrollmentToken) && !enrollment) {
                         sendJson(res, 401, { ok: false, error: "Agent enrollment authentication failed." });
                         return;
                     }
@@ -179,22 +184,28 @@ module.exports.create = function (options) {
                         return;
                     }
                     var deviceToken = crypto.randomBytes(32).toString("base64url");
+                    var policyEnrollment = policyService ?
+                        policyService.enroll(tenantId, deviceId, enrollment && enrollment.groupId || null) : null;
                     registry.devices[registryKey] = Object.assign({}, existing, {
                         tenantId: tenantId,
                         deviceId: deviceId,
                         machineName: String(body.machineName || deviceId).slice(0, 255),
+                        groupId: enrollment && enrollment.groupId || existing.groupId || null,
                         enrolledAtUtc: now,
                         credentialHash: tokenHash(deviceToken),
                         publicKeySpki: String(body.publicKeySpki)
                     });
                     registry.updatedAtUtc = now;
                     writeJsonAtomic(registryPath, registry);
+                    if (enrollmentAssigned && enrollment && enrollment.groupId)
+                        enrollmentAssigned(deviceId, enrollment.groupId);
                     sendJson(res, 201, {
                         ok: true,
                         protocolVersion: 1,
                         tenantId: tenantId,
                         deviceId: deviceId,
                         deviceToken: deviceToken,
+                        trustedPolicyKeys: policyEnrollment ? policyEnrollment.trustedPolicyKeys : [],
                         checkInEndpoint: "/api/agent/v1/checkin",
                         enrolledAtUtc: now
                     });
@@ -268,9 +279,18 @@ module.exports.create = function (options) {
                     machineName: String(body.machineName || deviceId).slice(0, 255),
                     agentVersion: String(body.agentVersion || "").slice(0, 64),
                     lastSeenUtc: now,
-                    heartbeat: body.heartbeat && typeof body.heartbeat === "object" ? body.heartbeat : null,
-                    management: body.management && typeof body.management === "object" ? body.management : null,
-                    runtimeHealth: body.runtimeHealth && typeof body.runtimeHealth === "object" ? body.runtimeHealth : null
+                    heartbeat: body.heartbeat && typeof body.heartbeat === "object" ? body.heartbeat : existing.heartbeat || null,
+                    management: body.management && typeof body.management === "object" ? body.management : existing.management || null,
+                    runtimeHealth: body.runtimeHealth && typeof body.runtimeHealth === "object" ? body.runtimeHealth : existing.runtimeHealth || null,
+                    security: body.security && typeof body.security === "object" ? body.security : existing.security || null,
+                    quarantine: body.quarantine && typeof body.quarantine === "object" ? body.quarantine : existing.quarantine || null,
+                    endurance: body.endurance && typeof body.endurance === "object" ? body.endurance : existing.endurance || null,
+                    activity: body.activity && typeof body.activity === "object" ? body.activity : existing.activity || null,
+                    browserActivity: body.browserActivity && typeof body.browserActivity === "object" ? body.browserActivity : existing.browserActivity || null,
+                    risk: body.risk && typeof body.risk === "object" ? body.risk : existing.risk || null,
+                    tamper: body.tamper && typeof body.tamper === "object" ? body.tamper : existing.tamper || null,
+                    portalStatus: body.portalStatus && typeof body.portalStatus === "object" ? body.portalStatus : existing.portalStatus || null,
+                    telemetryQueue: body.telemetryQueue && typeof body.telemetryQueue === "object" ? body.telemetryQueue : existing.telemetryQueue || null
                 };
                 registry.updatedAtUtc = now;
                 writeJsonAtomic(registryPath, registry);

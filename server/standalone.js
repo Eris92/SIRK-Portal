@@ -6,6 +6,8 @@ var http = require("http");
 var path = require("path");
 var adapter = require("./adapters/standalone/index.js");
 var agentGatewayFactory = require("./core/agent-gateway.js");
+var agentGroupFactory = require("./core/agent-group-service.js");
+var agentPolicyFactory = require("./core/agent-policy-service.js");
 var apiFactory = require("./http/api-router.js");
 var identityFactory = require("./core/identity-store.js");
 var maintenance = require("./core/portal-maintenance.js");
@@ -233,6 +235,8 @@ function start(options) {
     options.auth = options.auth || { currentUser: sessionUser };
     var host = adapter.createHost(options);
     host.identity = identity;
+    host.agentGroups = agentGroupFactory.create({ dataRoot: host.dataRoot });
+    host.agentPolicies = agentPolicyFactory.create({ dataRoot: host.dataRoot });
     var runtime = runtimeFactory.createRuntime(host, ROOT);
     var api = apiFactory.createHandler(runtime, host);
     var manager = updateManagerFactory.create({ appRoot: ROOT, dataRoot: host.dataRoot });
@@ -240,7 +244,10 @@ function start(options) {
     var agentGateway = agentGatewayFactory.create({
         dataRoot: host.dataRoot,
         token: options.agentToken,
-        enrollmentToken: options.agentEnrollmentToken
+        enrollmentToken: options.agentEnrollmentToken,
+        enrollmentResolver: host.agentGroups.resolveEnrollment,
+        enrollmentAssigned: host.agentGroups.assign,
+        policyService: host.agentPolicies
     });
 
     function portalConfig() {

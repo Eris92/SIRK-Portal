@@ -280,14 +280,61 @@
 
     function renderAgentDesktop(host, node) {
         var stopped = false;
-        host.innerHTML = '<div class="sirk-agent-operation sirk-agent-desktop"><header><strong>Pulpit SIRK Agent</strong><small>Bezpieczny broker aktywnej sesji użytkownika</small></header><div class="sirk-agent-desktop-stage"><img data-agent-desktop-image alt="Zdalny pulpit"></div><pre data-agent-operation-status>Łączenie z sesją użytkownika…</pre></div>';
+        host.innerHTML = '<div class="sirk-agent-operation sirk-agent-desktop"><header><strong>Pulpit SIRK Agent</strong><small>Bezpieczny broker wybranej sesji użytkownika</small></header><div class="sirk-agent-desktop-controls"><label>Sesja<select data-agent-desktop-session></select></label><label>Monitor<select data-agent-desktop-monitor><option value="-1">Wszystkie monitory</option></select></label></div><div class="sirk-agent-desktop-stage"><img data-agent-desktop-image alt="Zdalny pulpit" tabindex="0"></div><div class="sirk-agent-desktop-input"><input data-agent-desktop-text placeholder="Tekst do aktywnego okna"><button type="button" data-agent-desktop-send>Wyślij tekst</button><select data-agent-desktop-key><option>Enter</option><option>Tab</option><option>Escape</option><option>Backspace</option><option>Delete</option><option>Up</option><option>Down</option><option>Left</option><option>Right</option><option>Home</option><option>End</option><option>PageUp</option><option>PageDown</option><option>F5</option></select><button type="button" data-agent-desktop-key-send>Klawisz</button></div><div class="sirk-agent-desktop-clipboard"><textarea data-agent-desktop-clipboard placeholder="Schowek wybranej sesji"></textarea><button type="button" data-agent-desktop-clipboard-get>Pobierz schowek</button><button type="button" data-agent-desktop-clipboard-set>Ustaw schowek</button></div><pre data-agent-operation-status>Wykrywanie sesji użytkowników…</pre></div>';
         var image = host.querySelector("[data-agent-desktop-image]");
         var status = host.querySelector("[data-agent-operation-status]");
-        var nativeWidth = 0, nativeHeight = 0;
-        function snapshot() {
-            if (stopped || !host.isConnected) return;
-            runAgentOperation(node, "desktop.snapshot", {}, status).then(function (value) {
-                if (stopped || !host.isConnected) return;
+        var session = host.querySelector("[data-agent-desktop-session]");
+        var monitor = host.querySelector("[data-agent-desktop-monitor]");
+        var textInput = host.querySelector("[data-agent-desktop-text]");
+        var keyInput = host.querySelector("[data-agent-desktop-key]");
+        var clipboard = host.querySelector("[data-agent-desktop-clipboard]");
+        var nativeWidth = 0, nativeHeight = 0, streamGeneration = 0;
+        function selected() {
+            return { sessionId: Number(session.value), monitorIndex: Number(monitor.value) };
+        }
+        function input(parameters) {
+            var target = selected();
+            parameters.sessionId = target.sessionId;
+            parameters.monitorIndex = target.monitorIndex;
+            return agentOperation(node, "desktop.input", parameters);
+        }
+        function loadMonitors() {
+            monitor.disabled = true;
+            return runAgentOperation(node, "desktop.monitors", { sessionId: Number(session.value) }, status)
+                .then(function (value) {
+                    var data = value.result && value.result.data || {};
+                    monitor.innerHTML = '<option value="-1">Wszystkie monitory</option>';
+                    (data.monitors || []).forEach(function (item) {
+                        var option = document.createElement("option");
+                        option.value = String(item.index);
+                        option.textContent = (item.primary ? "Główny · " : "") + item.name + " · " + item.width + "×" + item.height;
+                        monitor.appendChild(option);
+                    });
+                }).finally(function () { monitor.disabled = false; });
+        }
+        function loadSessions() {
+            return runAgentOperation(node, "desktop.sessions", {}, status).then(function (value) {
+                var sessions = value.result && value.result.data || [];
+                session.innerHTML = "";
+                sessions.forEach(function (item) {
+                    var option = document.createElement("option");
+                    option.value = String(item.sessionId);
+                    option.textContent = "Sesja " + item.sessionId + (item.active ? " · aktywna" : "");
+                    session.appendChild(option);
+                });
+                if (!sessions.length) throw new Error("Brak aktywnego brokera sesji użytkownika.");
+                return loadMonitors();
+            });
+        }
+        function restartStream() {
+            streamGeneration += 1;
+            snapshot(streamGeneration);
+        }
+        function snapshot(generation) {
+            if (stopped || !host.isConnected || generation !== streamGeneration) return;
+            var target = selected();
+            runAgentOperation(node, "desktop.snapshot", target, status).then(function (value) {
+                if (stopped || !host.isConnected || generation !== streamGeneration) return;
                 var data = value.result && value.result.data;
                 if (value.status === "failed" || !data || !data.imageBase64) {
                     throw new Error(value.result && (value.result.output || value.result.code) || "Brak obrazu.");
@@ -295,39 +342,89 @@
                 nativeWidth = Number(data.width || 0);
                 nativeHeight = Number(data.height || 0);
                 image.src = "data:image/jpeg;base64," + data.imageBase64;
-                status.textContent = "Połączono · " + nativeWidth + " × " + nativeHeight;
+                status.textContent = "Połączono · sesja " + target.sessionId + " · " + nativeWidth + " × " + nativeHeight;
                 status.classList.remove("is-error");
-                setTimeout(snapshot, 150);
+                setTimeout(function () { snapshot(generation); }, 250);
             }).catch(function (error) {
-                if (stopped || !host.isConnected) return;
+                if (stopped || !host.isConnected || generation !== streamGeneration) return;
                 status.textContent = error.message || String(error);
                 status.classList.add("is-error");
-                setTimeout(snapshot, 3000);
+                setTimeout(function () { snapshot(generation); }, 3000);
             });
         }
-        image.addEventListener("click", function (event) {
+        var lastMouseMoveAt = 0;
+        function coordinates(event) {
             if (!nativeWidth || !nativeHeight) return;
             var bounds = image.getBoundingClientRect();
-            var x = Math.round((event.clientX - bounds.left) / bounds.width * nativeWidth);
-            var y = Math.round((event.clientY - bounds.top) / bounds.height * nativeHeight);
-            agentOperation(node, "desktop.input", { action: event.detail > 1 ? "doubleClick" : "click", x: x, y: y })
-                .catch(function (error) { status.textContent = error.message || String(error); status.classList.add("is-error"); });
+            return {
+                x: Math.round((event.clientX - bounds.left) / bounds.width * nativeWidth),
+                y: Math.round((event.clientY - bounds.top) / bounds.height * nativeHeight)
+            };
+        }
+        image.addEventListener("pointerdown", function (event) {
+            var point = coordinates(event); if (!point) return;
+            if (event.button === 0) {
+                image.setPointerCapture(event.pointerId);
+                input({ action: "leftDown", x: point.x, y: point.y }).catch(function (error) { status.textContent = error.message || String(error); });
+            } else if (event.button === 1) {
+                event.preventDefault();
+                input({ action: "middleClick", x: point.x, y: point.y }).catch(function (error) { status.textContent = error.message || String(error); });
+            }
+        });
+        image.addEventListener("pointerup", function (event) {
+            var point = coordinates(event); if (!point || event.button !== 0) return;
+            input({ action: "leftUp", x: point.x, y: point.y }).catch(function (error) { status.textContent = error.message || String(error); });
+        });
+        image.addEventListener("pointermove", function (event) {
+            var now = Date.now(); if (now - lastMouseMoveAt < 100) return;
+            var point = coordinates(event); if (!point) return; lastMouseMoveAt = now;
+            input({ action: "move", x: point.x, y: point.y }).catch(function () {});
+        });
+        image.addEventListener("wheel", function (event) {
+            var point = coordinates(event); if (!point) return; event.preventDefault();
+            input({ action: "wheel", x: point.x, y: point.y, delta: event.deltaY < 0 ? 120 : -120 }).catch(function (error) { status.textContent = error.message || String(error); });
         });
         image.addEventListener("contextmenu", function (event) {
             event.preventDefault();
             if (!nativeWidth || !nativeHeight) return;
             var bounds = image.getBoundingClientRect();
-            agentOperation(node, "desktop.input", {
+            input({
                 action: "rightClick",
                 x: Math.round((event.clientX - bounds.left) / bounds.width * nativeWidth),
                 y: Math.round((event.clientY - bounds.top) / bounds.height * nativeHeight)
             }).catch(function (error) { status.textContent = error.message || String(error); status.classList.add("is-error"); });
         });
+        host.querySelector("[data-agent-desktop-send]").addEventListener("click", function () {
+            if (!textInput.value) return;
+            input({ action: "text", text: textInput.value }).then(function () { textInput.value = ""; })
+                .catch(function (error) { status.textContent = error.message || String(error); status.classList.add("is-error"); });
+        });
+        host.querySelector("[data-agent-desktop-key-send]").addEventListener("click", function () {
+            input({ action: "key", key: keyInput.value, modifiers: "" })
+                .catch(function (error) { status.textContent = error.message || String(error); status.classList.add("is-error"); });
+        });
+        host.querySelector("[data-agent-desktop-clipboard-get]").addEventListener("click", function () {
+            runAgentOperation(node, "desktop.input", Object.assign(selected(), { action: "clipboardGet" }), status)
+                .then(function (value) { clipboard.value = value.result && value.result.data && value.result.data.text || ""; })
+                .catch(function (error) { status.textContent = error.message || String(error); status.classList.add("is-error"); });
+        });
+        host.querySelector("[data-agent-desktop-clipboard-set]").addEventListener("click", function () {
+            input({ action: "clipboardSet", text: clipboard.value })
+                .catch(function (error) { status.textContent = error.message || String(error); status.classList.add("is-error"); });
+        });
+        session.addEventListener("change", function () {
+            streamGeneration += 1;
+            loadMonitors().then(restartStream);
+        });
+        monitor.addEventListener("change", restartStream);
         var observer = new MutationObserver(function () {
             if (!host.isConnected) { stopped = true; observer.disconnect(); }
         });
         observer.observe(document.body, { childList: true, subtree: true });
-        snapshot();
+        loadSessions().then(restartStream).catch(function (error) {
+            status.textContent = error.message || String(error);
+            status.classList.add("is-error");
+        });
     }
 
     function renderAgentTab(host, node, type) {

@@ -1,4 +1,4 @@
-# SIRK Management Platform 2.0.0-dev.5
+# SIRK Management Platform 2.0.0-dev.14
 
 **Repozytorium:** `SIRK-Portal`  
 **Techniczny identyfikator pluginu MeshCentral:** `SIRKPortal`  
@@ -35,7 +35,14 @@ Szczegóły: [Kanały aktualizacji i lifecycle](docs/UPDATE-CHANNELS.md).
 
 ## Instalacja i dalsze aktualizacje
 
-Pierwszą instalację można wykonać przez MeshCentral. Po instalacji dalszy lifecycle SIRK Portal jest obsługiwany z poziomu widoku **Aktualizacje** w nowym Portalu, a nie przez manager pluginów MeshCentral.
+Pipeline `SIRK Portal Windows Release` przygotowuje instalator
+`SIRK-Portal-<wersja>-Windows-x64-Setup.exe`. Instalator zawiera runtime Node,
+rejestruje automatycznie odzyskiwaną usługę Windows i zachowuje dane,
+certyfikat TLS, użytkowników oraz konfigurację w `C:\ProgramData\SIRK\Portal`
+podczas aktualizacji. Portal nie wymaga MeshCentral.
+
+Po instalacji dalszy lifecycle SIRK Portal jest obsługiwany z poziomu widoku
+**Aktualizacje** w nowym Portalu.
 
 Widok umożliwia:
 

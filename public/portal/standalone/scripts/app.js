@@ -505,7 +505,7 @@
         var details = document.createElement("div"); details.className = "sirk-column-details";
         workspace.appendChild(primary); workspace.appendChild(secondary); workspace.appendChild(details);
         function renderSecondary(items, selected, onSelect) { secondary.innerHTML = ""; items.forEach(function (name, index) { var button = document.createElement("button"); button.type = "button"; button.className = "sirk-nav-item" + (name === selected || (!selected && index === 0) ? " active" : ""); button.textContent = name; button.onclick = function () { Array.prototype.forEach.call(secondary.children, function (node) { node.classList.remove("active"); }); button.classList.add("active"); onSelect(name); }; secondary.appendChild(button); }); }
-        var systemUpdatesHost = null;
+        var systemUpdatesHost = null, agentGroupsHost = null;
         function selectSettingsPane(name) { title.textContent = name; status.textContent = ""; output.hidden = true; form.hidden = false; if (systemUpdatesHost) systemUpdatesHost.hidden = true; Array.prototype.forEach.call(form.children, function (node) { node.hidden = node.getAttribute("data-settings-pane") !== name && node !== save; }); details.querySelectorAll(".sirk-settings-section").forEach(function (node) { node.hidden = node.getAttribute("data-settings-pane") !== name; }); }
         function renderAdminPane(name, sub) {
             title.textContent = name + " / " + sub;
@@ -528,7 +528,51 @@
             output.textContent = typeof source === "string" ? source : JSON.stringify(source, null, 2);
             status.textContent = "";
         }
-        ["Overview", "Settings", "Plugins", "Server", "Debug", "System"].forEach(function (name, index) { var button = document.createElement("button"); button.type = "button"; button.className = "sirk-nav-item" + (index === 1 ? " active" : ""); button.textContent = name; button.onclick = function () { Array.prototype.forEach.call(primary.children, function (node) { node.classList.remove("active"); }); button.classList.add("active"); if (index === 1) { renderSecondary(["Overview", "Portal", "Moduły", "Integracje", "Uprawnienia", "Diagnostyka", "Aktualizacje"], "Overview", selectSettingsPane); selectSettingsPane("Overview"); return; } var subcategories = name === "Debug" ? ["Config", "Logi", "Błędy"] : name === "System" ? ["Aktualizacje", "Backupy", "Historia", "Kanał"] : name === "Plugins" ? ["Zainstalowane", "Dostępne", "Historia"] : ["Przegląd", "Status", "Historia"]; renderSecondary(subcategories, subcategories[0], function (sub) { renderAdminPane(name, sub); }); renderAdminPane(name, subcategories[0]); }; primary.appendChild(button); });
+        function renderAgentGroups() {
+            title.textContent = "Grupy hostów SIRK Agent"; form.hidden = true; output.hidden = true;
+            if (systemUpdatesHost) systemUpdatesHost.hidden = true;
+            details.querySelectorAll(".sirk-settings-section").forEach(function (node) { node.hidden = true; });
+            if (!agentGroupsHost) { agentGroupsHost = document.createElement("div"); details.appendChild(agentGroupsHost); }
+            agentGroupsHost.hidden = false; agentGroupsHost.innerHTML = "<p>Ładowanie grup…</p>";
+            fetch("/api/admin/agent-groups", { credentials: "same-origin", cache: "no-store" })
+                .then(function (response) { return response.json().then(function (value) { if (!response.ok) throw new Error(value.error || "Nie można pobrać grup."); return value.value || []; }); })
+                .then(function (groups) {
+                    agentGroupsHost.innerHTML = "";
+                    var create = document.createElement("form"); create.className = "sirk-card sirk-agent-group-create";
+                    create.innerHTML = '<h3>Nowa grupa hostów</h3><label>Nazwa<input name="name" required maxlength="100"></label><label>Opis<input name="description" maxlength="500"></label><button type="submit" class="sirk-admin-primary">Dodaj grupę</button>';
+                    create.onsubmit = function (event) {
+                        event.preventDefault();
+                        var payload = { name: create.elements.name.value, description: create.elements.description.value };
+                        fetch("/api/admin/agent-groups", { method: "POST", credentials: "same-origin",
+                            headers: { "Content-Type": "application/json", "X-SIRK-CSRF": bootstrap.csrfToken || "" },
+                            body: JSON.stringify(payload) }).then(function (response) { return response.json().then(function (value) { if (!response.ok) throw new Error(value.error || "Nie dodano grupy."); }); })
+                            .then(renderAgentGroups).catch(function (error) { status.textContent = error.message || String(error); });
+                    };
+                    agentGroupsHost.appendChild(create);
+                    groups.forEach(function (group) {
+                        var card = document.createElement("section"); card.className = "sirk-card sirk-agent-group-card";
+                        var heading = document.createElement("h3"); heading.textContent = group.name; card.appendChild(heading);
+                        var copy = document.createElement("p"); copy.textContent = group.description || "Bez opisu"; card.appendChild(copy);
+                        var actions = document.createElement("div"); actions.className = "sirk-agent-group-actions";
+                        [["silent", "Pobierz instalację cichą"], ["run", "Pobierz tryb uruchomienia"]].forEach(function (item) {
+                            var link = document.createElement("a"); link.className = "sirk-button"; link.textContent = item[1];
+                            link.href = "/api/admin/agent-groups?groupId=" + encodeURIComponent(group.id) + "&download=" + item[0];
+                            actions.appendChild(link);
+                        });
+                        var remove = document.createElement("button"); remove.type = "button"; remove.textContent = "Usuń grupę";
+                        remove.onclick = function () {
+                            if (!window.confirm("Usunąć grupę " + group.name + "?")) return;
+                            fetch("/api/admin/agent-groups", { method: "DELETE", credentials: "same-origin",
+                                headers: { "Content-Type": "application/json", "X-SIRK-CSRF": bootstrap.csrfToken || "" },
+                                body: JSON.stringify({ id: group.id }) }).then(function (response) { if (!response.ok) return response.json().then(function (value) { throw new Error(value.error || "Nie usunięto grupy."); }); })
+                                .then(renderAgentGroups).catch(function (error) { status.textContent = error.message || String(error); });
+                        };
+                        actions.appendChild(remove); card.appendChild(actions); agentGroupsHost.appendChild(card);
+                    });
+                    status.textContent = groups.length ? "Grupy hostów: " + groups.length : "Nie utworzono jeszcze grup hostów.";
+                }).catch(function (error) { agentGroupsHost.innerHTML = ""; status.textContent = error.message || String(error); });
+        }
+        ["Overview", "Settings", "Grupy hostów", "Plugins", "Server", "Debug", "System"].forEach(function (name, index) { var button = document.createElement("button"); button.type = "button"; button.className = "sirk-nav-item" + (name === "Settings" ? " active" : ""); button.textContent = name; button.onclick = function () { Array.prototype.forEach.call(primary.children, function (node) { node.classList.remove("active"); }); button.classList.add("active"); if (agentGroupsHost) agentGroupsHost.hidden = true; if (name === "Settings") { renderSecondary(["Overview", "Portal", "Moduły", "Integracje", "Uprawnienia", "Diagnostyka", "Aktualizacje"], "Overview", selectSettingsPane); selectSettingsPane("Overview"); return; } if (name === "Grupy hostów") { renderSecondary(["Grupy i instalatory"], "Grupy i instalatory", renderAgentGroups); renderAgentGroups(); return; } var subcategories = name === "Debug" ? ["Config", "Logi", "Błędy"] : name === "System" ? ["Aktualizacje", "Backupy", "Historia", "Kanał"] : name === "Plugins" ? ["Zainstalowane", "Dostępne", "Historia"] : ["Przegląd", "Status", "Historia"]; renderSecondary(subcategories, subcategories[0], function (sub) { renderAdminPane(name, sub); }); renderAdminPane(name, subcategories[0]); }; primary.appendChild(button); });
         renderSecondary(["Overview", "Portal", "Moduły", "Integracje", "Uprawnienia", "Diagnostyka", "Aktualizacje"], "Overview", selectSettingsPane);
         var panel = document.createElement("section"); panel.className = "sirk-card";
         var title = document.createElement("h2"); title.textContent = "Portal settings"; panel.appendChild(title);
@@ -547,7 +591,7 @@
         form.appendChild(portalControls); form.appendChild(modules); form.appendChild(save); panel.appendChild(form); details.appendChild(panel);
         var restartResume = null;
         try { restartResume = JSON.parse(sessionStorage.getItem("sirkPortal.restartState") || "null"); } catch (error) {}
-        if (restartResume && restartResume.section) primary.children[5].click();
+        if (restartResume && restartResume.section) primary.children[6].click();
         var base = "/api";
         fetch(base + "/admin/settings", { credentials: "same-origin", cache: "no-store" }).then(function (response) { return response.json().then(function (value) { if (!response.ok) throw new Error(value.error || "Settings unavailable."); return value.value; }); }).then(function (snapshot) {
             settingsSnapshot = snapshot;

@@ -69,6 +69,43 @@ module.exports.createHandler = function (runtime, host) {
                 });
                 return;
             }
+            if (url.pathname === "/api/admin/agent-groups") {
+                if (!user.isAdmin || !host.agentGroups) {
+                    sendJson(res, 403, { ok: false, error: "Permission denied." }); return;
+                }
+                try {
+                    if (req.method === "GET" && url.searchParams.get("download")) {
+                        var requestHost = String(req.headers.host || "");
+                        if (!/^[a-zA-Z0-9.-]+(?::[0-9]{1,5})?$/.test(requestHost))
+                            throw new Error("Invalid Portal host.");
+                        var scheme = String(req.headers["x-forwarded-proto"] || "https").split(",")[0].trim();
+                        if (scheme !== "https" && scheme !== "http") scheme = "https";
+                        var origin = String(process.env.SIRK_PUBLIC_URL || scheme + "://" + requestHost);
+                        var groupId = String(url.searchParams.get("groupId") || "");
+                        var mode = url.searchParams.get("download") === "run" ? "run" : "silent";
+                        var script = host.agentGroups.bootstrapScript(groupId, mode, origin);
+                        res.statusCode = 200;
+                        res.setHeader("Content-Type", "text/plain; charset=utf-8");
+                        res.setHeader("Content-Disposition", "attachment; filename=\"SIRK-Agent-" +
+                            groupId.replace(/[^a-zA-Z0-9._-]/g, "") + "-" + mode + ".ps1\"");
+                        res.end(script);
+                        return;
+                    }
+                    if (req.method === "GET") {
+                        sendJson(res, 200, { ok: true, value: host.agentGroups.list() }); return;
+                    }
+                    if (req.method === "POST") {
+                        sendJson(res, 201, { ok: true, value: host.agentGroups.create(state.body) }); return;
+                    }
+                    if (req.method === "DELETE") {
+                        host.agentGroups.remove(state.body.id);
+                        sendJson(res, 200, { ok: true }); return;
+                    }
+                    sendJson(res, 405, { ok: false, error: "Method not allowed." }); return;
+                } catch (error) {
+                    sendJson(res, 400, { ok: false, error: String(error && error.message || error) }); return;
+                }
+            }
             if (url.pathname === "/api/agent-operations") {
                 if (!user.isAdmin) { sendJson(res, 403, { ok: false, error: "Permission denied." }); return; }
                 if (!agentCommands) agentCommands = agentCommandBrokerFactory.create({ dataRoot: host.dataRoot });

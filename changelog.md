@@ -1,3 +1,11 @@
+## 2.0.0-dev.14
+
+- Add multi-session and multi-monitor remote desktop with pointer movement, drag, wheel, keyboard, special keys and clipboard.
+- Show live SIRK Agent security, management, runtime, endurance, quarantine, activity, browser, risk and queue readings.
+- Add host groups with short-lived enrollment downloads for silent installation and run-only operation.
+- Issue production ES256 device policies and trusted policy keys during authenticated enrollment.
+- Build a Windows x64 Portal installer EXE and publish it as a GitHub Actions artifact or Release asset.
+
 ## 2.0.0-dev.5
 
 - Fix standalone Agent Terminal and Files operations to use the authenticated POST command contract.

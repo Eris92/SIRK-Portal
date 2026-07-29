@@ -1,5 +1,15 @@
 [
   {
+    "version": "2.0.0-dev.14",
+    "date": "2026-07-29",
+    "changes": [
+      "Add multi-session and multi-monitor SIRK Agent desktop with full pointer, keyboard and clipboard controls",
+      "Expose live Agent security, endurance, quarantine, activity, risk and queue readings in Security",
+      "Add host groups with short-lived enrollment downloads for silent install and run-only modes",
+      "Build a Windows x64 Portal installer EXE and publish it through the release workflow"
+    ]
+  },
+  {
     "version": "2.0.0-dev.5",
     "date": "2026-07-28",
     "changes": [

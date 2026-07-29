@@ -27,7 +27,25 @@
 .sirk-agent-file-list small { color:#708096; }
 .sirk-agent-desktop-pending { justify-content:center; text-align:center; }
 .sirk-agent-desktop-stage { display:flex; flex:1; min-height:360px; align-items:center; justify-content:center; overflow:auto; border-radius:7px; background:#0b1020; }
-.sirk-agent-desktop-stage img { display:block; max-width:100%; max-height:calc(100vh - 300px); cursor:crosshair; user-select:none; }
+.sirk-agent-desktop-stage img { display:block; max-width:100%; max-height:calc(100vh - 300px); cursor:crosshair; user-select:none; touch-action:none; }
+.sirk-agent-desktop-controls,
+.sirk-agent-desktop-input,
+.sirk-agent-desktop-clipboard { display:flex; flex-wrap:wrap; gap:8px; align-items:flex-end; }
+.sirk-agent-desktop-controls label { display:grid; gap:4px; min-width:190px; font-size:12px; color:#9ca9bd; }
+.sirk-agent-desktop-controls select,
+.sirk-agent-desktop-input input,
+.sirk-agent-desktop-input select,
+.sirk-agent-desktop-clipboard textarea { min-height:36px; border:1px solid #344158; border-radius:6px; background:#111827; color:#e8edf5; padding:7px 9px; }
+.sirk-agent-desktop-input input { flex:1 1 260px; }
+.sirk-agent-desktop-clipboard textarea { flex:1 1 360px; min-height:68px; resize:vertical; }
+.sirk-agent-group-create { display:grid; grid-template-columns:minmax(180px,1fr) minmax(240px,2fr) auto; gap:10px; align-items:end; }
+.sirk-agent-group-create h3 { grid-column:1/-1; margin:0; }
+.sirk-agent-group-create label { display:grid; gap:5px; }
+.sirk-agent-group-create input { min-height:36px; }
+.sirk-agent-group-card { margin-top:10px; }
+.sirk-agent-group-actions { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+.sirk-agent-group-actions .sirk-button { text-decoration:none; }
+@media (max-width:800px) { .sirk-agent-group-create { grid-template-columns:1fr; } }
 
 .sirk-device-compact-header {
     display: flex;

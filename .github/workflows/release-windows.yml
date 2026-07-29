@@ -1,0 +1,92 @@
+name: SIRK Portal Windows Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Installer version
+        required: true
+        default: 2.0.0
+      publish_release:
+        description: Publish or update GitHub Release
+        required: true
+        type: boolean
+        default: false
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  windows-installer:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Validate Portal
+        run: npm test
+      - name: Stage application and service runtime
+        shell: pwsh
+        run: |
+          $version = if ("${{ github.event_name }}" -eq "workflow_dispatch") {
+            "${{ inputs.version }}"
+          } else {
+            "${{ github.ref_name }}".TrimStart("v")
+          }
+          if ($version -notmatch '^\d+\.\d+\.\d+([.-][0-9A-Za-z.-]+)?$') {
+            throw "Invalid release version: $version"
+          }
+          $stage = Join-Path $env:RUNNER_TEMP "sirk-portal-stage"
+          New-Item -ItemType Directory -Path $stage -Force | Out-Null
+          & robocopy.exe $env:GITHUB_WORKSPACE $stage /E /XD .git .agents .github .release node_modules artifacts docs test scripts assets /XF AGENTS.md README.md changelog.md
+          if ($LASTEXITCODE -gt 7) { throw "Portal staging failed with robocopy code $LASTEXITCODE" }
+          New-Item -ItemType Directory -Path (Join-Path $stage "runtime") -Force | Out-Null
+          New-Item -ItemType Directory -Path (Join-Path $stage "server\daemon") -Force | Out-Null
+          Copy-Item -LiteralPath (Get-Command node.exe).Source -Destination (Join-Path $stage "runtime\node.exe")
+          $winsw = Join-Path $stage "server\daemon\sirkportal.exe"
+          Invoke-WebRequest -Uri "https://github.com/winsw/winsw/releases/download/v2.12.0/WinSW-x64.exe" -OutFile $winsw
+          $winswHash = (Get-FileHash -LiteralPath $winsw -Algorithm SHA256).Hash
+          if ($winswHash -ne "05B82D46AD331CC16BDC00DE5C6332C1EF818DF8CEEFCD49C726553209B3A0DA") {
+            throw "WinSW SHA-256 verification failed."
+          }
+          $env:SIRK_PORTAL_VERSION = $version
+          $env:SIRK_PORTAL_STAGE = $stage
+          "SIRK_PORTAL_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "SIRK_PORTAL_STAGE=$stage" | Out-File -FilePath $env:GITHUB_ENV -Append
+      - name: Build Windows EXE installer
+        shell: pwsh
+        run: |
+          $output = Join-Path $env:GITHUB_WORKSPACE "artifacts"
+          New-Item -ItemType Directory -Path $output -Force | Out-Null
+          $iscc = @(
+            "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe",
+            "$env:ProgramFiles\Inno Setup 6\ISCC.exe",
+            "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe"
+          ) | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+          if (-not (Test-Path -LiteralPath $iscc)) { throw "Inno Setup compiler is unavailable." }
+          & $iscc "/O$output" (Join-Path $env:GITHUB_WORKSPACE "tools\installer\SIRK-Portal.iss")
+          if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed." }
+          Get-FileHash (Join-Path $output "*.exe") -Algorithm SHA256 |
+            ForEach-Object { "$($_.Hash)  $([IO.Path]::GetFileName($_.Path))" } |
+            Set-Content (Join-Path $output "SHA256SUMS.txt") -Encoding ASCII
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SIRK-Portal-${{ env.SIRK_PORTAL_VERSION }}-Windows-x64
+          path: artifacts/*
+          if-no-files-found: error
+      - name: Publish GitHub Release assets
+        if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.publish_release)
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = if ("${{ github.event_name }}" -eq "workflow_dispatch") { "v$env:SIRK_PORTAL_VERSION" } else { "${{ github.ref_name }}" }
+          gh release view $tag *> $null
+          if ($LASTEXITCODE -ne 0) {
+            gh release create $tag --target $env:GITHUB_SHA --prerelease --title "SIRK Portal $env:SIRK_PORTAL_VERSION" --generate-notes
+          }
+          gh release upload $tag artifacts/* --clobber

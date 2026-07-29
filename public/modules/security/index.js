@@ -25,6 +25,28 @@
     function clear(host) { while (host.firstChild) host.removeChild(host.firstChild); }
     function element(tag, className, value) { var node = document.createElement(tag); if (className) node.className = className; if (value != null) node.textContent = value; return node; }
     function addList(host, title, values) { if (!Array.isArray(values) || !values.length) return; var section = element("section", "sirk-card"); section.appendChild(element("h3", "", title)); var list = element("ul", "sirk-agent-capability-list"); values.forEach(function (value) { list.appendChild(element("li", "", value)); }); section.appendChild(list); host.appendChild(section); }
+    function flatten(value, prefix, rows) {
+        if (value == null || typeof value !== "object") { rows.push([prefix || "wartość", text(value)]); return rows; }
+        if (Array.isArray(value)) {
+            if (!value.length) rows.push([prefix || "wartość", "[]"]);
+            value.forEach(function (item, index) { flatten(item, (prefix ? prefix + "." : "") + index, rows); });
+            return rows;
+        }
+        var keys = Object.keys(value);
+        if (!keys.length) rows.push([prefix || "wartość", "{}"]);
+        keys.sort().forEach(function (key) { flatten(value[key], prefix ? prefix + "." + key : key, rows); });
+        return rows;
+    }
+    function liveReadings(host, fields, devices) {
+        (devices || []).forEach(function (device) {
+            var section = element("section", "sirk-card"), table = element("table", "sirk-settings-table"), body = element("tbody"), rows = [];
+            section.appendChild(element("h3", "", text(device.machineName) + " · aktualne odczyty"));
+            fields.forEach(function (field) { flatten(device[field], field, rows); });
+            table.innerHTML = "<thead><tr><th>Parametr</th><th>Odczyt</th></tr></thead>";
+            rows.forEach(function (item) { var row = element("tr"); row.appendChild(element("td", "", item[0])); row.appendChild(element("td", "", item[1])); body.appendChild(row); });
+            table.appendChild(body); section.appendChild(table); host.appendChild(section);
+        });
+    }
     function renderDeviceTable(host, devices) {
         var section = element("section", "sirk-card"), table = element("table", "sirk-settings-table"), body = element("tbody");
         section.appendChild(element("h3", "", "Urządzenia zgłoszone przez SIRK Agent")); table.innerHTML = "<thead><tr><th>Urządzenie</th><th>Tenant / Device ID</th><th>Wersja</th><th>Stan</th><th>Ostatni check-in</th></tr></thead>";
@@ -41,7 +63,7 @@
             details.appendChild(cards); renderDeviceTable(details, agentState.snapshot.devices || []); return;
         }
         var liveFields = category.fields || [];
-        if (liveFields.length) { var live = element("section", "sirk-card"), pre = element("pre", "sirk-output"); live.appendChild(element("h3", "", "Aktualne dane urządzeń")); pre.textContent = JSON.stringify((agentState.snapshot.devices || []).map(function (device) { var value = { machineName: device.machineName, deviceId: device.deviceId }; liveFields.forEach(function (field) { value[field] = device[field]; }); return value; }), null, 2); live.appendChild(pre); details.appendChild(live); }
+        if (liveFields.length) liveReadings(details, liveFields, agentState.snapshot.devices || []);
     }
     function renderCategoryNavigation(shell, categories) {
         shell.nav(shell.state.page.secondary, categories.map(function (item) { return { key: item.key, title: item.title }; }), agentState.category, function (item) { agentState.category = item.key; renderCategoryNavigation(shell, categories); renderCategory(shell, categories.find(function (entry) { return entry.key === agentState.category; })); });
