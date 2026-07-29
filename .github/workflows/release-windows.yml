@@ -44,6 +44,7 @@ jobs:
           New-Item -ItemType Directory -Path $stage -Force | Out-Null
           & robocopy.exe $env:GITHUB_WORKSPACE $stage /E /XD .git .agents .github .release node_modules artifacts docs test scripts assets /XF AGENTS.md README.md changelog.md
           if ($LASTEXITCODE -gt 7) { throw "Portal staging failed with robocopy code $LASTEXITCODE" }
+          $global:LASTEXITCODE = 0
           New-Item -ItemType Directory -Path (Join-Path $stage "runtime") -Force | Out-Null
           New-Item -ItemType Directory -Path (Join-Path $stage "server\daemon") -Force | Out-Null
           Copy-Item -LiteralPath (Get-Command node.exe).Source -Destination (Join-Path $stage "runtime\node.exe")
