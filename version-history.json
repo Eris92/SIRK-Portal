@@ -1,5 +1,12 @@
 [
   {
+    "version": "2.0.0-dev.15",
+    "date": "2026-07-29",
+    "changes": [
+      "Normalize interactive-session metadata for monitor selection and clipboard reads in the Portal UI"
+    ]
+  },
+  {
     "version": "2.0.0-dev.14",
     "date": "2026-07-29",
     "changes": [

@@ -1,3 +1,7 @@
+## 2.0.0-dev.15
+
+- Normalize interactive-session metadata so monitor selection and clipboard reads work through the Portal UI.
+
 ## 2.0.0-dev.14
 
 - Add multi-session and multi-monitor remote desktop with pointer movement, drag, wheel, keyboard, special keys and clipboard.

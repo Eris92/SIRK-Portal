@@ -298,11 +298,18 @@
             parameters.monitorIndex = target.monitorIndex;
             return agentOperation(node, "desktop.input", parameters);
         }
+        function desktopData(value) {
+            var response = value.result && value.result.data || {};
+            if (response.data && typeof response.data === "object") {
+                Object.keys(response.data).forEach(function (key) { response[key] = response.data[key]; });
+            }
+            return response;
+        }
         function loadMonitors() {
             monitor.disabled = true;
             return runAgentOperation(node, "desktop.monitors", { sessionId: Number(session.value) }, status)
                 .then(function (value) {
-                    var data = value.result && value.result.data || {};
+                    var data = desktopData(value);
                     monitor.innerHTML = '<option value="-1">Wszystkie monitory</option>';
                     (data.monitors || []).forEach(function (item) {
                         var option = document.createElement("option");
@@ -335,7 +342,7 @@
             var target = selected();
             runAgentOperation(node, "desktop.snapshot", target, status).then(function (value) {
                 if (stopped || !host.isConnected || generation !== streamGeneration) return;
-                var data = value.result && value.result.data;
+                var data = desktopData(value);
                 if (value.status === "failed" || !data || !data.imageBase64) {
                     throw new Error(value.result && (value.result.output || value.result.code) || "Brak obrazu.");
                 }
@@ -405,7 +412,7 @@
         });
         host.querySelector("[data-agent-desktop-clipboard-get]").addEventListener("click", function () {
             runAgentOperation(node, "desktop.input", Object.assign(selected(), { action: "clipboardGet" }), status)
-                .then(function (value) { clipboard.value = value.result && value.result.data && value.result.data.text || ""; })
+                .then(function (value) { clipboard.value = desktopData(value).text || ""; })
                 .catch(function (error) { status.textContent = error.message || String(error); status.classList.add("is-error"); });
         });
         host.querySelector("[data-agent-desktop-clipboard-set]").addEventListener("click", function () {
