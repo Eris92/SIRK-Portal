@@ -87,6 +87,7 @@ module.exports.create = function (options) {
     var batchPath = path.join(dataRoot, "agent-event-batches.jsonl");
     var policyRoot = path.join(dataRoot, "agent-policy-outbox");
     var commandBroker = options.commandBroker || commandBrokerFactory.create({ dataRoot: dataRoot });
+    var desktopRelay = options.desktopRelay || null;
     fs.mkdirSync(dataRoot, { recursive: true });
     if (!enrollmentToken && options.autoCreateEnrollmentToken === true) {
         var enrollmentTokenPath = path.join(dataRoot, "agent-enrollment-token.txt");
@@ -136,7 +137,9 @@ module.exports.create = function (options) {
 
     function handler(req, res) {
         var url = new URL(req.url, "http://sirk.local");
-        if (url.pathname !== "/api/agent/v1/checkin" && url.pathname !== "/api/agent/v1/enroll" &&
+        if (url.pathname !== "/api/agent/v1/checkin" && url.pathname !== "/api/agent/v1/desktop/frame" &&
+            url.pathname !== "/api/agent/v1/desktop/control" &&
+            url.pathname !== "/api/agent/v1/enroll" &&
             url.pathname !== "/api/agent/v1/rotate-key") return false;
         if (req.method !== "POST") {
             sendJson(res, 405, { ok: false, error: "Method not allowed." });
@@ -146,7 +149,7 @@ module.exports.create = function (options) {
         req.on("data", function (chunk) {
             if (ended) return;
             size += chunk.length;
-            if (size > 1024 * 1024) {
+            if (size > (url.pathname === "/api/agent/v1/desktop/frame" ? 4 * 1024 * 1024 : 1024 * 1024)) {
                 ended = true;
                 sendJson(res, 413, { ok: false, error: "Agent check-in body is too large." });
                 req.destroy();
@@ -158,6 +161,77 @@ module.exports.create = function (options) {
             if (ended) return;
             try {
                 var bodyBytes = Buffer.concat(chunks);
+                if (url.pathname === "/api/agent/v1/desktop/control") {
+                    var controlBody = JSON.parse(bodyBytes.toString("utf8"));
+                    var controlTenantId = safeId(req.headers["x-sirk-tenant"] || controlBody.tenantId);
+                    var controlDeviceId = safeId(req.headers["x-sirk-device"] || controlBody.deviceId);
+                    var controlRegistry = readRegistry();
+                    var controlDevice = controlRegistry.devices[controlTenantId + "/" + controlDeviceId];
+                    if (!controlTenantId || !controlDeviceId || !controlDevice ||
+                        !authorizedHash(req, controlDevice.credentialHash) ||
+                        !validDeviceSignature(req, bodyBytes, controlDevice)) {
+                        sendJson(res, 401, { ok: false, error: "Desktop control authentication failed." });
+                        return;
+                    }
+                    if (!desktopRelay) {
+                        sendJson(res, 503, { ok: false, error: "Desktop relay unavailable." });
+                        return;
+                    }
+                    var control = await desktopRelay.control(controlTenantId, controlDeviceId,
+                        Math.max(0, Math.min(25000, Number(controlBody.waitMilliseconds) || 0)));
+                    sendJson(res, 200, { ok: true, viewerActive: control.viewerActive, inputs: control.inputs });
+                    return;
+                }
+                if (url.pathname === "/api/agent/v1/desktop/frame") {
+                    var frameTenantId = safeId(req.headers["x-sirk-tenant"]);
+                    var frameDeviceId = safeId(req.headers["x-sirk-device"]);
+                    var frameRegistry = readRegistry();
+                    var frameDevice = frameRegistry.devices[frameTenantId + "/" + frameDeviceId];
+                    if (!frameTenantId || !frameDeviceId || !frameDevice ||
+                        !authorizedHash(req, frameDevice.credentialHash) ||
+                        !validDeviceSignature(req, bodyBytes, frameDevice)) {
+                        sendJson(res, 401, { ok: false, error: "Desktop frame authentication failed." });
+                        return;
+                    }
+                    if (!desktopRelay || bodyBytes.length < 4) {
+                        sendJson(res, 503, { ok: false, error: "Desktop relay unavailable." });
+                        return;
+                    }
+                    var published = desktopRelay.publish(frameTenantId, frameDeviceId, bodyBytes, {
+                        width: Number(req.headers["x-sirk-width"]) || 0,
+                        height: Number(req.headers["x-sirk-height"]) || 0,
+                        captureMilliseconds: Number(req.headers["x-sirk-capture-ms"]) || 0,
+                        encodeMilliseconds: Number(req.headers["x-sirk-encode-ms"]) || 0,
+                        captureBackend: String(req.headers["x-sirk-capture-backend"] || "").slice(0, 64),
+                        fullFrame: String(req.headers["x-sirk-full-frame"] || "") === "1",
+                        patches: (function () {
+                            try {
+                                var encoded = String(req.headers["x-sirk-patches"] || "");
+                                if (encoded.length > 16384) return [];
+                                var parsed = JSON.parse(Buffer.from(encoded, "base64").toString("utf8"));
+                                return Array.isArray(parsed) ? parsed.slice(0, 64) : [];
+                            } catch (error) { return []; }
+                        }()),
+                        moves: (function () {
+                            try {
+                                var encoded = String(req.headers["x-sirk-moves"] || "");
+                                if (encoded.length > 16384) return [];
+                                var parsed = JSON.parse(Buffer.from(encoded, "base64").toString("utf8"));
+                                return Array.isArray(parsed) ? parsed.slice(0, 64) : [];
+                            } catch (error) { return []; }
+                        }()),
+                        cursorX: Number(req.headers["x-sirk-cursor-x"]) || 0,
+                        cursorY: Number(req.headers["x-sirk-cursor-y"]) || 0,
+                        capturedAtUnixMilliseconds: Number(req.headers["x-sirk-captured-at"]) || 0,
+                        encodedBytes: bodyBytes.length,
+                        encoding: "JPEG"
+                    });
+                    sendJson(res, 202, {
+                        ok: true, sequence: published.sequence, viewers: published.viewers,
+                        inputs: published.inputs
+                    });
+                    return;
+                }
                 var body = JSON.parse(bodyBytes.toString("utf8"));
                 var tenantId = safeId(body.tenantId);
                 var deviceId = safeId(body.deviceId);

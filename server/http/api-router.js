@@ -69,6 +69,42 @@ module.exports.createHandler = function (runtime, host) {
                 });
                 return;
             }
+            if (req.method === "GET" && url.pathname === "/api/agent-desktop/frame") {
+                if (!user.isAdmin || !host.agentDesktopRelay) {
+                    sendJson(res, 403, { ok: false, error: "Permission denied." }); return;
+                }
+                var frameTenant = String(url.searchParams.get("tenantId") || "");
+                var frameDevice = String(url.searchParams.get("deviceId") || "");
+                var after = Math.max(0, Number(url.searchParams.get("after")) || 0);
+                var wait = Math.max(0, Math.min(25000, Number(url.searchParams.get("waitMilliseconds")) || 0));
+                host.agentDesktopRelay.wait(frameTenant, frameDevice, after, wait).then(function (value) {
+                    if (!value) { res.statusCode = 204; res.end(); return; }
+                    res.statusCode = 200;
+                    res.setHeader("Content-Type", "image/jpeg");
+                    res.setHeader("Cache-Control", "no-store");
+                    res.setHeader("X-SIRK-Sequence", String(value.sequence));
+                    res.setHeader("X-SIRK-Metadata", Buffer.from(JSON.stringify(value.metadata)).toString("base64"));
+                    res.end(value.frame);
+                });
+                return;
+            }
+            if (req.method === "POST" && url.pathname === "/api/agent-desktop/input") {
+                if (!user.isAdmin || !host.agentDesktopRelay) {
+                    sendJson(res, 403, { ok: false, error: "Permission denied." }); return;
+                }
+                var inputTenant = String(state.body.tenantId || "");
+                var inputDevice = String(state.body.deviceId || "");
+                var input = state.body.input && typeof state.body.input === "object" ? state.body.input : {};
+                var allowed = ["move", "leftDown", "leftUp", "rightClick", "middleClick", "wheel",
+                    "key", "text", "clipboardGet", "clipboardSet", "clipboardFileSet", "streamProfile",
+                    "requestKeyframe"];
+                if (allowed.indexOf(String(input.action || "")) < 0) {
+                    sendJson(res, 400, { ok: false, error: "Unsupported desktop input." }); return;
+                }
+                var queued = host.agentDesktopRelay.input(inputTenant, inputDevice, input);
+                sendJson(res, 202, { ok: true, value: queued });
+                return;
+            }
             if (url.pathname === "/api/admin/agent-groups") {
                 if (!user.isAdmin || !host.agentGroups) {
                     sendJson(res, 403, { ok: false, error: "Permission denied." }); return;

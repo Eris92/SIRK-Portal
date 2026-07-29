@@ -9,6 +9,7 @@ Wybierz test na podstawie zmienianego kontraktu. Nie czytaj wszystkich testów p
 | folder permissions | `folder-access.test.js` |
 | dostęp do widoków Portalu | `portal-view-access.test.js` |
 | integracje i health | `integration-health.test.js` |
+| połączenie wychodzące z Portal Central | `central-tunnel-client.test.js` |
 | dostęp i Desktop | `portal-access-and-desktop-connect.test.js` |
 | Terminal | `portal-terminal-connect.test.js` |
 | aktualizacje pluginów | `plugin-update-manager.test.js` |

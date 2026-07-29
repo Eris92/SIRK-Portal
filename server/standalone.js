@@ -7,8 +7,10 @@ var path = require("path");
 var adapter = require("./adapters/standalone/index.js");
 var agentGatewayFactory = require("./core/agent-gateway.js");
 var agentCommandBrokerFactory = require("./core/agent-command-broker.js");
+var agentDesktopRelayFactory = require("./core/agent-desktop-relay.js");
 var agentGroupFactory = require("./core/agent-group-service.js");
 var agentPolicyFactory = require("./core/agent-policy-service.js");
+var centralTunnelFactory = require("./core/central-tunnel-client.js");
 var apiFactory = require("./http/api-router.js");
 var identityFactory = require("./core/identity-store.js");
 var maintenance = require("./core/portal-maintenance.js");
@@ -239,6 +241,7 @@ function start(options) {
     host.agentGroups = agentGroupFactory.create({ dataRoot: host.dataRoot });
     host.agentPolicies = agentPolicyFactory.create({ dataRoot: host.dataRoot });
     host.agentCommands = agentCommandBrokerFactory.create({ dataRoot: host.dataRoot });
+    host.agentDesktopRelay = agentDesktopRelayFactory.create();
     var runtime = runtimeFactory.createRuntime(host, ROOT);
     var api = apiFactory.createHandler(runtime, host);
     var manager = updateManagerFactory.create({ appRoot: ROOT, dataRoot: host.dataRoot });
@@ -251,6 +254,7 @@ function start(options) {
         enrollmentAssigned: host.agentGroups.assign,
         policyService: host.agentPolicies,
         commandBroker: host.agentCommands
+        , desktopRelay: host.agentDesktopRelay
     });
 
     function portalConfig() {
@@ -338,7 +342,22 @@ function start(options) {
         });
         return new Promise(function (resolve) {
             var port = options.port == null ? Number(process.env.PORT || 8080) : Number(options.port);
-            server.listen(port, options.host || process.env.HOST || "127.0.0.1", function () { resolve(server); });
+            server.listen(port, options.host || process.env.HOST || "127.0.0.1", function () {
+                var address = server.address();
+                var storedCentral = runtime.context.secrets.get("central-tunnel");
+                var centralTunnel = centralTunnelFactory.create({
+                    centralUrl: options.centralUrl || storedCentral.centralUrl,
+                    portalId: options.centralPortalId || storedCentral.portalId,
+                    portalName: options.centralPortalName || storedCentral.portalName,
+                    portalToken: options.centralToken || storedCentral.portalToken,
+                    localPort: address && address.port,
+                    portalVersion: version()
+                });
+                if (centralTunnel.configured()) centralTunnel.connect();
+                server.on("close", centralTunnel.stop);
+                host.centralTunnel = centralTunnel;
+                resolve(server);
+            });
         });
     });
 }
