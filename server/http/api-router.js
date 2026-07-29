@@ -97,7 +97,7 @@ module.exports.createHandler = function (runtime, host) {
                 var input = state.body.input && typeof state.body.input === "object" ? state.body.input : {};
                 var allowed = ["move", "leftDown", "leftUp", "rightClick", "middleClick", "wheel",
                     "key", "text", "clipboardGet", "clipboardSet", "clipboardFileSet", "streamProfile",
-                    "requestKeyframe"];
+                    "requestKeyframe", "streamStop"];
                 if (allowed.indexOf(String(input.action || "")) < 0) {
                     sendJson(res, 400, { ok: false, error: "Unsupported desktop input." }); return;
                 }

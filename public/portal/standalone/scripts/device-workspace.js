@@ -662,6 +662,7 @@
             });
         });
         disconnectButton.addEventListener("click", function () {
+            input({ action: "streamStop" }).catch(function () {});
             connected = false;
             streamGeneration += 1;
             hasCompleteFrame = false;
