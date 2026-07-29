@@ -303,10 +303,10 @@
         var hasCompleteFrame = false;
         var frameTimes = [], inputTimes = [], byteSamples = [], renderedFrames = 0, statsStartedAt = performance.now();
         var profiles = {
-            smooth: { maxWidth: 1920, quality: 72 },
-            text: { maxWidth: 1920, quality: 80 },
-            weak: { maxWidth: 1280, quality: 55 },
-            minimum: { maxWidth: 960, quality: 35 }
+            smooth: { maxWidth: 1920, quality: 72, targetKbps: 1000 },
+            text: { maxWidth: 1920, quality: 80, targetKbps: 1500 },
+            weak: { maxWidth: 1280, quality: 55, targetKbps: 700 },
+            minimum: { maxWidth: 960, quality: 35, targetKbps: 350 }
         };
         function percentile(values, fraction) {
             if (!values.length) return 0;
@@ -409,7 +409,8 @@
             hasCompleteFrame = false;
             snapshot.sequence = 0;
             var settings = effectiveProfile();
-            input({ action: "streamProfile", maxWidth: settings.maxWidth, quality: settings.quality })
+            input({ action: "streamProfile", maxWidth: settings.maxWidth, quality: settings.quality,
+                targetKbps: settings.targetKbps })
                 .catch(function () {});
             snapshot(streamGeneration);
         }
