@@ -68,6 +68,11 @@ async function invoke(gateway, token, body, url, privateKey) {
         }]);
         assert.strictEqual((await completedWait).status, "completed",
             "Command completion must wake the waiting Portal request.");
+        commandBroker.queue("investa", "priority-device", "desktop.snapshot", {}, { id: "latency-test" });
+        commandBroker.queue("investa", "priority-device", "desktop.input",
+            { action: "move", x: 10, y: 10 }, { id: "latency-test" });
+        assert.strictEqual(commandBroker.pending("investa", "priority-device", 2)[0].type, "desktop.input",
+            "Desktop input must bypass queued screen frames.");
         var assignedGroup = null;
         var issuedPolicy = null;
         var gateway = gatewayFactory.create({

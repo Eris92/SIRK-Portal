@@ -108,9 +108,18 @@ module.exports.create = function (options) {
 
     function pending(tenantId, deviceId, limit) {
         var now = Date.now();
+        function priority(command) {
+            if (command.type === "desktop.input") return 0;
+            if (command.type === "desktop.monitors" || command.type === "desktop.sessions") return 1;
+            if (command.type === "desktop.snapshot") return 3;
+            return 2;
+        }
         return Array.from(commandStore(tenantId, deviceId).values())
             .filter(function (value) { return value && value.status === "queued" && Date.parse(value.expiresAtUtc) > now; })
-            .sort(function (a, b) { return String(a.createdAtUtc).localeCompare(String(b.createdAtUtc)); })
+            .sort(function (a, b) {
+                return priority(a) - priority(b) ||
+                    String(a.createdAtUtc).localeCompare(String(b.createdAtUtc));
+            })
             .slice(0, Math.max(1, Math.min(10, Number(limit) || 5)));
     }
 

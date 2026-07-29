@@ -1,3 +1,9 @@
+## 2.0.0-dev.19
+
+- Add live remote desktop FPS, latency, pipeline, bitrate, backend and link telemetry.
+- Add Auto, Smooth, Sharp text, Weak link and Minimum transfer desktop profiles.
+- Prioritize keyboard and mouse commands over screen frames and raise pointer updates to 60 Hz.
+
 ## 2.0.0-dev.18
 
 - Close active Agent long-polls during Portal shutdown so the Windows service restarts promptly.

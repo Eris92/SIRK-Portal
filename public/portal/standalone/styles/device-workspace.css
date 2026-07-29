@@ -28,6 +28,9 @@
 .sirk-agent-desktop-pending { justify-content:center; text-align:center; }
 .sirk-agent-desktop-stage { display:flex; flex:1; min-height:360px; align-items:center; justify-content:center; overflow:auto; border-radius:7px; background:#0b1020; }
 .sirk-agent-desktop-stage img { display:block; max-width:100%; max-height:calc(100vh - 300px); cursor:crosshair; user-select:none; touch-action:none; }
+.sirk-agent-desktop-stats { display:flex; flex-wrap:wrap; gap:6px; padding:8px; border:1px solid #344158; border-radius:7px; background:#0b1020; }
+.sirk-agent-desktop-stats span { padding:5px 8px; border-radius:5px; background:#182235; color:#9ca9bd; font-size:12px; }
+.sirk-agent-desktop-stats b { color:#e8edf5; font-variant-numeric:tabular-nums; }
 .sirk-agent-desktop-controls,
 .sirk-agent-desktop-admin,
 .sirk-agent-desktop-input,
