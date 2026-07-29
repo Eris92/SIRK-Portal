@@ -460,6 +460,85 @@
                 y: Math.round((event.clientY - bounds.top) / bounds.height * nativeHeight)
             }).catch(function (error) { status.textContent = error.message || String(error); status.classList.add("is-error"); });
         });
+        function completedInput(parameters) {
+            return runAgentOperation(node, "desktop.input", Object.assign(selected(), parameters), status);
+        }
+        function downloadClipboardFile(data) {
+            if (data.tooLarge) throw new Error("Plik w schowku ma " + data.bytes +
+                " B; automatyczny schowek obsługuje obecnie do " + data.maximumBytes + " B.");
+            var binary = atob(data.fileBase64 || "");
+            var bytes = new Uint8Array(binary.length);
+            for (var index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+            var link = document.createElement("a");
+            link.href = URL.createObjectURL(new Blob([bytes]));
+            link.download = data.fileName || "sirk-transfer.bin";
+            link.click();
+            setTimeout(function () { URL.revokeObjectURL(link.href); }, 1000);
+        }
+        function copyFromRemote() {
+            return completedInput({ action: "key", key: "C", modifiers: "Control" })
+                .then(function () {
+                    return completedInput({ action: "clipboardGet" });
+                }).then(function (value) {
+                    var data = desktopData(value);
+                    if (data.kind === "file") {
+                        downloadClipboardFile(data);
+                        status.textContent = "Pobrano plik ze zdalnego schowka: " + data.fileName;
+                        return;
+                    }
+                    return navigator.clipboard.writeText(data.text || "").then(function () {
+                        status.textContent = "Zdalny tekst jest w lokalnym schowku.";
+                    });
+                });
+        }
+        function pasteToRemote() {
+            return navigator.clipboard.readText().then(function (text) {
+                return completedInput({ action: "clipboardSet", text: text });
+            }).then(function () {
+                return completedInput({ action: "key", key: "V", modifiers: "Control" });
+            }).then(function () { status.textContent = "Wklejono lokalny schowek do sesji zdalnej."; });
+        }
+        image.addEventListener("keydown", function (event) {
+            if (!connected || !event.ctrlKey || event.altKey || event.metaKey) return;
+            var key = String(event.key || "").toLowerCase();
+            if (key !== "c" && key !== "v") return;
+            event.preventDefault();
+            (key === "c" ? copyFromRemote() : pasteToRemote()).catch(function (error) {
+                status.textContent = error.message || String(error);
+                status.classList.add("is-error");
+            });
+        });
+        image.addEventListener("dragover", function (event) {
+            if (!connected) return;
+            event.preventDefault();
+            image.classList.add("is-file-drop");
+        });
+        image.addEventListener("dragleave", function () { image.classList.remove("is-file-drop"); });
+        image.addEventListener("drop", function (event) {
+            event.preventDefault();
+            image.classList.remove("is-file-drop");
+            var file = event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files[0];
+            if (!file) return;
+            if (file.size > 512 * 1024) {
+                status.textContent = "Automatyczny transfer schowka obsługuje obecnie pliki do 512 KiB.";
+                status.classList.add("is-error");
+                return;
+            }
+            var reader = new FileReader();
+            reader.onload = function () {
+                var encoded = String(reader.result || "").split(",")[1] || "";
+                completedInput({ action: "clipboardFileSet", fileName: file.name, fileBase64: encoded })
+                    .then(function () {
+                        return completedInput({ action: "key", key: "V", modifiers: "Control" });
+                    }).then(function () {
+                        status.textContent = "Przeniesiono i wklejono plik: " + file.name;
+                    }).catch(function (error) {
+                        status.textContent = error.message || String(error);
+                        status.classList.add("is-error");
+                    });
+            };
+            reader.readAsDataURL(file);
+        });
         host.querySelector("[data-agent-desktop-send]").addEventListener("click", function () {
             if (!textInput.value) return;
             input({ action: "text", text: textInput.value }).then(function () { textInput.value = ""; })

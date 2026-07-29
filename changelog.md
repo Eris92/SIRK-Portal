@@ -1,3 +1,9 @@
+## 2.0.0-dev.20
+
+- Synchronize remote and local text clipboards through Ctrl+C and Ctrl+V.
+- Transfer small files through desktop drag-and-drop and remote clipboard copy.
+- Remove the manual clipboard controls from the visible Desktop interface.
+
 ## 2.0.0-dev.19
 
 - Add live remote desktop FPS, latency, pipeline, bitrate, backend and link telemetry.

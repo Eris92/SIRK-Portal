@@ -1,5 +1,14 @@
 [
   {
+    "version": "2.0.0-dev.20",
+    "date": "2026-07-29",
+    "changes": [
+      "Synchronize remote and local text clipboards through Ctrl+C and Ctrl+V",
+      "Transfer small clipboard files through drag-and-drop and remote copy",
+      "Remove the manual clipboard controls from the visible Desktop interface"
+    ]
+  },
+  {
     "version": "2.0.0-dev.19",
     "date": "2026-07-29",
     "changes": [
