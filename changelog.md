@@ -1,3 +1,7 @@
+## 2.0.0-dev.16
+
+- Include the standalone browser scripts in the Windows installer staging tree.
+
 ## 2.0.0-dev.15
 
 - Normalize interactive-session metadata so monitor selection and clipboard reads work through the Portal UI.

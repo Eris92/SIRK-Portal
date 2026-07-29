@@ -1,5 +1,12 @@
 [
   {
+    "version": "2.0.0-dev.16",
+    "date": "2026-07-29",
+    "changes": [
+      "Include the standalone browser scripts in the Windows installer staging tree"
+    ]
+  },
+  {
     "version": "2.0.0-dev.15",
     "date": "2026-07-29",
     "changes": [

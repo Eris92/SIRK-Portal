@@ -11,6 +11,7 @@ assert.ok(workflow.indexOf("actions/upload-artifact@v4") >= 0);
 assert.ok(workflow.indexOf("gh release upload") >= 0);
 assert.ok(workflow.indexOf("WinSW SHA-256 verification failed") >= 0);
 assert.ok(workflow.indexOf("$global:LASTEXITCODE = 0") >= 0);
+assert.ok(workflow.indexOf("test scripts assets") < 0);
 assert.ok(workflow.indexOf("node-version: \"24\"") >= 0);
 assert.ok(installer.indexOf("OutputBaseFilename=SIRK-Portal-{#AppVersion}-Windows-x64-Setup") >= 0);
 assert.ok(installer.indexOf("PrepareToInstall") >= 0);
