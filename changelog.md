@@ -1,3 +1,7 @@
+## 2.0.0-dev.18
+
+- Close active Agent long-polls during Portal shutdown so the Windows service restarts promptly.
+
 ## 2.0.0-dev.17
 
 - Reduce live Agent command latency with event-driven delivery and result completion.

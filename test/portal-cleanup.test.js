@@ -8,6 +8,7 @@ var root = path.resolve(__dirname, "..");
 var css = fs.readFileSync(path.join(root, "public", "portal", "standalone", "styles", "cleanup.css"), "utf8");
 var js = fs.readFileSync(path.join(root, "public", "portal", "standalone", "scripts", "cleanup.js"), "utf8");
 var nav = fs.readFileSync(path.join(root, "public", "portal", "standalone", "scripts", "navigation.js"), "utf8");
+var httpsHost = fs.readFileSync(path.join(root, "server", "standalone-https.js"), "utf8");
 
 [
     ".sirk-device-compact-tabs",
@@ -37,5 +38,9 @@ assert(nav.indexOf('"portal-cleanup.css"') >= 0, "Standalone navigation must loa
 assert(nav.indexOf('"portal-cleanup.js"') >= 0, "Standalone navigation must load cleanup JS.");
 assert(css.indexOf("#sirkPortalRoot") >= 0, "Cleanup styles must remain scoped to the standalone Portal.");
 assert(css.indexOf(".sirk-platform-native-ui") < 0, "Cleanup styles must not target native MeshCentral.");
+assert(httpsHost.indexOf("closeAllConnections") >= 0,
+    "Standalone HTTPS shutdown must terminate long-lived Agent connections.");
+assert(httpsHost.indexOf("request.destroy()") >= 0,
+    "Standalone HTTPS shutdown must terminate active upstream long-polls.");
 
 console.log("Standalone Portal cleanup contract: OK");

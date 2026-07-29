@@ -5,7 +5,7 @@ var http = require("http");
 var https = require("https");
 var standalone = require("./standalone.js");
 
-function proxyRequest(targetPort, req, res) {
+function proxyRequest(targetPort, req, res, activeRequests) {
     var upstream = http.request({
         hostname: "127.0.0.1",
         port: targetPort,
@@ -19,6 +19,8 @@ function proxyRequest(targetPort, req, res) {
         res.writeHead(response.statusCode || 502, response.headers);
         response.pipe(res);
     });
+    activeRequests.add(upstream);
+    upstream.once("close", function () { activeRequests.delete(upstream); });
     upstream.on("error", function (error) {
         if (!res.headersSent) {
             res.statusCode = 502;
@@ -55,7 +57,10 @@ async function start(options) {
         key: fs.readFileSync(privateKeyPath)
     };
     tlsOptions.minVersion = "TLSv1.2";
-    var gateway = https.createServer(tlsOptions, function (req, res) { proxyRequest(internalPort, req, res); });
+    var activeRequests = new Set();
+    var gateway = https.createServer(tlsOptions, function (req, res) {
+        proxyRequest(internalPort, req, res, activeRequests);
+    });
     await new Promise(function (resolve, reject) {
         gateway.once("error", reject);
         gateway.listen(httpsPort, "0.0.0.0", resolve);
@@ -63,6 +68,10 @@ async function start(options) {
     function close() {
         gateway.close();
         application.close();
+        activeRequests.forEach(function (request) { request.destroy(); });
+        if (typeof gateway.closeAllConnections === "function") gateway.closeAllConnections();
+        if (typeof application.closeAllConnections === "function") application.closeAllConnections();
+        setTimeout(function () { process.exit(0); }, 1000);
     }
     process.once("SIGTERM", close);
     process.once("SIGINT", close);
