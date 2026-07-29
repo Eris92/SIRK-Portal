@@ -11,6 +11,7 @@ try {
     var enrollment = service.enroll("tenant", "device", "warsaw");
     assert.strictEqual(enrollment.trustedPolicyKeys.length, 1);
     assert.strictEqual(enrollment.policy.settings.remoteDesktopEnabled, true);
+    assert.strictEqual(enrollment.policy.settings.remoteAdministrativeDesktopEnabled, true);
     assert.strictEqual(enrollment.policy.settings.remoteTerminalEnabled, true);
     assert.strictEqual(enrollment.policy.settings.remoteFilesEnabled, true);
     assert.strictEqual(enrollment.policy.settings.hostGroupId, "warsaw");

@@ -1,3 +1,9 @@
+## 2.0.0-dev.17
+
+- Reduce live Agent command latency with event-driven delivery and result completion.
+- Add explicit Desktop connect/disconnect controls and administrative SYSTEM tools.
+- Use an adaptive 1280 px live desktop profile with immediate frame scheduling.
+
 ## 2.0.0-dev.16
 
 - Include the standalone browser scripts in the Windows installer staging tree.

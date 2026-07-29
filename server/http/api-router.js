@@ -123,8 +123,17 @@ module.exports.createHandler = function (runtime, host) {
                 }
                 if (req.method === "GET") {
                     try {
-                        var value = agentCommands.get(tenantId, deviceId, String(url.searchParams.get("commandId") || ""));
-                        sendJson(res, value ? 200 : 404, value ? { ok: true, value: value } : { ok: false, error: "Operation not found." });
+                        var commandId = String(url.searchParams.get("commandId") || "");
+                        var waitMilliseconds = Math.max(0, Math.min(25000,
+                            Number(url.searchParams.get("waitMilliseconds")) || 0));
+                        Promise.resolve(agentCommands.waitForResult(tenantId, deviceId, commandId, waitMilliseconds))
+                            .then(function (value) {
+                                sendJson(res, value ? 200 : 404, value
+                                    ? { ok: true, value: value }
+                                    : { ok: false, error: "Operation not found." });
+                            }).catch(function (error) {
+                                sendJson(res, 400, { ok: false, error: String(error && error.message || error) });
+                            });
                     } catch (error) {
                         sendJson(res, 400, { ok: false, error: String(error && error.message || error) });
                     }

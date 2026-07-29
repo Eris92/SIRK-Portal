@@ -1,5 +1,14 @@
 [
   {
+    "version": "2.0.0-dev.17",
+    "date": "2026-07-29",
+    "changes": [
+      "Reduce live Agent command latency with event-driven delivery and result completion",
+      "Add explicit Desktop connect and disconnect controls plus administrative SYSTEM tools",
+      "Use an adaptive 1280 px live desktop profile with immediate frame scheduling"
+    ]
+  },
+  {
     "version": "2.0.0-dev.16",
     "date": "2026-07-29",
     "changes": [

@@ -6,6 +6,7 @@ var http = require("http");
 var path = require("path");
 var adapter = require("./adapters/standalone/index.js");
 var agentGatewayFactory = require("./core/agent-gateway.js");
+var agentCommandBrokerFactory = require("./core/agent-command-broker.js");
 var agentGroupFactory = require("./core/agent-group-service.js");
 var agentPolicyFactory = require("./core/agent-policy-service.js");
 var apiFactory = require("./http/api-router.js");
@@ -237,6 +238,7 @@ function start(options) {
     host.identity = identity;
     host.agentGroups = agentGroupFactory.create({ dataRoot: host.dataRoot });
     host.agentPolicies = agentPolicyFactory.create({ dataRoot: host.dataRoot });
+    host.agentCommands = agentCommandBrokerFactory.create({ dataRoot: host.dataRoot });
     var runtime = runtimeFactory.createRuntime(host, ROOT);
     var api = apiFactory.createHandler(runtime, host);
     var manager = updateManagerFactory.create({ appRoot: ROOT, dataRoot: host.dataRoot });
@@ -247,7 +249,8 @@ function start(options) {
         enrollmentToken: options.agentEnrollmentToken,
         enrollmentResolver: host.agentGroups.resolveEnrollment,
         enrollmentAssigned: host.agentGroups.assign,
-        policyService: host.agentPolicies
+        policyService: host.agentPolicies,
+        commandBroker: host.agentCommands
     });
 
     function portalConfig() {

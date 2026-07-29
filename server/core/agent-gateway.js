@@ -154,7 +154,7 @@ module.exports.create = function (options) {
             }
             chunks.push(chunk);
         });
-        req.on("end", function () {
+        req.on("end", async function () {
             if (ended) return;
             try {
                 var bodyBytes = Buffer.concat(chunks);
@@ -278,6 +278,8 @@ module.exports.create = function (options) {
                     deviceId: deviceId,
                     machineName: String(body.machineName || deviceId).slice(0, 255),
                     agentVersion: String(body.agentVersion || "").slice(0, 64),
+                    transportWaitMilliseconds: Math.max(0, Math.min(25000,
+                        Number(body.waitMilliseconds) || 0)),
                     lastSeenUtc: now,
                     heartbeat: body.heartbeat && typeof body.heartbeat === "object" ? body.heartbeat : existing.heartbeat || null,
                     management: body.management && typeof body.management === "object" ? body.management : existing.management || null,
@@ -305,12 +307,18 @@ module.exports.create = function (options) {
                         event: event
                     }) + "\n", "utf8");
                 });
+                var waitMilliseconds = Math.max(0, Math.min(25000, Number(body.waitMilliseconds) || 0));
+                if (commandBroker && typeof commandBroker.waitForPending === "function")
+                    await commandBroker.waitForPending(tenantId, deviceId, 5, waitMilliseconds);
+                var commands = commandBroker && typeof commandBroker.claimPending === "function"
+                    ? commandBroker.claimPending(tenantId, deviceId, 5)
+                    : commandBroker ? commandBroker.pending(tenantId, deviceId, 5) : [];
                 sendJson(res, 200, {
                     ok: true,
                     serverTimeUtc: now,
                     acceptedEvents: Math.min(100, Array.isArray(body.events) ? body.events.length : 0),
                     policies: pendingPolicies(tenantId, deviceId, body.acknowledgedPolicyIds),
-                    commands: commandBroker ? commandBroker.pending(tenantId, deviceId, 5) : []
+                    commands: commands
                 });
             } catch (error) {
                 sendJson(res, 400, { ok: false, error: "Invalid agent check-in payload." });

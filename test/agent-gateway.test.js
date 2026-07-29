@@ -53,6 +53,21 @@ async function invoke(gateway, token, body, url, privateKey) {
     var root = fs.mkdtempSync(path.join(os.tmpdir(), "sirk-agent-gateway-"));
     try {
         var commandBroker = commandBrokerFactory.create({ dataRoot: root });
+        var wakeStarted = Date.now();
+        var pendingWake = commandBroker.waitForPending("investa", "wake-device", 5, 2000);
+        setTimeout(function () {
+            commandBroker.queue("investa", "wake-device", "desktop.snapshot", {}, { id: "latency-test" });
+        }, 20);
+        var wokenCommands = await pendingWake;
+        assert.strictEqual(wokenCommands.length, 1);
+        assert.ok(Date.now() - wakeStarted < 500, "Agent long-poll must wake without an interval delay.");
+        var completedWait = commandBroker.waitForResult("investa", "wake-device",
+            wokenCommands[0].commandId, 1000);
+        commandBroker.acceptResults("investa", "wake-device", [{
+            commandId: wokenCommands[0].commandId, ok: true, code: "OK", output: "", data: {}
+        }]);
+        assert.strictEqual((await completedWait).status, "completed",
+            "Command completion must wake the waiting Portal request.");
         var assignedGroup = null;
         var issuedPolicy = null;
         var gateway = gatewayFactory.create({

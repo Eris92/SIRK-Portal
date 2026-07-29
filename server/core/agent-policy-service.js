@@ -61,6 +61,7 @@ module.exports.create = function (options) {
                 remoteTerminalEnabled: true,
                 remoteFilesEnabled: true,
                 remoteDesktopEnabled: true,
+                remoteAdministrativeDesktopEnabled: true,
                 hostGroupId: groupId || null
             },
             signature: { algorithm: "ES256", keyId: keyId, value: "pending" }
