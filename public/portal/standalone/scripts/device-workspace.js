@@ -450,7 +450,6 @@
                 }
                 nativeWidth = Number(data.width || 0);
                 nativeHeight = Number(data.height || 0);
-                var frameMs = performance.now() - requestStarted;
                 var decodeStarted = performance.now();
                 return createImageBitmap(value.blob).then(function (decoded) {
                     if (generation !== streamGeneration) return;
@@ -483,6 +482,9 @@
                     localCursor.style.left = (Number(data.cursorX || 0) / nativeWidth * 100) + "%";
                     localCursor.style.top = (Number(data.cursorY || 0) / nativeHeight * 100) + "%";
                     decoded.close();
+                    var capturedAt = Number(data.capturedAtUnixMilliseconds || 0);
+                    var frameMs = capturedAt > 0 ? Math.max(0, Date.now() - capturedAt) :
+                        performance.now() - requestStarted;
                     updateStats(data, frameMs, performance.now() - decodeStarted);
                     status.textContent = "Połączono · strumień bezpośredni · " + nativeWidth + " × " + nativeHeight + " · profil " + profile.options[profile.selectedIndex].text;
                     status.classList.remove("is-error");
