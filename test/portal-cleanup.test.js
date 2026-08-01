@@ -40,7 +40,7 @@ assert(css.indexOf("#sirkPortalRoot") >= 0, "Cleanup styles must remain scoped t
 assert(css.indexOf(".sirk-platform-native-ui") < 0, "Cleanup styles must not target native MeshCentral.");
 assert(httpsHost.indexOf("closeAllConnections") >= 0,
     "Standalone HTTPS shutdown must terminate long-lived Agent connections.");
-assert(httpsHost.indexOf("request.destroy()") >= 0,
+assert(/activeRequests\.forEach\(function \([^)]*\) \{ [^}]*\.destroy\(\)/.test(httpsHost),
     "Standalone HTTPS shutdown must terminate active upstream long-polls.");
 
 console.log("Standalone Portal cleanup contract: OK");
