@@ -300,6 +300,7 @@
         var adminStart = host.querySelector("[data-agent-admin-start]");
         host.querySelector("[data-stat-input]").parentNode.firstChild.nodeValue = "input dispatch ";
         var nativeWidth = 0, nativeHeight = 0, streamGeneration = 0, connected = false;
+        var inputSequence = 0, pendingInput = new Map();
         var hasCompleteFrame = false;
         var frameTimes = [], inputTimes = [], byteSamples = [], renderedFrames = 0, statsStartedAt = performance.now();
         var profiles = {
@@ -345,6 +346,23 @@
             parameters.sessionId = target.sessionId;
             parameters.monitorIndex = target.monitorIndex;
             var started = performance.now();
+            var socketActions = ["move", "leftDown", "leftUp", "rightClick", "middleClick", "wheel", "key", "text"];
+            if (desktopSocket && desktopSocket.readyState === WebSocket.OPEN &&
+                socketActions.indexOf(parameters.action) >= 0) {
+                if (parameters.action === "move") {
+                    desktopSocket.send(JSON.stringify({ type: "input", id: 0, input: parameters }));
+                    return Promise.resolve({ ok: true });
+                }
+                var id = ++inputSequence;
+                return new Promise(function (resolve, reject) {
+                    var timer = setTimeout(function () {
+                        pendingInput.delete(id);
+                        reject(new Error("Input dispatch timeout."));
+                    }, 2000);
+                    pendingInput.set(id, { resolve: resolve, reject: reject, timer: timer, started: started });
+                    desktopSocket.send(JSON.stringify({ type: "input", id: id, input: parameters }));
+                });
+            }
             var runtime = window.SirkPlatformRuntime && window.SirkPlatformRuntime.state;
             var csrfToken = runtime && runtime.bootstrap && runtime.bootstrap.csrfToken || "";
             return fetch("/api/agent-desktop/input", {
@@ -426,6 +444,18 @@
             socket.binaryType = "arraybuffer";
             socket.onmessage = function (event) {
                 if (generation !== streamGeneration || socket !== desktopSocket) return;
+                if (typeof event.data === "string") {
+                    var message;
+                    try { message = JSON.parse(event.data); } catch (error) { return; }
+                    if (message.type === "inputAck" && pendingInput.has(Number(message.id))) {
+                        var pending = pendingInput.get(Number(message.id));
+                        pendingInput.delete(Number(message.id)); clearTimeout(pending.timer);
+                        inputTimes.push(performance.now() - pending.started);
+                        if (inputTimes.length > 60) inputTimes.shift();
+                        pending.resolve({ ok: true });
+                    }
+                    return;
+                }
                 var packet = new Uint8Array(event.data);
                 if (packet.length < 5) return;
                 var metadataLength = new DataView(packet.buffer, packet.byteOffset, 4).getUint32(0, false);
@@ -443,6 +473,8 @@
             };
             socket.onclose = function () {
                 if (generation !== streamGeneration || socket !== desktopSocket) return;
+                pendingInput.forEach(function (pending) { clearTimeout(pending.timer); pending.reject(new Error("Desktop socket closed.")); });
+                pendingInput.clear();
                 desktopSocket = null;
                 setTimeout(function () { snapshot(generation); }, 250);
             };
@@ -667,11 +699,34 @@
             }).then(function () { status.textContent = "Wklejono lokalny schowek do sesji zdalnej."; });
         }
         image.addEventListener("keydown", function (event) {
-            if (!connected || !event.ctrlKey || event.altKey || event.metaKey) return;
+            if (!connected) return;
             var key = String(event.key || "").toLowerCase();
-            if (key !== "c" && key !== "v") return;
+            if (event.ctrlKey && !event.altKey && !event.metaKey && (key === "c" || key === "v")) {
+                event.preventDefault();
+                (key === "c" ? copyFromRemote() : pasteToRemote()).catch(function (error) {
+                    status.textContent = error.message || String(error); status.classList.add("is-error");
+                });
+                return;
+            }
+            if (event.metaKey || (event.ctrlKey && event.altKey)) return;
+            var special = { Enter: "Enter", Tab: "Tab", Escape: "Escape", Backspace: "Backspace",
+                Delete: "Delete", ArrowUp: "Up", ArrowDown: "Down", ArrowLeft: "Left", ArrowRight: "Right",
+                Home: "Home", End: "End", PageUp: "PageUp", PageDown: "PageDown",
+                F1: "F1", F2: "F2", F3: "F3", F4: "F4", F5: "F5", F6: "F6",
+                F7: "F7", F8: "F8", F9: "F9", F10: "F10", F11: "F11", F12: "F12" };
+            var command = null;
+            if (special[event.key]) command = { action: "key", key: special[event.key],
+                modifiers: [event.ctrlKey ? "Control" : "", event.altKey ? "Alt" : "",
+                    event.shiftKey ? "Shift" : ""].filter(Boolean).join(",") };
+            else if (event.key && event.key.length === 1 && !event.ctrlKey && !event.altKey)
+                command = { action: "text", text: event.key };
+            else if (event.key && event.key.length === 1 && (event.ctrlKey || event.altKey))
+                command = { action: "key", key: event.key.toUpperCase(),
+                    modifiers: [event.ctrlKey ? "Control" : "", event.altKey ? "Alt" : "",
+                        event.shiftKey ? "Shift" : ""].filter(Boolean).join(",") };
+            if (!command) return;
             event.preventDefault();
-            (key === "c" ? copyFromRemote() : pasteToRemote()).catch(function (error) {
+            input(command).catch(function (error) {
                 status.textContent = error.message || String(error);
                 status.classList.add("is-error");
             });

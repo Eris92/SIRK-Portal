@@ -350,8 +350,9 @@ function start(options) {
                 var identity = agentGateway.authorizeDesktopSocket(req);
                 if (!identity) { socket.destroy(); return; }
                 agentDesktopSockets.handleUpgrade(req, socket, head, function (client) {
+                    host.agentDesktopRelay.attachAgent(identity.tenantId, identity.deviceId, client);
                     client.on("message", function (packet, binary) {
-                        if (!binary) { client.close(1003); return; }
+                        if (!binary) return;
                         try {
                             agentGateway.publishDesktopSocket(identity, Buffer.from(packet));
                         } catch (error) {
@@ -376,6 +377,22 @@ function start(options) {
                     client.binaryType = "arraybuffer";
                     client.once("close", function () { closed = true; clearInterval(viewerHeartbeat); });
                     client.once("error", function () { closed = true; clearInterval(viewerHeartbeat); });
+                    client.on("message", function (packet, binary) {
+                        if (binary) return;
+                        try {
+                            var request = JSON.parse(Buffer.from(packet).toString("utf8"));
+                            var command = request && request.input && typeof request.input === "object" ? request.input : {};
+                            var allowed = ["move", "leftDown", "leftUp", "rightClick", "middleClick", "wheel",
+                                "key", "text", "streamProfile", "requestKeyframe", "streamStop"];
+                            if (request.type !== "input" || allowed.indexOf(String(command.action || "")) < 0)
+                                throw new Error("Unsupported desktop input.");
+                            host.agentDesktopRelay.input(tenantId, deviceId, command);
+                            if (request.id) client.send(JSON.stringify({ type: "inputAck", id: request.id }));
+                        } catch (error) {
+                            client.send(JSON.stringify({ type: "inputError", id: 0,
+                                error: String(error.message || error).slice(0, 160) }));
+                        }
+                    });
                     (async function pump() {
                         while (!closed && client.readyState === WebSocket.OPEN) {
                             var value = await host.agentDesktopRelay.wait(tenantId, deviceId, sequence, 25000);

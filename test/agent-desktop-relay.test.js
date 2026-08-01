@@ -1,6 +1,7 @@
 "use strict";
 
 var assert = require("assert");
+var EventEmitter = require("events");
 var relay = require("../server/core/agent-desktop-relay.js").create();
 
 (async function () {
@@ -44,6 +45,18 @@ var relay = require("../server/core/agent-desktop-relay.js").create();
     await new Promise(function (resolve) { setTimeout(resolve, 10); });
     relay.wait("tenant", "viewer", 0, 1);
     assert.strictEqual((await viewerControl).viewerActive, true);
+    var directSocket = new EventEmitter();
+    directSocket.readyState = 1;
+    directSocket.sent = [];
+    directSocket.send = function (value) { this.sent.push(JSON.parse(value)); };
+    relay.attachAgent("tenant", "direct", directSocket);
+    var direct = relay.input("tenant", "direct", { action: "key", key: "C" });
+    assert.strictEqual(direct.direct, true);
+    assert.strictEqual(directSocket.sent[0].input.key, "C");
+    assert.strictEqual((await relay.control("tenant", "direct", 0)).inputs.length, 0);
+    directSocket.emit("close");
+    relay.input("tenant", "direct", { action: "key", key: "D" });
+    assert.strictEqual((await relay.control("tenant", "direct", 0)).inputs[0].key, "D");
     console.log("SIRK Agent desktop binary relay: OK");
 })().catch(function (error) {
     console.error(error);

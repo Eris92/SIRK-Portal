@@ -4,7 +4,7 @@
 param(
     [Parameter(Mandatory)][string]$InstallPath,
     [string]$DataPath = "$env:ProgramData\SIRK\Portal",
-    [int]$HttpsPort = 9443,
+    [ValidateRange(1, 65535)][int]$HttpsPort = 443,
     [int]$InternalPort = 9080
 )
 $ErrorActionPreference = 'Stop'
@@ -81,4 +81,9 @@ if ($legacy) {
 & $wrapper install | Out-Null
 & $wrapper start | Out-Null
 (Get-Service -Name $serviceId).WaitForStatus('Running', [TimeSpan]::FromSeconds(30))
+$firewallRule = 'SIRK Portal HTTPS'
+& netsh.exe advfirewall firewall delete rule name="$firewallRule" dir=in | Out-Null
+& netsh.exe advfirewall firewall add rule name="$firewallRule" dir=in action=allow `
+    protocol=TCP localport=$HttpsPort program="$node" profile=domain,private | Out-Null
+if ($LASTEXITCODE -ne 0) { throw 'Nie skonfigurowano reguły Zapory Windows dla HTTPS Portalu.' }
 Write-Host "SIRK Portal działa pod adresem https://$($env:COMPUTERNAME):$HttpsPort/" -ForegroundColor Green

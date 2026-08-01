@@ -13,7 +13,7 @@ module.exports.create = function () {
         if (!value) {
             value = {
                 sequence: 0, frame: null, metadata: null, waiters: new Set(),
-                controlWaiters: new Set(), viewerLeaseUntil: 0, inputs: []
+                controlWaiters: new Set(), viewerLeaseUntil: 0, inputs: [], agentSocket: null
             };
             streams.set(id, value);
         }
@@ -70,6 +70,14 @@ module.exports.create = function () {
 
     function input(tenantId, deviceId, command) {
         var value = state(tenantId, deviceId);
+        if (value.agentSocket && value.agentSocket.readyState === 1) {
+            try {
+                value.agentSocket.send(JSON.stringify({ type: "input", input: command }));
+                return { queued: 0, direct: true };
+            } catch (error) {
+                value.agentSocket = null;
+            }
+        }
         if (command && command.action === "move")
             value.inputs = value.inputs.filter(function (item) { return !item || item.action !== "move"; });
         if (value.inputs.length >= 128) value.inputs.shift();
@@ -77,6 +85,14 @@ module.exports.create = function () {
         value.controlWaiters.forEach(function (resolve) { resolve(); });
         value.controlWaiters.clear();
         return { queued: value.inputs.length };
+    }
+
+    function attachAgent(tenantId, deviceId, socket) {
+        var value = state(tenantId, deviceId);
+        value.agentSocket = socket;
+        function detach() { if (value.agentSocket === socket) value.agentSocket = null; }
+        socket.once("close", detach);
+        socket.once("error", detach);
     }
 
     function control(tenantId, deviceId, milliseconds) {
@@ -103,5 +119,6 @@ module.exports.create = function () {
         });
     }
 
-    return { publish: publish, wait: wait, touchViewer: touchViewer, input: input, control: control };
+    return { publish: publish, wait: wait, touchViewer: touchViewer, input: input,
+        control: control, attachAgent: attachAgent };
 };

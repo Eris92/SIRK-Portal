@@ -36,7 +36,7 @@ function proxyRequest(targetPort, req, res, activeRequests) {
 async function start(options) {
     options = options || {};
     var internalPort = Number(options.internalPort || process.env.SIRK_INTERNAL_PORT || 9080);
-    var httpsPort = Number(options.httpsPort || process.env.SIRK_HTTPS_PORT || 9443);
+    var httpsPort = Number(options.httpsPort || process.env.SIRK_HTTPS_PORT || 443);
     var certificatePath = options.certificatePath || process.env.SIRK_TLS_CERT;
     var privateKeyPath = options.privateKeyPath || process.env.SIRK_TLS_KEY;
     var pfxPath = options.pfxPath || process.env.SIRK_TLS_PFX;
@@ -60,8 +60,13 @@ async function start(options) {
     };
     tlsOptions.minVersion = "TLSv1.2";
     var activeRequests = new Set();
+    var activeSockets = new Set();
     var gateway = https.createServer(tlsOptions, function (req, res) {
         proxyRequest(internalPort, req, res, activeRequests);
+    });
+    gateway.on("connection", function (socket) {
+        activeSockets.add(socket);
+        socket.once("close", function () { activeSockets.delete(socket); });
     });
     gateway.on("upgrade", function (req, socket, head) {
         var upstream = net.connect(internalPort, "127.0.0.1", function () {
@@ -76,6 +81,8 @@ async function start(options) {
             if (head && head.length) upstream.write(head);
             socket.pipe(upstream).pipe(socket);
         });
+        activeSockets.add(upstream);
+        upstream.once("close", function () { activeSockets.delete(upstream); });
         upstream.on("error", function () { socket.destroy(); });
     });
     await new Promise(function (resolve, reject) {
@@ -86,6 +93,7 @@ async function start(options) {
         gateway.close();
         application.close();
         activeRequests.forEach(function (request) { request.destroy(); });
+        activeSockets.forEach(function (socket) { socket.destroy(); });
         if (typeof gateway.closeAllConnections === "function") gateway.closeAllConnections();
         if (typeof application.closeAllConnections === "function") application.closeAllConnections();
         setTimeout(function () { process.exit(0); }, 1000);
