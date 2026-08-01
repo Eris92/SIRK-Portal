@@ -303,7 +303,7 @@
         var inputSequence = 0, pendingInput = new Map();
         var hasCompleteFrame = false;
         var frameTimes = [], inputTimes = [], byteSamples = [], frameRenderTimes = [];
-        var activeAutoProfile = "smooth", lastAutoChangeAt = 0;
+        var activeAutoProfile = "smooth", lastAutoChangeAt = 0, lastStatsPaintAt = 0;
         var profiles = {
             smooth: { maxWidth: 1920, quality: 72, targetKbps: 1000 },
             text: { maxWidth: 1920, quality: 80, targetKbps: 1500 },
@@ -331,13 +331,6 @@
             var fps = frameRenderTimes.length > 1 ? (frameRenderTimes.length - 1) / fpsSeconds : 0;
             var bits = byteSamples.reduce(function (sum, item) { return sum + item.bytes * 8; }, 0);
             var inputP95 = percentile(inputTimes, 0.95);
-            host.querySelector("[data-stat-fps]").textContent = fps.toFixed(1);
-            host.querySelector("[data-stat-latency]").textContent = Math.round(percentile(frameTimes, 0.5)) + " / " + Math.round(percentile(frameTimes, 0.95)) + " ms";
-            host.querySelector("[data-stat-input]").textContent = inputP95 ? Math.round(inputP95) + " ms p95" : "—";
-            host.querySelector("[data-stat-pipeline]").textContent = Number(data.captureMilliseconds || 0).toFixed(1) + " / " + Number(data.encodeMilliseconds || 0).toFixed(1) + " / " + Number(data.sessionMilliseconds || 0).toFixed(1) + " / " + decodeMs.toFixed(1) + " ms";
-            host.querySelector("[data-stat-bitrate]").textContent = (bits / 5000000).toFixed(2) + " Mb/s";
-            host.querySelector("[data-stat-link]").textContent = percentile(frameTimes, 0.95) > 350 ? "bardzo słabe" : percentile(frameTimes, 0.95) > 190 ? "słabe" : "dobre";
-            host.querySelector("[data-stat-backend]").textContent = (data.captureBackend || "—") + " · " + (data.encoding || "—");
             if (profile.value === "auto" && connected && now - lastAutoChangeAt > 2000) {
                 var latencyP95 = percentile(frameTimes, 0.95), nextProfile = activeAutoProfile;
                 if (activeAutoProfile === "smooth" && latencyP95 > 180) nextProfile = "weak";
@@ -352,6 +345,15 @@
                         quality: adaptive.quality, targetKbps: adaptive.targetKbps }).catch(function () {});
                 }
             }
+            if (now - lastStatsPaintAt < 250) return;
+            lastStatsPaintAt = now;
+            host.querySelector("[data-stat-fps]").textContent = fps.toFixed(1);
+            host.querySelector("[data-stat-latency]").textContent = Math.round(percentile(frameTimes, 0.5)) + " / " + Math.round(percentile(frameTimes, 0.95)) + " ms";
+            host.querySelector("[data-stat-input]").textContent = inputP95 ? Math.round(inputP95) + " ms p95" : "—";
+            host.querySelector("[data-stat-pipeline]").textContent = Number(data.captureMilliseconds || 0).toFixed(1) + " / " + Number(data.encodeMilliseconds || 0).toFixed(1) + " / " + Number(data.sessionMilliseconds || 0).toFixed(1) + " / " + decodeMs.toFixed(1) + " ms";
+            host.querySelector("[data-stat-bitrate]").textContent = (bits / 5000000).toFixed(2) + " Mb/s";
+            host.querySelector("[data-stat-link]").textContent = percentile(frameTimes, 0.95) > 350 ? "bardzo słabe" : percentile(frameTimes, 0.95) > 190 ? "słabe" : "dobre";
+            host.querySelector("[data-stat-backend]").textContent = (data.captureBackend || "—") + " · " + (data.encoding || "—");
         }
         function selected() {
             return { sessionId: Number(session.value), monitorIndex: Number(monitor.value) };
@@ -820,7 +822,7 @@
             status.textContent = "Nawiązywanie połączenia live…";
             loadSessions().then(function () {
                 frameTimes = []; inputTimes = []; byteSamples = []; frameRenderTimes = [];
-                activeAutoProfile = "smooth"; lastAutoChangeAt = 0;
+                activeAutoProfile = "smooth"; lastAutoChangeAt = 0; lastStatsPaintAt = 0;
                 connected = true;
                 session.disabled = false;
                 monitor.disabled = false;
