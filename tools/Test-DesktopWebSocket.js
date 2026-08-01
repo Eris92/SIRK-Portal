@@ -32,22 +32,25 @@ async function main() {
         encodeURIComponent(tenantId) + "&deviceId=" + encodeURIComponent(deviceId), {
         headers: { cookie: cookie }, rejectUnauthorized: false, perMessageDeflate: false
     });
-    var frames = 0, bytes = 0, backends = new Set(), started = Date.now();
+    var frames = 0, bytes = 0, backends = new Set(), started = 0, firstSequence = 0, lastSequence = 0;
     socket.on("message", function (packet) {
         var metadataLength = packet.readUInt32BE(0);
         var metadata = JSON.parse(packet.subarray(4, 4 + metadataLength).toString("utf8"));
         frames += 1;
+        if (!firstSequence) firstSequence = Number(metadata.sequence) || 0;
+        lastSequence = Number(metadata.sequence) || 0;
         bytes += packet.length - 4 - metadataLength;
         backends.add(metadata.captureBackend);
     });
     await new Promise(function (resolve, reject) {
         socket.once("error", reject);
-        socket.once("open", function () { setTimeout(resolve, duration * 1000); });
+        socket.once("open", function () { started = Date.now(); setTimeout(resolve, duration * 1000); });
     });
     var elapsed = (Date.now() - started) / 1000;
     socket.close();
     process.stdout.write(JSON.stringify({ frames: frames, fps: frames / elapsed,
-        mbps: bytes * 8 / elapsed / 1000000, backends: Array.from(backends) }, null, 2) + "\n");
+        mbps: bytes * 8 / elapsed / 1000000, firstSequence: firstSequence,
+        lastSequence: lastSequence, backends: Array.from(backends) }, null, 2) + "\n");
 }
 
 main().catch(function (error) { console.error(error); process.exitCode = 1; });

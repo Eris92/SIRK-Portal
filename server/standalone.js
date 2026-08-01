@@ -352,8 +352,11 @@ function start(options) {
                 agentDesktopSockets.handleUpgrade(req, socket, head, function (client) {
                     client.on("message", function (packet, binary) {
                         if (!binary) { client.close(1003); return; }
-                        try { agentGateway.publishDesktopSocket(identity, Buffer.from(packet)); }
-                        catch (error) { client.close(1007); }
+                        try {
+                            agentGateway.publishDesktopSocket(identity, Buffer.from(packet));
+                        } catch (error) {
+                            client.close(1007, String(error.message || "Invalid desktop frame").slice(0, 120));
+                        }
                     });
                 });
                 return;
