@@ -434,8 +434,9 @@
                     for (var index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
                     metadata = JSON.parse(new TextDecoder().decode(bytes));
                 } catch (error) {}
-                return response.blob().then(function (blob) {
-                    return { blob: blob, data: metadata, sequence: receivedSequence, previous: previousSequence };
+                return response.arrayBuffer().then(function (buffer) {
+                    return { buffer: buffer, contentType: response.headers.get("Content-Type") || "image/jpeg",
+                        data: metadata, sequence: receivedSequence, previous: previousSequence };
                 });
             }).then(function (value) {
                 if (stopped || !connected || !host.isConnected || generation !== streamGeneration) return;
@@ -451,7 +452,9 @@
                 nativeWidth = Number(data.width || 0);
                 nativeHeight = Number(data.height || 0);
                 var decodeStarted = performance.now();
-                return createImageBitmap(value.blob).then(function (decoded) {
+                if (value.contentType.indexOf("video/h264") === 0 && "VideoDecoder" in window)
+                    return decodeH264Frame(value, generation, requestStarted);
+                return createImageBitmap(new Blob([value.buffer], { type: value.contentType })).then(function (decoded) {
                     if (generation !== streamGeneration) return;
                     if (image.width !== nativeWidth || image.height !== nativeHeight) {
                         image.width = nativeWidth;
@@ -496,6 +499,41 @@
                 status.classList.add("is-error");
                 setTimeout(function () { snapshot(generation); }, 3000);
             });
+        }
+        var videoDecoder = null;
+        function decodeH264Frame(value, generation, requestStarted) {
+            var data = value.data || {};
+            return new Promise(function (resolve, reject) {
+                if (!videoDecoder || videoDecoder.state === "closed") {
+                    videoDecoder = new VideoDecoder({
+                        output: function (decoded) {
+                            if (generation === streamGeneration) {
+                                nativeWidth = decoded.displayWidth;
+                                nativeHeight = decoded.displayHeight;
+                                if (image.width !== nativeWidth || image.height !== nativeHeight) {
+                                    image.width = nativeWidth; image.height = nativeHeight;
+                                }
+                                imageContext.drawImage(decoded, 0, 0, nativeWidth, nativeHeight);
+                                hasCompleteFrame = true;
+                                localCursor.style.display = "";
+                                localCursor.style.left = (Number(data.cursorX || 0) / nativeWidth * 100) + "%";
+                                localCursor.style.top = (Number(data.cursorY || 0) / nativeHeight * 100) + "%";
+                                var capturedAt = Number(data.capturedAtUnixMilliseconds || 0);
+                                updateStats(data, capturedAt ? Math.max(0, Date.now() - capturedAt) : performance.now() - requestStarted, 0);
+                                status.textContent = "Połączono · H.264 low-latency · " + nativeWidth + " × " + nativeHeight;
+                            }
+                            decoded.close(); resolve();
+                        },
+                        error: reject
+                    });
+                    videoDecoder.configure({ codec: "avc1.42E01F", optimizeForLatency: true, hardwareAcceleration: "prefer-hardware" });
+                }
+                videoDecoder.decode(new EncodedVideoChunk({
+                    type: data.keyFrame ? "key" : "delta",
+                    timestamp: Number(data.capturedAtUnixMilliseconds || Date.now()) * 1000,
+                    data: new Uint8Array(value.buffer)
+                }));
+            }).then(function () { setTimeout(function () { snapshot(generation); }, 0); });
         }
         var lastMouseMoveAt = 0;
         function coordinates(event) {

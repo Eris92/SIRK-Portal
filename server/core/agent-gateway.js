@@ -224,7 +224,9 @@ module.exports.create = function (options) {
                         cursorY: Number(req.headers["x-sirk-cursor-y"]) || 0,
                         capturedAtUnixMilliseconds: Number(req.headers["x-sirk-captured-at"]) || 0,
                         encodedBytes: bodyBytes.length,
-                        encoding: "JPEG"
+                        contentType: String(req.headers["content-type"] || "image/jpeg").split(";")[0],
+                        encoding: String(req.headers["x-sirk-codec"] || "JPEG").slice(0, 32),
+                        keyFrame: String(req.headers["x-sirk-key-frame"] || "") === "1"
                     });
                     sendJson(res, 202, {
                         ok: true, sequence: published.sequence, viewers: published.viewers,

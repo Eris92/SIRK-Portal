@@ -80,7 +80,7 @@ module.exports.createHandler = function (runtime, host) {
                 host.agentDesktopRelay.wait(frameTenant, frameDevice, after, wait).then(function (value) {
                     if (!value) { res.statusCode = 204; res.end(); return; }
                     res.statusCode = 200;
-                    res.setHeader("Content-Type", "image/jpeg");
+                    res.setHeader("Content-Type", String(value.metadata && value.metadata.contentType || "image/jpeg"));
                     res.setHeader("Cache-Control", "no-store");
                     res.setHeader("X-SIRK-Sequence", String(value.sequence));
                     res.setHeader("X-SIRK-Metadata", Buffer.from(JSON.stringify(value.metadata)).toString("base64"));
