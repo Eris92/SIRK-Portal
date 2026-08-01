@@ -34,6 +34,7 @@ async function main() {
     });
     var frames = 0, bytes = 0, backends = new Set(), started = 0, firstSequence = 0, lastSequence = 0;
     var inputSentAt = 0, inputAckMilliseconds = 0;
+    var captureSamples = [], encodeSamples = [], sessionSamples = [], ageSamples = [];
     socket.on("message", function (packet, binary) {
         if (!binary) {
             var message = JSON.parse(packet.toString("utf8"));
@@ -48,6 +49,11 @@ async function main() {
         lastSequence = Number(metadata.sequence) || 0;
         bytes += packet.length - 4 - metadataLength;
         backends.add(metadata.captureBackend);
+        captureSamples.push(Number(metadata.captureMilliseconds || 0));
+        encodeSamples.push(Number(metadata.encodeMilliseconds || 0));
+        sessionSamples.push(Number(metadata.sessionMilliseconds || 0));
+        if (metadata.capturedAtUnixMilliseconds)
+            ageSamples.push(Math.max(0, Date.now() - Number(metadata.capturedAtUnixMilliseconds)));
     });
     await new Promise(function (resolve, reject) {
         socket.once("error", reject);
@@ -60,9 +66,18 @@ async function main() {
     });
     var elapsed = (Date.now() - started) / 1000;
     socket.close();
+    function percentile(values, fraction) {
+        if (!values.length) return 0;
+        values.sort(function (a, b) { return a - b; });
+        return values[Math.min(values.length - 1, Math.floor(values.length * fraction))];
+    }
     process.stdout.write(JSON.stringify({ frames: frames, fps: frames / elapsed,
         mbps: bytes * 8 / elapsed / 1000000, firstSequence: firstSequence,
         lastSequence: lastSequence, inputAckMilliseconds: inputAckMilliseconds,
+        captureP50Ms: percentile(captureSamples, 0.5), captureP95Ms: percentile(captureSamples, 0.95),
+        encodeP50Ms: percentile(encodeSamples, 0.5), encodeP95Ms: percentile(encodeSamples, 0.95),
+        sessionP50Ms: percentile(sessionSamples, 0.5), sessionP95Ms: percentile(sessionSamples, 0.95),
+        frameAgeP50Ms: percentile(ageSamples, 0.5), frameAgeP95Ms: percentile(ageSamples, 0.95),
         backends: Array.from(backends) }, null, 2) + "\n");
 }
 
