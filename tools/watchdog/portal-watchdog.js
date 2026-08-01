@@ -31,16 +31,16 @@ function create(options) {
         return [
             "config.json",
             "package.json",
-            "server\\standalone.js",
-            "server\\standalone-https.js",
-            "server\\core\\runtime.js",
-            "server\\core\\identity-store.js",
-            "server\\http\\api-router.js",
-            "public\\portal\\standalone\\index.html",
-            "public\\portal\\standalone\\login.html",
-            "public\\portal\\settings.js",
+            "server/standalone.js",
+            "server/standalone-https.js",
+            "server/core/runtime.js",
+            "server/core/identity-store.js",
+            "server/http/api-router.js",
+            "public/portal/standalone/index.html",
+            "public/portal/standalone/login.html",
+            "public/portal/settings.js",
             "portal-independence.json"
-        ].map(function (relative) { return path.join(root, relative); });
+        ].map(function (relative) { return path.join.apply(path, [root].concat(relative.split("/"))); });
     }
     function validateRoot(root) {
         var missing = requiredFiles(root).filter(function (file) { return !fs.existsSync(file); });
