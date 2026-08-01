@@ -2,6 +2,8 @@
 
 var childProcess = require("child_process");
 var fs = require("fs");
+var http = require("http");
+var https = require("https");
 var path = require("path");
 
 function sleep(milliseconds) {
@@ -35,10 +37,13 @@ function run(command, args, options) {
     return result;
 }
 
-function sc(args) {
+function sc(args, acceptedCodes) {
     var result = childProcess.spawnSync("sc.exe", args, { encoding: "utf8", windowsHide: true });
     if (result.error) throw result.error;
-    if (result.status !== 0) throw new Error("sc.exe " + args.join(" ") + " failed with exit code " + result.status + ": " + String(result.stderr || result.stdout || "").trim());
+    acceptedCodes = acceptedCodes || [0];
+    if (acceptedCodes.indexOf(result.status) < 0) {
+        throw new Error("sc.exe " + args.join(" ") + " failed with exit code " + result.status + ": " + String(result.stderr || result.stdout || "").trim());
+    }
     return result;
 }
 
@@ -71,10 +76,11 @@ function waitForServiceState(serviceName, desiredState, timeoutMs) {
 }
 
 function stopWindowsService(serviceName, parentPid) {
-    sc(["config", serviceName, "start=", "disabled"]);
     var result = childProcess.spawnSync("sc.exe", ["stop", serviceName], { encoding: "utf8", windowsHide: true });
     var output = String(result.stdout || "") + String(result.stderr || "");
-    if (result.status !== 0 && !/1062|SERVICE_NOT_ACTIVE/i.test(output)) throw new Error("Unable to stop service " + serviceName + ": " + output.trim());
+    if (result.status !== 0 && !/1062|SERVICE_NOT_ACTIVE/i.test(output)) {
+        throw new Error("Unable to stop service " + serviceName + ": " + output.trim());
+    }
     waitForProcessExit(parentPid, 120000);
     waitForServiceState(serviceName, "STOPPED", 120000);
 }
@@ -83,8 +89,24 @@ function startWindowsService(serviceName) {
     sc(["config", serviceName, "start=", "auto"]);
     var result = childProcess.spawnSync("sc.exe", ["start", serviceName], { encoding: "utf8", windowsHide: true });
     var output = String(result.stdout || "") + String(result.stderr || "");
-    if (result.status !== 0 && !/1056|INSTANCE_OF_SERVICE_ALREADY_RUNNING/i.test(output)) throw new Error("Unable to start service " + serviceName + ": " + output.trim());
+    if (result.status !== 0 && !/1056|INSTANCE_OF_SERVICE_ALREADY_RUNNING/i.test(output)) {
+        throw new Error("Unable to start service " + serviceName + ": " + output.trim());
+    }
     waitForServiceState(serviceName, "RUNNING", 120000);
+}
+
+function requestHealthy(url, timeoutMs) {
+    var deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+        var healthy = childProcess.spawnSync(process.execPath, ["-e",
+            "const u=new URL(process.argv[1]);const t=u.protocol==='https:'?require('https'):require('http');" +
+            "const r=t.get(u,{timeout:5000,rejectUnauthorized:false},x=>{x.resume();x.on('end',()=>process.exit(x.statusCode>=200&&x.statusCode<400?0:2));});" +
+            "r.on('timeout',()=>r.destroy());r.on('error',()=>process.exit(3));", url],
+            { encoding: "utf8", windowsHide: true, timeout: 10000 });
+        if (healthy.status === 0) return;
+        sleep(1000);
+    }
+    throw new Error("Portal health check failed for " + url + ".");
 }
 
 function copyTree(source, destination) {
@@ -137,9 +159,19 @@ function complete(stateFile, operation) {
 function fail(stateFile, manifest, error) {
     updateState(stateFile, function (state) {
         state.history = Array.isArray(state.history) ? state.history : [];
-        state.history.unshift({ type: String(manifest.history && manifest.history.type || "update") + "-failed", at: new Date().toISOString(), version: manifest.history && (manifest.history.to || manifest.history.version) || "", error: String(error && error.message || error), channel: manifest.history && manifest.history.channel || state.channel || "dev" });
+        state.history.unshift({
+            type: String(manifest.history && manifest.history.type || "update") + "-failed",
+            at: new Date().toISOString(),
+            version: manifest.history && (manifest.history.to || manifest.history.version) || "",
+            error: String(error && error.message || error),
+            channel: manifest.history && manifest.history.channel || state.channel || "dev"
+        });
         state.pending = null;
     });
+}
+
+function removeFile(file) {
+    try { fs.rmSync(file, { force: true }); } catch (error) {}
 }
 
 function main() {
@@ -149,12 +181,18 @@ function main() {
     var target = path.resolve(manifest.target);
     var staged = path.resolve(manifest.staged);
     var rollback = manifest.rollback ? path.resolve(manifest.rollback) : "";
-    var serviceName = String(manifest.serviceName || "SirkPortalStandalone");
+    var stateFile = path.resolve(manifest.stateFile);
+    var dataRoot = path.dirname(path.dirname(stateFile));
+    var maintenanceFile = path.resolve(manifest.maintenanceFile || path.join(dataRoot, "maintenance.lock"));
+    var serviceName = String(manifest.serviceName || "SirkPortal");
+    var healthUrl = String(manifest.healthUrl || "https://127.0.0.1/login");
     var signalFile = path.resolve(manifest.signalFile || path.join(path.dirname(manifestFile), "restart.signal"));
     var preserve = manifest.preserve || ["Service", "node_modules"];
     var stoppedService = false;
+    var rollbackHealthy = false;
 
     waitForFile(signalFile, 30 * 60 * 1000);
+    fs.writeFileSync(maintenanceFile, JSON.stringify({ startedAtUtc: new Date().toISOString(), token: manifest.token || "", targetVersion: manifest.history && (manifest.history.to || manifest.history.version) || "" }, null, 2));
 
     try {
         if (process.platform === "win32") {
@@ -163,26 +201,60 @@ function main() {
         } else {
             waitForProcessExit(Number(manifest.parentPid) || 0, 120000);
         }
+
         replaceApplication(target, staged, preserve);
         installDependencies(target);
-        complete(path.resolve(manifest.stateFile), manifest.history || { type: "update", at: new Date().toISOString() });
-        try { fs.rmSync(path.dirname(manifestFile), { recursive: true, force: true }); } catch (ignored) {}
-        if (process.platform === "win32") startWindowsService(serviceName);
+
+        if (process.platform === "win32") {
+            startWindowsService(serviceName);
+            stoppedService = false;
+            requestHealthy(healthUrl, 120000);
+        }
+
+        complete(stateFile, manifest.history || { type: "update", at: new Date().toISOString() });
+        removeFile(path.join(path.dirname(manifestFile), "failure.txt"));
     } catch (error) {
         try {
-            if (rollback && fs.existsSync(rollback)) {
-                replaceApplication(target, rollback, preserve);
-                installDependencies(target);
+            if (process.platform === "win32" && !stoppedService) {
+                stopWindowsService(serviceName, 0);
+                stoppedService = true;
+            }
+            if (!rollback || !fs.existsSync(rollback)) throw new Error("Valid rollback tree is unavailable.");
+            replaceApplication(target, rollback, preserve);
+            installDependencies(target);
+            if (process.platform === "win32") {
+                startWindowsService(serviceName);
+                stoppedService = false;
+                requestHealthy(healthUrl, 120000);
+                rollbackHealthy = true;
             }
         } catch (rollbackError) {
             error = new Error(String(error.message || error) + " Rollback failed: " + String(rollbackError.message || rollbackError));
         }
-        fail(path.resolve(manifest.stateFile), manifest, error);
-        try { fs.writeFileSync(path.join(path.dirname(manifestFile), "failure.txt"), String(error && error.stack || error)); } catch (ignored2) {}
+        fail(stateFile, manifest, error);
+        try { fs.writeFileSync(path.join(path.dirname(manifestFile), "failure.txt"), String(error && error.stack || error)); } catch (ignored) {}
         if (process.platform === "win32" && stoppedService) {
-            try { startWindowsService(serviceName); } catch (startError) {}
+            try {
+                startWindowsService(serviceName);
+                requestHealthy(healthUrl, 120000);
+                rollbackHealthy = true;
+            } catch (startError) {
+                error = new Error(String(error.message || error) + " Service recovery failed: " + String(startError.message || startError));
+            }
         }
+        if (!rollbackHealthy && process.platform === "win32") throw error;
         throw error;
+    } finally {
+        if (process.platform === "win32") {
+            try { sc(["config", serviceName, "start=", "auto"]); } catch (error) {}
+        }
+        removeFile(maintenanceFile);
+        removeFile(signalFile);
+        try {
+            if (!fs.existsSync(path.join(path.dirname(manifestFile), "failure.txt"))) {
+                fs.rmSync(path.dirname(manifestFile), { recursive: true, force: true });
+            }
+        } catch (error) {}
     }
 }
 
