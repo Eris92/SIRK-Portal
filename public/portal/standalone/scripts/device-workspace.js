@@ -299,7 +299,8 @@
         var adminTool = host.querySelector("[data-agent-admin-tool]");
         var adminStart = host.querySelector("[data-agent-admin-start]");
         host.querySelector("[data-stat-input]").parentNode.firstChild.nodeValue = "input dispatch ";
-        var nativeWidth = 0, nativeHeight = 0, streamGeneration = 0, connected = false;
+        var nativeWidth = 0, nativeHeight = 0, sourceWidth = 0, sourceHeight = 0;
+        var streamGeneration = 0, connected = false;
         var inputSequence = 0, pendingInput = new Map();
         var hasCompleteFrame = false;
         var frameTimes = [], inputTimes = [], byteSamples = [], renderedFrames = 0, statsStartedAt = performance.now();
@@ -517,6 +518,8 @@
                 }
                 nativeWidth = Number(data.width || 0);
                 nativeHeight = Number(data.height || 0);
+                sourceWidth = Number(data.sourceWidth || nativeWidth);
+                sourceHeight = Number(data.sourceHeight || nativeHeight);
                 var decodeStarted = performance.now();
                 if (value.contentType.indexOf("video/h264") === 0 && "VideoDecoder" in window)
                     return decodeH264Frame(value, generation, requestStarted, true);
@@ -583,18 +586,21 @@
                             if (videoGeneration === streamGeneration) {
                                 nativeWidth = Number(frameData.width || decoded.displayWidth);
                                 nativeHeight = Number(frameData.height || decoded.displayHeight);
+                                sourceWidth = Number(frameData.sourceWidth || nativeWidth);
+                                sourceHeight = Number(frameData.sourceHeight || nativeHeight);
                                 if (image.width !== nativeWidth || image.height !== nativeHeight) {
                                     image.width = nativeWidth; image.height = nativeHeight;
                                 }
                                 imageContext.drawImage(decoded, 0, 0, nativeWidth, nativeHeight);
                                 hasCompleteFrame = true;
                                 localCursor.style.display = "";
-                                localCursor.style.left = (Number(frameData.cursorX || 0) / nativeWidth * 100) + "%";
-                                localCursor.style.top = (Number(frameData.cursorY || 0) / nativeHeight * 100) + "%";
+                                localCursor.style.left = (Number(frameData.cursorX || 0) / sourceWidth * 100) + "%";
+                                localCursor.style.top = (Number(frameData.cursorY || 0) / sourceHeight * 100) + "%";
                                 var capturedAt = Number(frameData.capturedAtUnixMilliseconds || 0);
                                 updateStats(frameData, capturedAt ? Math.max(0, Date.now() - capturedAt) :
                                     performance.now() - Number(metadata.requestStarted || requestStarted), 0);
-                                status.textContent = "Połączono · H.264 low-latency · " + nativeWidth + " × " + nativeHeight;
+                                status.textContent = "Połączono · H.264 low-latency · " + sourceWidth + " × " + sourceHeight +
+                                    " → " + nativeWidth + " × " + nativeHeight;
                             }
                             decoded.close();
                     },
@@ -617,11 +623,11 @@
         }
         var lastMouseMoveAt = 0;
         function coordinates(event) {
-            if (!nativeWidth || !nativeHeight) return;
+            if (!sourceWidth || !sourceHeight) return;
             var bounds = image.getBoundingClientRect();
             return {
-                x: Math.round((event.clientX - bounds.left) / bounds.width * nativeWidth),
-                y: Math.round((event.clientY - bounds.top) / bounds.height * nativeHeight)
+                x: Math.round((event.clientX - bounds.left) / bounds.width * sourceWidth),
+                y: Math.round((event.clientY - bounds.top) / bounds.height * sourceHeight)
             };
         }
         image.addEventListener("pointerdown", function (event) {
