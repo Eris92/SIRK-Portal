@@ -362,7 +362,8 @@ function start(options) {
                 });
                 return;
             }
-            if (url.pathname !== "/api/agent-desktop/stream") { socket.destroy(); return; }
+            var inputOnly = url.pathname === "/api/agent-desktop/input-stream";
+            if (url.pathname !== "/api/agent-desktop/stream" && !inputOnly) { socket.destroy(); return; }
             sessionUser(req).then(function (user) {
                 if (!user.isAdmin || !requireSameOrigin(req)) { socket.destroy(); return; }
                 desktopSockets.handleUpgrade(req, socket, head, function (client) {
@@ -370,13 +371,19 @@ function start(options) {
                     var deviceId = String(url.searchParams.get("deviceId") || "");
                     var sequence = Math.max(0, Number(url.searchParams.get("after")) || 0);
                     var closed = false;
-                    host.agentDesktopRelay.touchViewer(tenantId, deviceId);
-                    var viewerHeartbeat = setInterval(function () {
+                    if (!inputOnly) host.agentDesktopRelay.touchViewer(tenantId, deviceId);
+                    var viewerHeartbeat = inputOnly ? null : setInterval(function () {
                         host.agentDesktopRelay.touchViewer(tenantId, deviceId);
                     }, 10000);
                     client.binaryType = "arraybuffer";
-                    client.once("close", function () { closed = true; clearInterval(viewerHeartbeat); });
-                    client.once("error", function () { closed = true; clearInterval(viewerHeartbeat); });
+                    client.once("close", function () {
+                        closed = true;
+                        if (viewerHeartbeat) clearInterval(viewerHeartbeat);
+                    });
+                    client.once("error", function () {
+                        closed = true;
+                        if (viewerHeartbeat) clearInterval(viewerHeartbeat);
+                    });
                     client.on("message", function (packet, binary) {
                         if (binary) return;
                         try {
@@ -393,6 +400,7 @@ function start(options) {
                                 error: String(error.message || error).slice(0, 160) }));
                         }
                     });
+                    if (inputOnly) return;
                     (async function pump() {
                         while (!closed && client.readyState === WebSocket.OPEN) {
                             var value = await host.agentDesktopRelay.wait(tenantId, deviceId, sequence, 25000);

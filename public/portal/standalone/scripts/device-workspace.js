@@ -281,9 +281,9 @@
 
     function renderAgentDesktop(host, node) {
         var stopped = false;
-        host.innerHTML = '<div class="sirk-agent-operation sirk-agent-desktop"><header><strong>Pulpit SIRK Agent Live</strong><small>Natychmiastowa pomoc zdalna w wybranej sesji użytkownika</small></header><div class="sirk-agent-desktop-controls"><label>Sesja<select data-agent-desktop-session disabled></select></label><label>Monitor<select data-agent-desktop-monitor disabled><option value="-1">Wszystkie monitory</option></select></label><label>Profil<select data-agent-desktop-profile><option value="auto">Auto</option><option value="smooth">Płynny</option><option value="text">Ostry tekst</option><option value="weak">Słabe łącze</option><option value="minimum">Minimalny transfer</option></select></label><button type="button" data-agent-desktop-connect>Połącz</button><button type="button" data-agent-desktop-disconnect disabled>Rozłącz</button></div><div class="sirk-agent-desktop-stats" data-agent-desktop-stats><span>FPS <b data-stat-fps>0</b></span><span>latencja p50/p95 <b data-stat-latency>—</b></span><span>input dispatch <b data-stat-input>—</b></span><span>capture/encode/session/decode <b data-stat-pipeline>—</b></span><span>bitrate <b data-stat-bitrate>0</b></span><span>łącze <b data-stat-link>pomiar…</b></span><span>backend <b data-stat-backend>—</b></span></div><div class="sirk-agent-desktop-admin"><strong>Pulpit administracyjny</strong><select data-agent-admin-tool><option value="powershell">PowerShell SYSTEM</option><option value="computer-management">Zarządzanie komputerem</option><option value="services">Usługi</option><option value="registry">Edytor rejestru</option><option value="task-manager">Menedżer zadań</option><option value="event-viewer">Podgląd zdarzeń</option><option value="device-manager">Menedżer urządzeń</option></select><button type="button" data-agent-admin-start disabled>Uruchom w sesji użytkownika</button></div><div class="sirk-agent-desktop-stage" style="position:relative"><canvas data-agent-desktop-image aria-label="Zdalny pulpit" tabindex="0"></canvas><span data-agent-desktop-cursor style="position:absolute;width:12px;height:12px;border:2px solid #fff;border-radius:50%;background:#111;box-shadow:0 0 0 1px #111;pointer-events:none;transform:translate(-2px,-2px)"></span></div><div class="sirk-agent-desktop-input"><input data-agent-desktop-text placeholder="Tekst do aktywnego okna"><button type="button" data-agent-desktop-send>Wyślij tekst</button><select data-agent-desktop-key><option>Enter</option><option>Tab</option><option>Escape</option><option>Backspace</option><option>Delete</option><option>Up</option><option>Down</option><option>Left</option><option>Right</option><option>Home</option><option>End</option><option>PageUp</option><option>PageDown</option><option>F5</option></select><button type="button" data-agent-desktop-key-send>Klawisz</button></div><div class="sirk-agent-desktop-clipboard"><textarea data-agent-desktop-clipboard placeholder="Schowek wybranej sesji"></textarea><button type="button" data-agent-desktop-clipboard-get>Pobierz schowek</button><button type="button" data-agent-desktop-clipboard-set>Ustaw schowek</button></div><pre data-agent-operation-status>Gotowy do natychmiastowego połączenia.</pre></div>';
+        host.innerHTML = '<div class="sirk-agent-operation sirk-agent-desktop"><header><strong>Pulpit SIRK Agent Live</strong><small>Natychmiastowa pomoc zdalna w wybranej sesji użytkownika</small></header><div class="sirk-agent-desktop-controls"><label>Sesja<select data-agent-desktop-session disabled></select></label><label>Monitor<select data-agent-desktop-monitor disabled><option value="-1">Wszystkie monitory</option></select></label><label>Profil<select data-agent-desktop-profile><option value="auto">Auto</option><option value="smooth">Płynny</option><option value="text">Ostry tekst</option><option value="weak">Słabe łącze</option><option value="minimum">Minimalny transfer</option></select></label><button type="button" data-agent-desktop-connect>Połącz</button><button type="button" data-agent-desktop-disconnect disabled>Rozłącz</button></div><div class="sirk-agent-desktop-stats" data-agent-desktop-stats><span>FPS <b data-stat-fps>0</b></span><span>latencja p50/p95 <b data-stat-latency>—</b></span><span>input dispatch <b data-stat-input>—</b></span><span>capture/encode/session/decode/render <b data-stat-pipeline>—</b></span><span>bitrate <b data-stat-bitrate>0</b></span><span>łącze <b data-stat-link>pomiar…</b></span><span>backend <b data-stat-backend>—</b></span></div><div class="sirk-agent-desktop-admin"><strong>Pulpit administracyjny</strong><select data-agent-admin-tool><option value="powershell">PowerShell SYSTEM</option><option value="computer-management">Zarządzanie komputerem</option><option value="services">Usługi</option><option value="registry">Edytor rejestru</option><option value="task-manager">Menedżer zadań</option><option value="event-viewer">Podgląd zdarzeń</option><option value="device-manager">Menedżer urządzeń</option></select><button type="button" data-agent-admin-start disabled>Uruchom w sesji użytkownika</button></div><div class="sirk-agent-desktop-stage" style="position:relative"><canvas data-agent-desktop-image aria-label="Zdalny pulpit" tabindex="0"></canvas><span data-agent-desktop-cursor style="position:absolute;width:12px;height:12px;border:2px solid #fff;border-radius:50%;background:#111;box-shadow:0 0 0 1px #111;pointer-events:none;transform:translate(-2px,-2px)"></span></div><div class="sirk-agent-desktop-input"><input data-agent-desktop-text placeholder="Tekst do aktywnego okna"><button type="button" data-agent-desktop-send>Wyślij tekst</button><select data-agent-desktop-key><option>Enter</option><option>Tab</option><option>Escape</option><option>Backspace</option><option>Delete</option><option>Up</option><option>Down</option><option>Left</option><option>Right</option><option>Home</option><option>End</option><option>PageUp</option><option>PageDown</option><option>F5</option></select><button type="button" data-agent-desktop-key-send>Klawisz</button></div><div class="sirk-agent-desktop-clipboard"><textarea data-agent-desktop-clipboard placeholder="Schowek wybranej sesji"></textarea><button type="button" data-agent-desktop-clipboard-get>Pobierz schowek</button><button type="button" data-agent-desktop-clipboard-set>Ustaw schowek</button></div><pre data-agent-operation-status>Gotowy do natychmiastowego połączenia.</pre></div>';
         var image = host.querySelector("[data-agent-desktop-image]");
-        var imageContext = image.getContext("2d", { alpha: false });
+        var imageContext = image.getContext("2d", { alpha: false, desynchronized: true });
         var moveCanvas = document.createElement("canvas");
         var moveContext = moveCanvas.getContext("2d", { alpha: false });
         var localCursor = host.querySelector("[data-agent-desktop-cursor]");
@@ -319,7 +319,11 @@
             if (profile.value !== "auto") return profiles[profile.value];
             return profiles[activeAutoProfile];
         }
-        function updateStats(data, frameMs, decodeMs) {
+        function setStreamStatus(message) {
+            if (status.textContent !== message) status.textContent = message;
+            if (status.classList.contains("is-error")) status.classList.remove("is-error");
+        }
+        function updateStats(data, frameMs, decodeMs, renderMs) {
             frameTimes.push(frameMs); if (frameTimes.length > 120) frameTimes.shift();
             var now = performance.now();
             frameRenderTimes.push(now);
@@ -350,7 +354,7 @@
             host.querySelector("[data-stat-fps]").textContent = fps.toFixed(1);
             host.querySelector("[data-stat-latency]").textContent = Math.round(percentile(frameTimes, 0.5)) + " / " + Math.round(percentile(frameTimes, 0.95)) + " ms";
             host.querySelector("[data-stat-input]").textContent = inputP95 ? Math.round(inputP95) + " ms p95" : "—";
-            host.querySelector("[data-stat-pipeline]").textContent = Number(data.captureMilliseconds || 0).toFixed(1) + " / " + Number(data.encodeMilliseconds || 0).toFixed(1) + " / " + Number(data.sessionMilliseconds || 0).toFixed(1) + " / " + decodeMs.toFixed(1) + " ms";
+            host.querySelector("[data-stat-pipeline]").textContent = Number(data.captureMilliseconds || 0).toFixed(1) + " / " + Number(data.encodeMilliseconds || 0).toFixed(1) + " / " + Number(data.sessionMilliseconds || 0).toFixed(1) + " / " + decodeMs.toFixed(1) + " / " + renderMs.toFixed(1) + " ms";
             host.querySelector("[data-stat-bitrate]").textContent = (bits / 5000000).toFixed(2) + " Mb/s";
             host.querySelector("[data-stat-link]").textContent = percentile(frameTimes, 0.95) > 350 ? "bardzo słabe" : percentile(frameTimes, 0.95) > 190 ? "słabe" : "dobre";
             host.querySelector("[data-stat-backend]").textContent = (data.captureBackend || "—") + " · " + (data.encoding || "—");
@@ -364,10 +368,12 @@
             parameters.monitorIndex = target.monitorIndex;
             var started = performance.now();
             var socketActions = ["move", "leftDown", "leftUp", "rightClick", "middleClick", "wheel", "key", "text"];
-            if (desktopSocket && desktopSocket.readyState === WebSocket.OPEN &&
+            var inputChannel = desktopInputSocket && desktopInputSocket.readyState === WebSocket.OPEN
+                ? desktopInputSocket : desktopSocket;
+            if (inputChannel && inputChannel.readyState === WebSocket.OPEN &&
                 socketActions.indexOf(parameters.action) >= 0) {
                 if (parameters.action === "move") {
-                    desktopSocket.send(JSON.stringify({ type: "input", id: 0, input: parameters }));
+                    inputChannel.send(JSON.stringify({ type: "input", id: 0, input: parameters }));
                     return Promise.resolve({ ok: true });
                 }
                 var id = ++inputSequence;
@@ -377,7 +383,7 @@
                         reject(new Error("Input dispatch timeout."));
                     }, 2000);
                     pendingInput.set(id, { resolve: resolve, reject: reject, timer: timer, started: started });
-                    desktopSocket.send(JSON.stringify({ type: "input", id: id, input: parameters }));
+                    inputChannel.send(JSON.stringify({ type: "input", id: id, input: parameters }));
                 });
             }
             var runtime = window.SirkPlatformRuntime && window.SirkPlatformRuntime.state;
@@ -395,8 +401,10 @@
                     return value;
                 });
             }).then(function (value) {
-                inputTimes.push(performance.now() - started);
-                if (inputTimes.length > 60) inputTimes.shift();
+                if (socketActions.indexOf(parameters.action) >= 0) {
+                    inputTimes.push(performance.now() - started);
+                    if (inputTimes.length > 60) inputTimes.shift();
+                }
                 return value;
             });
         }
@@ -450,27 +458,52 @@
             startDesktopSocket(streamGeneration);
         }
         var desktopSocket = null;
+        var desktopInputSocket = null;
+        var desktopTextDecoder = new TextDecoder();
+        function handleInputSocketMessage(event) {
+            if (typeof event.data !== "string") return;
+            var message;
+            try { message = JSON.parse(event.data); } catch (error) { return; }
+            var id = Number(message.id);
+            if (message.type === "inputAck" && pendingInput.has(id)) {
+                var pending = pendingInput.get(id);
+                pendingInput.delete(id); clearTimeout(pending.timer);
+                inputTimes.push(performance.now() - pending.started);
+                if (inputTimes.length > 60) inputTimes.shift();
+                pending.resolve({ ok: true });
+            }
+        }
+        function rejectPendingInputs(message) {
+            pendingInput.forEach(function (pending) {
+                clearTimeout(pending.timer); pending.reject(new Error(message));
+            });
+            pendingInput.clear();
+        }
         function startDesktopSocket(generation) {
             if (desktopSocket) { try { desktopSocket.close(); } catch (error) {} }
+            if (desktopInputSocket) { try { desktopInputSocket.close(); } catch (error) {} }
             var scheme = location.protocol === "https:" ? "wss:" : "ws:";
-            var url = scheme + "//" + location.host + "/api/agent-desktop/stream?tenantId=" +
-                encodeURIComponent(node.tenantId) + "&deviceId=" + encodeURIComponent(node.deviceId) +
+            var identityQuery = "tenantId=" + encodeURIComponent(node.tenantId) +
+                "&deviceId=" + encodeURIComponent(node.deviceId);
+            var url = scheme + "//" + location.host + "/api/agent-desktop/stream?" + identityQuery +
                 "&after=" + encodeURIComponent(snapshot.sequence || 0);
             var socket = new WebSocket(url);
             desktopSocket = socket;
+            var inputSocket = new WebSocket(scheme + "//" + location.host +
+                "/api/agent-desktop/input-stream?" + identityQuery);
+            desktopInputSocket = inputSocket;
+            inputSocket.onmessage = handleInputSocketMessage;
+            inputSocket.onclose = function () {
+                if (generation !== streamGeneration || inputSocket !== desktopInputSocket) return;
+                desktopInputSocket = null;
+                rejectPendingInputs("Desktop input socket closed.");
+            };
+            inputSocket.onerror = function () { try { inputSocket.close(); } catch (error) {} };
             socket.binaryType = "arraybuffer";
             socket.onmessage = function (event) {
                 if (generation !== streamGeneration || socket !== desktopSocket) return;
                 if (typeof event.data === "string") {
-                    var message;
-                    try { message = JSON.parse(event.data); } catch (error) { return; }
-                    if (message.type === "inputAck" && pendingInput.has(Number(message.id))) {
-                        var pending = pendingInput.get(Number(message.id));
-                        pendingInput.delete(Number(message.id)); clearTimeout(pending.timer);
-                        inputTimes.push(performance.now() - pending.started);
-                        if (inputTimes.length > 60) inputTimes.shift();
-                        pending.resolve({ ok: true });
-                    }
+                    handleInputSocketMessage(event);
                     return;
                 }
                 var packet = new Uint8Array(event.data);
@@ -478,7 +511,7 @@
                 var metadataLength = new DataView(packet.buffer, packet.byteOffset, 4).getUint32(0, false);
                 if (metadataLength < 2 || metadataLength + 4 > packet.length) return;
                 var data;
-                try { data = JSON.parse(new TextDecoder().decode(packet.subarray(4, 4 + metadataLength))); }
+                try { data = JSON.parse(desktopTextDecoder.decode(packet.subarray(4, 4 + metadataLength))); }
                 catch (error) { return; }
                 snapshot.sequence = Number(data.sequence || snapshot.sequence || 0);
                 if (data.cursorOnly === true) {
@@ -491,15 +524,15 @@
                 }
                 if (data.contentType !== "video/h264") { socket.close(); return; }
                 if (videoDecoder && videoDecoder.decodeQueueSize > 1 && !data.keyFrame) return;
-                decodeH264Frame({ buffer: packet.slice(4 + metadataLength).buffer, data: data },
+                decodeH264Frame({ buffer: packet.subarray(4 + metadataLength), data: data },
                     generation, performance.now(), false).catch(function () {
                         input({ action: "requestKeyframe" }).catch(function () {});
                     });
             };
             socket.onclose = function () {
                 if (generation !== streamGeneration || socket !== desktopSocket) return;
-                pendingInput.forEach(function (pending) { clearTimeout(pending.timer); pending.reject(new Error("Desktop socket closed.")); });
-                pendingInput.clear();
+                if (!desktopInputSocket || desktopInputSocket.readyState !== WebSocket.OPEN)
+                    rejectPendingInputs("Desktop socket closed.");
                 desktopSocket = null;
                 setTimeout(function () { snapshot(generation); }, 250);
             };
@@ -555,6 +588,7 @@
                         moveCanvas.width = nativeWidth;
                         moveCanvas.height = nativeHeight;
                     }
+                    var renderStarted = performance.now();
                     if (hasCompleteFrame && (data.moves || []).length) {
                         moveContext.clearRect(0, 0, moveCanvas.width, moveCanvas.height);
                         moveContext.drawImage(image, 0, 0);
@@ -581,9 +615,9 @@
                     var capturedAt = Number(data.capturedAtUnixMilliseconds || 0);
                     var frameMs = capturedAt > 0 ? Math.max(0, Date.now() - capturedAt) :
                         performance.now() - requestStarted;
-                    updateStats(data, frameMs, performance.now() - decodeStarted);
-                    status.textContent = "Połączono · strumień bezpośredni · " + nativeWidth + " × " + nativeHeight + " · profil " + profile.options[profile.selectedIndex].text;
-                    status.classList.remove("is-error");
+                    updateStats(data, frameMs, renderStarted - decodeStarted,
+                        performance.now() - renderStarted);
+                    setStreamStatus("Połączono · strumień bezpośredni · " + nativeWidth + " × " + nativeHeight + " · profil " + profile.options[profile.selectedIndex].text);
                     setTimeout(function () { snapshot(generation); }, 0);
                 });
             }).catch(function (error) {
@@ -607,6 +641,7 @@
                             var metadata = videoMetadata.get(decoded.timestamp) || {};
                             videoMetadata.delete(decoded.timestamp);
                             var frameData = metadata.data || {};
+                            var outputAt = performance.now();
                             if (videoGeneration === streamGeneration) {
                                 nativeWidth = Number(frameData.width || decoded.displayWidth);
                                 nativeHeight = Number(frameData.height || decoded.displayHeight);
@@ -615,17 +650,19 @@
                                 if (image.width !== nativeWidth || image.height !== nativeHeight) {
                                     image.width = nativeWidth; image.height = nativeHeight;
                                 }
+                                var renderStarted = performance.now();
                                 imageContext.drawImage(decoded, 0, 0, nativeWidth, nativeHeight);
+                                var renderMilliseconds = performance.now() - renderStarted;
                                 hasCompleteFrame = true;
                                 localCursor.style.display = "";
                                 localCursor.style.left = (Number(frameData.cursorX || 0) / sourceWidth * 100) + "%";
                                 localCursor.style.top = (Number(frameData.cursorY || 0) / sourceHeight * 100) + "%";
                                 var capturedAt = Number(frameData.capturedAtUnixMilliseconds || 0);
+                                var inputAt = Number(metadata.requestStarted || requestStarted);
                                 updateStats(frameData, capturedAt ? Math.max(0, Date.now() - capturedAt) :
-                                    performance.now() - Number(metadata.requestStarted || requestStarted),
-                                    performance.now() - Number(metadata.requestStarted || requestStarted));
-                                status.textContent = "Połączono · H.264 low-latency · " + sourceWidth + " × " + sourceHeight +
-                                    " → " + nativeWidth + " × " + nativeHeight;
+                                    performance.now() - inputAt, outputAt - inputAt, renderMilliseconds);
+                                setStreamStatus("Połączono · H.264 low-latency · " + sourceWidth + " × " + sourceHeight +
+                                    " → " + nativeWidth + " × " + nativeHeight);
                             }
                             decoded.close();
                     },
@@ -635,8 +672,9 @@
             }
             var timestamp = Number(data.sequence || data.capturedAtUnixMilliseconds || Date.now()) * 1000;
             videoMetadata.set(timestamp, { data: data, requestStarted: requestStarted });
+            var encodedBytes = value.buffer instanceof Uint8Array ? value.buffer : new Uint8Array(value.buffer);
             videoDecoder.decode(new EncodedVideoChunk({
-                type: data.keyFrame ? "key" : "delta", timestamp: timestamp, data: new Uint8Array(value.buffer)
+                type: data.keyFrame ? "key" : "delta", timestamp: timestamp, data: encodedBytes
             }));
             if (continuePolling) setTimeout(function () { snapshot(generation); }, 0);
             return Promise.resolve().then(function () {
@@ -840,6 +878,8 @@
             connected = false;
             streamGeneration += 1;
             if (desktopSocket) { try { desktopSocket.close(); } catch (error) {} desktopSocket = null; }
+            if (desktopInputSocket) { try { desktopInputSocket.close(); } catch (error) {} desktopInputSocket = null; }
+            rejectPendingInputs("Desktop session disconnected.");
             hasCompleteFrame = false;
             snapshot.sequence = 0;
             imageContext.clearRect(0, 0, image.width, image.height);
@@ -867,6 +907,8 @@
             if (!host.isConnected) {
                 stopped = true;
                 if (desktopSocket) { try { desktopSocket.close(); } catch (error) {} desktopSocket = null; }
+                if (desktopInputSocket) { try { desktopInputSocket.close(); } catch (error) {} desktopInputSocket = null; }
+                rejectPendingInputs("Desktop workspace closed.");
                 observer.disconnect();
             }
         });
