@@ -1,13 +1,13 @@
 {
   "name": "sirk-portal",
-  "version": "2.0.0-dev.28",
+  "version": "2.0.0-dev.29",
   "private": true,
   "scripts": {
     "start": "node server/standalone.js",
     "test:standalone": "node scripts/validate-standalone.js && node test/windows-service-manager.test.js && node test/portal-identity.test.js && node test/standalone-host-boundary.test.js",
-    "test:update-manager": "node test/system-update-manager.test.js",
+    "test:update-manager": "node test/system-update-manager.test.js && node test/transactional-updater-contract.test.js",
     "pretest": "node scripts/validate-standalone.js",
-    "test": "node test/one-line-installer-contract.test.js && node test/installer-service-detection-contract.test.js && node test/breakglass-access-gateway.test.js && node test/canonical-login-route.test.js && node test/windows-service-manager.test.js && node test/portal-watchdog.test.js && node test/watchdog-installer-contract.test.js && node test/agent-gateway.test.js && node test/agent-desktop-relay.test.js && node test/agent-groups.test.js && node test/agent-policy-service.test.js && node test/agent-security-overview.test.js && node test/portal-installer-workflow.test.js && node test/portal-identity.test.js && node test/standalone-host-boundary.test.js && node test/portal-class-contract.test.js && node test/portal-provider-contract.test.js && node test/system-update-manager.test.js && node test/script-localization.test.js && node test/folder-access.test.js && node test/integration-health.test.js && node test/central-tunnel-client.test.js && node test/central-agent-control-plane.test.js && node test/central-agent-command-dispatcher.test.js && node test/portal-terminal-connect.test.js && node test/portal-access-and-desktop-connect.test.js && node test/portal-cleanup.test.js",
+    "test": "node test/one-line-installer-contract.test.js && node test/installer-service-detection-contract.test.js && node test/breakglass-access-gateway.test.js && node test/canonical-login-route.test.js && node test/transactional-updater-contract.test.js && node test/windows-service-manager.test.js && node test/portal-watchdog.test.js && node test/watchdog-installer-contract.test.js && node test/agent-gateway.test.js && node test/agent-desktop-relay.test.js && node test/agent-groups.test.js && node test/agent-policy-service.test.js && node test/agent-security-overview.test.js && node test/portal-installer-workflow.test.js && node test/portal-identity.test.js && node test/standalone-host-boundary.test.js && node test/portal-class-contract.test.js && node test/portal-provider-contract.test.js && node test/system-update-manager.test.js && node test/script-localization.test.js && node test/folder-access.test.js && node test/integration-health.test.js && node test/central-tunnel-client.test.js && node test/central-agent-control-plane.test.js && node test/central-agent-command-dispatcher.test.js && node test/portal-terminal-connect.test.js && node test/portal-access-and-desktop-connect.test.js && node test/portal-cleanup.test.js",
     "check": "npm test"
   },
   "engines": {
