@@ -1,3 +1,11 @@
+## 2.0.0-dev.22
+
+- Publish signed Portal control-plane heartbeat to SIRK Central with total and online Agent counts.
+- Route Central `sync` operations with `kind=agent-command` to the local per-device Agent command broker.
+- Persist Central-to-Agent command mappings and prevent duplicate local execution after redelivery or Portal restart.
+- Report Agent command `running`, `completed` and `failed` states back to Central.
+- Keep the Agent isolated from Central URLs and credentials.
+
 ## 2.0.0-dev.21
 
 - Record the Agent source address and current interface topology on every check-in.
