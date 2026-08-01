@@ -303,6 +303,7 @@
         var inputSequence = 0, pendingInput = new Map();
         var hasCompleteFrame = false;
         var frameTimes = [], inputTimes = [], byteSamples = [], renderedFrames = 0, statsStartedAt = performance.now();
+        var activeAutoProfile = "smooth", lastAutoChangeAt = 0;
         var profiles = {
             smooth: { maxWidth: 1920, quality: 72, targetKbps: 1000 },
             text: { maxWidth: 1920, quality: 80, targetKbps: 1500 },
@@ -316,8 +317,7 @@
         }
         function effectiveProfile() {
             if (profile.value !== "auto") return profiles[profile.value];
-            var p95 = percentile(frameTimes, 0.95);
-            return p95 > 350 ? profiles.minimum : p95 > 190 ? profiles.weak : profiles.smooth;
+            return profiles[activeAutoProfile];
         }
         function updateStats(data, frameMs, decodeMs) {
             frameTimes.push(frameMs); if (frameTimes.length > 120) frameTimes.shift();
@@ -337,6 +337,20 @@
             host.querySelector("[data-stat-bitrate]").textContent = (bits / 5000000).toFixed(2) + " Mb/s";
             host.querySelector("[data-stat-link]").textContent = percentile(frameTimes, 0.95) > 350 ? "bardzo słabe" : percentile(frameTimes, 0.95) > 190 ? "słabe" : "dobre";
             host.querySelector("[data-stat-backend]").textContent = (data.captureBackend || "—") + " · " + (data.encoding || "—");
+            if (profile.value === "auto" && connected && now - lastAutoChangeAt > 2000) {
+                var latencyP95 = percentile(frameTimes, 0.95), nextProfile = activeAutoProfile;
+                if (activeAutoProfile === "smooth" && latencyP95 > 180) nextProfile = "weak";
+                else if (activeAutoProfile === "weak" && latencyP95 > 340) nextProfile = "minimum";
+                else if (activeAutoProfile === "minimum" && latencyP95 < 240) nextProfile = "weak";
+                else if (activeAutoProfile === "weak" && latencyP95 < 125) nextProfile = "smooth";
+                if (nextProfile !== activeAutoProfile) {
+                    activeAutoProfile = nextProfile;
+                    lastAutoChangeAt = now;
+                    var adaptive = profiles[nextProfile];
+                    input({ action: "streamProfile", maxWidth: adaptive.maxWidth,
+                        quality: adaptive.quality, targetKbps: adaptive.targetKbps }).catch(function () {});
+                }
+            }
         }
         function selected() {
             return { sessionId: Number(session.value), monitorIndex: Number(monitor.value) };
@@ -796,6 +810,8 @@
             connectButton.disabled = true;
             status.textContent = "Nawiązywanie połączenia live…";
             loadSessions().then(function () {
+                frameTimes = []; inputTimes = []; byteSamples = []; renderedFrames = 0;
+                statsStartedAt = performance.now(); activeAutoProfile = "smooth"; lastAutoChangeAt = 0;
                 connected = true;
                 session.disabled = false;
                 monitor.disabled = false;
