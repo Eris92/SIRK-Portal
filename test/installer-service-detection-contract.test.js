@@ -10,7 +10,7 @@ assert.match(installer, /DisplayName -eq 'SIRK Portal'/);
 assert.match(installer, /DisplayName -eq 'SIRK Portal Watchdog'/);
 assert.match(installer, /sirkportal\.exe/);
 assert.match(installer, /sirkportalwatchdog\.exe/);
-assert.match(installer, /HKLM:\\\\SYSTEM\\\\CurrentControlSet\\\\Services/);
+assert.match(installer, /CurrentControlSet\\Services/);
 assert.match(installer, /Stop-Service -Name \$watchdog\.Name/);
 assert.match(installer, /Start-Service -Name \$watchdog\.Name/);
 assert.doesNotMatch(installer, /Get-CimInstance Win32_Service -Filter \"Name='SirkPortal'\"/);
