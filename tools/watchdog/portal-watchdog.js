@@ -10,10 +10,10 @@ function create(options) {
     options = options || {};
     var portalRoot = path.resolve(options.portalRoot || process.env.SIRK_PORTAL_ROOT || "C:\\Program Files\\SIRK\\Portal");
     var dataRoot = path.resolve(options.dataRoot || process.env.SIRK_DATA_ROOT || "C:\\ProgramData\\SIRK\\Portal");
-    var serviceName = String(options.serviceName || process.env.SIRK_SERVICE_NAME || "SirkPortalStandalone");
+    var serviceName = String(options.serviceName || process.env.SIRK_SERVICE_NAME || "SirkPortal");
     var intervalMs = Math.max(5000, Number(options.intervalMs || process.env.SIRK_WATCHDOG_INTERVAL_MS || 15000));
     var threshold = Math.max(2, Number(options.threshold || process.env.SIRK_WATCHDOG_FAILURE_THRESHOLD || 3));
-    var healthUrl = String(options.healthUrl || process.env.SIRK_PORTAL_HEALTH_URL || "https://127.0.0.1:9443/health");
+    var healthUrl = String(options.healthUrl || process.env.SIRK_PORTAL_HEALTH_URL || "https://127.0.0.1/login");
     var stateRoot = path.join(dataRoot, "watchdog");
     var stateFile = path.join(stateRoot, "state.json");
     var logFile = path.join(stateRoot, "watchdog.log");
