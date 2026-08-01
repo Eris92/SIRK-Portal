@@ -473,11 +473,19 @@
                 var packet = new Uint8Array(event.data);
                 if (packet.length < 5) return;
                 var metadataLength = new DataView(packet.buffer, packet.byteOffset, 4).getUint32(0, false);
-                if (metadataLength < 2 || metadataLength + 4 >= packet.length) return;
+                if (metadataLength < 2 || metadataLength + 4 > packet.length) return;
                 var data;
                 try { data = JSON.parse(new TextDecoder().decode(packet.subarray(4, 4 + metadataLength))); }
                 catch (error) { return; }
                 snapshot.sequence = Number(data.sequence || snapshot.sequence || 0);
+                if (data.cursorOnly === true) {
+                    sourceWidth = Number(data.sourceWidth || sourceWidth || data.width || 1);
+                    sourceHeight = Number(data.sourceHeight || sourceHeight || data.height || 1);
+                    localCursor.style.display = "";
+                    localCursor.style.left = (Number(data.cursorX || 0) / sourceWidth * 100) + "%";
+                    localCursor.style.top = (Number(data.cursorY || 0) / sourceHeight * 100) + "%";
+                    return;
+                }
                 if (data.contentType !== "video/h264") { socket.close(); return; }
                 if (videoDecoder && videoDecoder.decodeQueueSize > 1 && !data.keyFrame) return;
                 decodeH264Frame({ buffer: packet.slice(4 + metadataLength).buffer, data: data },
@@ -662,8 +670,8 @@
             var now = Date.now(); if (now - lastMouseMoveAt < 16) return;
             var point = coordinates(event); if (!point) return; lastMouseMoveAt = now;
             localCursor.style.display = "";
-            localCursor.style.left = (point.x / nativeWidth * 100) + "%";
-            localCursor.style.top = (point.y / nativeHeight * 100) + "%";
+            localCursor.style.left = (point.x / sourceWidth * 100) + "%";
+            localCursor.style.top = (point.y / sourceHeight * 100) + "%";
             input({ action: "move", x: point.x, y: point.y }).catch(function () {});
         });
         image.addEventListener("wheel", function (event) {
@@ -672,12 +680,12 @@
         });
         image.addEventListener("contextmenu", function (event) {
             event.preventDefault();
-            if (!nativeWidth || !nativeHeight) return;
+            if (!sourceWidth || !sourceHeight) return;
             var bounds = image.getBoundingClientRect();
             input({
                 action: "rightClick",
-                x: Math.round((event.clientX - bounds.left) / bounds.width * nativeWidth),
-                y: Math.round((event.clientY - bounds.top) / bounds.height * nativeHeight)
+                x: Math.round((event.clientX - bounds.left) / bounds.width * sourceWidth),
+                y: Math.round((event.clientY - bounds.top) / bounds.height * sourceHeight)
             }).catch(function (error) { status.textContent = error.message || String(error); status.classList.add("is-error"); });
         });
         function completedInput(parameters) {

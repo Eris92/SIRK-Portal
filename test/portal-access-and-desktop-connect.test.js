@@ -23,6 +23,8 @@ assert(workspace.indexOf('fetch("/api/agent-desktop/input"') >= 0);
 assert(workspace.indexOf('desktopSocket.send(JSON.stringify({ type: "input"') >= 0);
 assert(workspace.indexOf('message.type === "inputAck"') >= 0);
 assert(workspace.indexOf('event.key.length === 1') >= 0);
+assert(workspace.indexOf('data.cursorOnly === true') >= 0);
+assert(workspace.indexOf('point.x / sourceWidth') >= 0);
 assert(workspace.indexOf('runAgentOperation(node, "desktop.sessions"') >= 0);
 assert(workspace.indexOf('runAgentOperation(node, "desktop.monitors"') >= 0);
 assert(workspace.indexOf('action: "clipboardGet"') >= 0);

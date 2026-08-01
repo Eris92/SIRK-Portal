@@ -120,7 +120,7 @@ module.exports.create = function (options) {
         if (!desktopRelay || !identity || !Buffer.isBuffer(packet) || packet.length < 5)
             throw new Error("Invalid desktop stream packet.");
         var metadataLength = packet.readUInt32BE(0);
-        if (metadataLength < 2 || metadataLength > 65536 || packet.length <= 4 + metadataLength)
+        if (metadataLength < 2 || metadataLength > 65536 || packet.length < 4 + metadataLength)
             throw new Error("Invalid desktop stream metadata.");
         var metadata = JSON.parse(packet.subarray(4, 4 + metadataLength).toString("utf8"));
         var frame = packet.subarray(4 + metadataLength);

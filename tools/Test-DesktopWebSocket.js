@@ -32,8 +32,9 @@ async function main() {
         encodeURIComponent(tenantId) + "&deviceId=" + encodeURIComponent(deviceId), {
         headers: { cookie: cookie }, rejectUnauthorized: false, perMessageDeflate: false
     });
-    var frames = 0, bytes = 0, backends = new Set(), started = 0, firstSequence = 0, lastSequence = 0;
+    var frames = 0, cursorUpdates = 0, bytes = 0, backends = new Set(), started = 0, firstSequence = 0, lastSequence = 0;
     var inputSentAt = 0, inputAckMilliseconds = 0;
+    var cursorTimer = null, cursorStep = 0;
     var captureSamples = [], encodeSamples = [], sessionSamples = [], ageSamples = [];
     socket.on("message", function (packet, binary) {
         if (!binary) {
@@ -44,7 +45,7 @@ async function main() {
         }
         var metadataLength = packet.readUInt32BE(0);
         var metadata = JSON.parse(packet.subarray(4, 4 + metadataLength).toString("utf8"));
-        frames += 1;
+        if (metadata.cursorOnly === true) cursorUpdates += 1; else frames += 1;
         if (!firstSequence) firstSequence = Number(metadata.sequence) || 0;
         lastSequence = Number(metadata.sequence) || 0;
         bytes += packet.length - 4 - metadataLength;
@@ -61,17 +62,25 @@ async function main() {
             started = Date.now(); inputSentAt = Date.now();
             socket.send(JSON.stringify({ type: "input", id: 1,
                 input: { action: "requestKeyframe", sessionId: 2, monitorIndex: 0 } }));
+            if (process.env.SIRK_TEST_CURSOR_MOTION === "1") cursorTimer = setInterval(function () {
+                cursorStep += 1;
+                socket.send(JSON.stringify({ type: "input", id: 0, input: {
+                    action: "move", sessionId: 2, monitorIndex: 0,
+                    x: 200 + (cursorStep * 17) % 800, y: 200 + (cursorStep * 11) % 400
+                } }));
+            }, 16);
             setTimeout(resolve, duration * 1000);
         });
     });
     var elapsed = (Date.now() - started) / 1000;
+    if (cursorTimer) clearInterval(cursorTimer);
     socket.close();
     function percentile(values, fraction) {
         if (!values.length) return 0;
         values.sort(function (a, b) { return a - b; });
         return values[Math.min(values.length - 1, Math.floor(values.length * fraction))];
     }
-    process.stdout.write(JSON.stringify({ frames: frames, fps: frames / elapsed,
+    process.stdout.write(JSON.stringify({ frames: frames, cursorUpdates: cursorUpdates, fps: frames / elapsed,
         mbps: bytes * 8 / elapsed / 1000000, firstSequence: firstSequence,
         lastSequence: lastSequence, inputAckMilliseconds: inputAckMilliseconds,
         captureP50Ms: percentile(captureSamples, 0.5), captureP95Ms: percentile(captureSamples, 0.95),
