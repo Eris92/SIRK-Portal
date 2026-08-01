@@ -302,7 +302,7 @@
         var streamGeneration = 0, connected = false;
         var inputSequence = 0, pendingInput = new Map();
         var hasCompleteFrame = false;
-        var frameTimes = [], inputTimes = [], byteSamples = [], renderedFrames = 0, statsStartedAt = performance.now();
+        var frameTimes = [], inputTimes = [], byteSamples = [], frameRenderTimes = [];
         var activeAutoProfile = "smooth", lastAutoChangeAt = 0;
         var profiles = {
             smooth: { maxWidth: 1920, quality: 72, targetKbps: 1000 },
@@ -321,13 +321,14 @@
         }
         function updateStats(data, frameMs, decodeMs) {
             frameTimes.push(frameMs); if (frameTimes.length > 120) frameTimes.shift();
-            renderedFrames += 1;
             var now = performance.now();
+            frameRenderTimes.push(now);
+            frameRenderTimes = frameRenderTimes.filter(function (at) { return now - at <= 2000; });
             byteSamples.push({ at: now, bytes: Number(data.encodedBytes || 0) });
             byteSamples = byteSamples.filter(function (item) { return now - item.at <= 5000; });
-            var seconds = Math.max(0.001, (now - statsStartedAt) / 1000);
-            var fps = renderedFrames / seconds;
-            if (seconds > 5) { renderedFrames = 0; statsStartedAt = now; }
+            var fpsSeconds = frameRenderTimes.length > 1
+                ? Math.max(0.001, (now - frameRenderTimes[0]) / 1000) : 1;
+            var fps = frameRenderTimes.length > 1 ? (frameRenderTimes.length - 1) / fpsSeconds : 0;
             var bits = byteSamples.reduce(function (sum, item) { return sum + item.bytes * 8; }, 0);
             var inputP95 = percentile(inputTimes, 0.95);
             host.querySelector("[data-stat-fps]").textContent = fps.toFixed(1);
@@ -818,8 +819,8 @@
             connectButton.disabled = true;
             status.textContent = "Nawiązywanie połączenia live…";
             loadSessions().then(function () {
-                frameTimes = []; inputTimes = []; byteSamples = []; renderedFrames = 0;
-                statsStartedAt = performance.now(); activeAutoProfile = "smooth"; lastAutoChangeAt = 0;
+                frameTimes = []; inputTimes = []; byteSamples = []; frameRenderTimes = [];
+                activeAutoProfile = "smooth"; lastAutoChangeAt = 0;
                 connected = true;
                 session.disabled = false;
                 monitor.disabled = false;
