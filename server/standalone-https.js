@@ -24,6 +24,13 @@ function cookie(req, name) {
 function breakGlassAllowed(req, accessHash) {
     return Boolean(accessHash) && equalHex(cookie(req, "sirk_breakglass"), accessHash);
 }
+function redirect(res, location) {
+    res.statusCode = 302;
+    res.setHeader("Location", location);
+    res.setHeader("Cache-Control", "no-store");
+    res.setHeader("Content-Length", "0");
+    res.end();
+}
 function microsoftPage() {
     return fs.readFileSync(path.join(ROOT, "public/portal/standalone/microsoft-login.html"), "utf8");
 }
@@ -66,6 +73,18 @@ async function start(options) {
     var gateway = https.createServer(tlsOptions, function (req, res) {
         var url;
         try { url = new URL(req.url, "https://sirk.local"); } catch (error) { res.statusCode = 400; res.end("Bad request"); return; }
+
+        var safeMethod = req.method === "GET" || req.method === "HEAD";
+        var hasPortalSession = Boolean(cookie(req, "sirk_session"));
+        if (safeMethod && url.pathname === "/" && !hasPortalSession) {
+            redirect(res, "/login" + url.search);
+            return;
+        }
+        if (safeMethod && url.pathname === "/login" && hasPortalSession) {
+            redirect(res, "/");
+            return;
+        }
+
         if (!accessHash) { proxyRequest(internalPort, req, res, activeRequests); return; }
         if (req.method === "GET" && url.pathname === "/login" && url.searchParams.has("access")) {
             if (!equalHex(sha256(url.searchParams.get("access")), accessHash)) { res.statusCode = 404; res.end("Not found"); return; }
@@ -73,9 +92,9 @@ async function start(options) {
             res.setHeader("Set-Cookie", "sirk_breakglass=" + accessHash + "; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=1800");
             res.setHeader("Location", "/login"); res.end(); return;
         }
-        if (req.method === "GET" && url.pathname === "/login" && !breakGlassAllowed(req, accessHash)) {
+        if (safeMethod && url.pathname === "/login" && !breakGlassAllowed(req, accessHash)) {
             res.statusCode = 200; res.setHeader("Content-Type", "text/html; charset=utf-8"); res.setHeader("Cache-Control", "no-store");
-            res.end(microsoftPage()); return;
+            res.end(req.method === "HEAD" ? undefined : microsoftPage()); return;
         }
         if (url.pathname === "/auth/microsoft") {
             if (!microsoftLoginUrl) { res.statusCode = 503; res.setHeader("Content-Type", "application/json; charset=utf-8");
