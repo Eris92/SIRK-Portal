@@ -24,6 +24,75 @@ function Get-Sha256Hex([string]$Value) {
     finally { $sha.Dispose() }
 }
 
+function Ensure-SirkUpdater {
+    $service = Get-Service -Name 'SirkUpdater' -ErrorAction SilentlyContinue
+    $cli = 'C:\Program Files\SIRK\Updater\SirkUpdater.exe'
+
+    if (-not $service -or -not (Test-Path -LiteralPath $cli)) {
+        Write-Host '=== Install shared SIRK Updater ==='
+        $installer = Join-Path $env:TEMP ('sirk-updater-install-' + [guid]::NewGuid().ToString('N') + '.ps1')
+        try {
+            Invoke-WebRequest `
+                -Uri ('https://raw.githubusercontent.com/Eris92/SIRK-Updater/main/install.ps1?nocache=' + [guid]::NewGuid()) `
+                -OutFile $installer `
+                -UseBasicParsing
+            & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $installer
+            if ($LASTEXITCODE -ne 0) { throw "SIRK Updater installation failed. ExitCode=$LASTEXITCODE" }
+        }
+        finally {
+            Remove-Item $installer -Force -ErrorAction SilentlyContinue
+        }
+    }
+
+    $service = Get-Service -Name 'SirkUpdater' -ErrorAction Stop
+    if ($service.Status -ne 'Running') {
+        Start-Service -Name 'SirkUpdater'
+        $service.WaitForStatus('Running', [TimeSpan]::FromSeconds(30))
+    }
+
+    if (-not (Test-Path -LiteralPath $cli)) {
+        throw "SIRK Updater CLI is missing: $cli"
+    }
+
+    return $cli
+}
+
+function Register-PortalWithUpdater {
+    param(
+        [Parameter(Mandatory)][string]$UpdaterCli,
+        [Parameter(Mandatory)]$PortalService,
+        [Parameter(Mandatory)]$WatchdogService
+    )
+
+    Write-Host '=== Register Portal in shared SIRK Updater ==='
+    $manifestPath = Join-Path $env:TEMP ('sirk-portal-updater-' + [guid]::NewGuid().ToString('N') + '.json')
+    try {
+        $manifest = [ordered]@{
+            schemaVersion       = 1
+            applicationId       = 'sirk-portal'
+            displayName         = 'SIRK Portal'
+            serviceName         = $PortalService.Name
+            watchdogServiceName = $WatchdogService.Name
+            installRoot         = 'C:\Program Files\SIRK\Portal'
+            dataRoot            = 'C:\ProgramData\SIRK\Portal'
+            healthUrl           = 'https://127.0.0.1/login'
+            channel             = 'develop'
+            updateSource        = 'https://github.com/Eris92/SIRK-Portal'
+            packageSha256Url    = $null
+            signatureRequired   = $false
+        }
+
+        $manifest | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $manifestPath -Encoding UTF8
+        & $UpdaterCli register $manifestPath
+        if ($LASTEXITCODE -ne 0) { throw "Portal registration in SIRK Updater failed. ExitCode=$LASTEXITCODE" }
+        & $UpdaterCli show sirk-portal | Out-Host
+        if ($LASTEXITCODE -ne 0) { throw 'Registered Portal manifest cannot be read back.' }
+    }
+    finally {
+        Remove-Item $manifestPath -Force -ErrorAction SilentlyContinue
+    }
+}
+
 if (-not (Test-Administrator)) { throw 'Run PowerShell as Administrator.' }
 
 $defaultName = $env:COMPUTERNAME.ToLowerInvariant()
@@ -82,11 +151,15 @@ try {
     if ($status -ne '200') { throw "Portal readiness failed. HTTP=$status" }
     Start-Service -Name $watchdog.Name
 
+    $updaterCli = Ensure-SirkUpdater
+    Register-PortalWithUpdater -UpdaterCli $updaterCli -PortalService $portal -WatchdogService $watchdog
+
     Write-Host ''
     Write-Host 'SIRK_PORTAL_INSTALLATION_READY'
-    Write-Host "Portal URL: https://$portalName/"
+    Write-Host "Portal URL: https://$portalName/login"
     Write-Host "Break-Glass URL: https://$portalName/login?access=$accessToken"
     Write-Host 'Save the Break-Glass URL outside the Portal. The access token is not stored in plaintext.'
+    Write-Host 'Shared updater: SIRK Updater (sirk-portal registered)'
 }
 finally {
     Remove-Item $core -Force -ErrorAction SilentlyContinue
