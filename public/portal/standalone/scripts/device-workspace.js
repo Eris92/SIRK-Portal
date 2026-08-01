@@ -508,8 +508,8 @@
                     videoDecoder = new VideoDecoder({
                         output: function (decoded) {
                             if (generation === streamGeneration) {
-                                nativeWidth = decoded.displayWidth;
-                                nativeHeight = decoded.displayHeight;
+                                nativeWidth = Number(data.width || decoded.displayWidth);
+                                nativeHeight = Number(data.height || decoded.displayHeight);
                                 if (image.width !== nativeWidth || image.height !== nativeHeight) {
                                     image.width = nativeWidth; image.height = nativeHeight;
                                 }
