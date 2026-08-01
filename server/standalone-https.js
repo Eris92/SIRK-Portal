@@ -1,10 +1,37 @@
 "use strict";
 
+var crypto = require("crypto");
 var fs = require("fs");
 var http = require("http");
 var https = require("https");
 var net = require("net");
+var path = require("path");
 var standalone = require("./standalone.js");
+
+var ROOT = path.resolve(__dirname, "..");
+
+function sha256(value) {
+    return crypto.createHash("sha256").update(String(value || ""), "utf8").digest("hex");
+}
+
+function equalHex(left, right) {
+    if (!/^[a-f0-9]{64}$/i.test(left) || !/^[a-f0-9]{64}$/i.test(right)) return false;
+    return crypto.timingSafeEqual(Buffer.from(left, "hex"), Buffer.from(right, "hex"));
+}
+
+function cookie(req, name) {
+    var expression = new RegExp("(?:^|;\\s*)" + name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "=([^;]+)");
+    var match = String(req.headers.cookie || "").match(expression);
+    return match ? decodeURIComponent(match[1]) : "";
+}
+
+function breakGlassAllowed(req, accessHash) {
+    return Boolean(accessHash) && equalHex(cookie(req, "sirk_breakglass"), accessHash);
+}
+
+function microsoftPage() {
+    return fs.readFileSync(path.join(ROOT, "public/portal/standalone/microsoft-login.html"), "utf8");
+}
 
 function proxyRequest(targetPort, req, res, activeRequests) {
     var upstream = http.request({
@@ -42,8 +69,12 @@ async function start(options) {
     var pfxPath = options.pfxPath || process.env.SIRK_TLS_PFX;
     var pfxPasswordFile = options.pfxPasswordFile || process.env.SIRK_TLS_PFX_PASSWORD_FILE;
     var enrollmentTokenFile = options.enrollmentTokenFile || process.env.SIRK_ENROLLMENT_TOKEN_FILE;
+    var accessHash = String(options.accessHash || process.env.SIRK_ACCESS_KEY_HASH || "").toLowerCase();
+    var microsoftLoginUrl = String(options.microsoftLoginUrl || process.env.SIRK_MICROSOFT_LOGIN_URL || "").trim();
     if (!pfxPath && (!certificatePath || !privateKeyPath))
         throw new Error("SIRK_TLS_PFX or SIRK_TLS_CERT with SIRK_TLS_KEY is required.");
+    if (!/^[a-f0-9]{64}$/.test(accessHash)) throw new Error("SIRK_ACCESS_KEY_HASH is required.");
+
     var application = await standalone.start({
         host: "127.0.0.1",
         port: internalPort,
@@ -62,6 +93,48 @@ async function start(options) {
     var activeRequests = new Set();
     var activeSockets = new Set();
     var gateway = https.createServer(tlsOptions, function (req, res) {
+        var url;
+        try { url = new URL(req.url, "https://sirk.local"); }
+        catch (error) { res.statusCode = 400; res.end("Bad request"); return; }
+
+        if (req.method === "GET" && url.pathname === "/login" && url.searchParams.has("access")) {
+            var suppliedHash = sha256(url.searchParams.get("access"));
+            if (!equalHex(suppliedHash, accessHash)) {
+                res.statusCode = 404;
+                res.end("Not found");
+                return;
+            }
+            res.statusCode = 302;
+            res.setHeader("Cache-Control", "no-store");
+            res.setHeader("Set-Cookie", "sirk_breakglass=" + accessHash + "; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=1800");
+            res.setHeader("Location", "/login?breakglass=1");
+            res.end();
+            return;
+        }
+        if (req.method === "GET" && url.pathname === "/login" && !breakGlassAllowed(req, accessHash)) {
+            res.statusCode = 200;
+            res.setHeader("Content-Type", "text/html; charset=utf-8");
+            res.setHeader("Cache-Control", "no-store");
+            res.end(microsoftPage());
+            return;
+        }
+        if (url.pathname === "/auth/microsoft") {
+            if (!microsoftLoginUrl) {
+                res.statusCode = 503;
+                res.setHeader("Content-Type", "application/json; charset=utf-8");
+                res.end(JSON.stringify({ ok: false, error: "Microsoft Entra login is not configured." }));
+                return;
+            }
+            res.statusCode = 302;
+            res.setHeader("Location", microsoftLoginUrl);
+            res.end();
+            return;
+        }
+        if (url.pathname === "/api/auth/login" && !breakGlassAllowed(req, accessHash)) {
+            res.statusCode = 404;
+            res.end("Not found");
+            return;
+        }
         proxyRequest(internalPort, req, res, activeRequests);
     });
     gateway.on("connection", function (socket) {
@@ -112,4 +185,4 @@ if (require.main === module) {
     });
 }
 
-module.exports = { start: start };
+module.exports = { start: start, sha256: sha256 };
