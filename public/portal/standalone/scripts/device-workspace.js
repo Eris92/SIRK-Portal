@@ -482,6 +482,51 @@
             });
             pendingInput.clear();
         }
+        function renderJpegFrame(buffer, data, generation, requestStarted) {
+            var desktopWidth = Number(data.sourceWidth || data.width || 0);
+            var desktopHeight = Number(data.sourceHeight || data.height || 0);
+            if (!desktopWidth || !desktopHeight) return Promise.reject(new Error("Invalid desktop dimensions."));
+            var decodeStarted = performance.now();
+            return createImageBitmap(new Blob([buffer], { type: "image/jpeg" })).then(function (decoded) {
+                if (generation !== streamGeneration) { decoded.close(); return; }
+                sourceWidth = desktopWidth; sourceHeight = desktopHeight;
+                nativeWidth = desktopWidth; nativeHeight = desktopHeight;
+                if (image.width !== desktopWidth || image.height !== desktopHeight) {
+                    image.width = desktopWidth; image.height = desktopHeight;
+                    moveCanvas.width = desktopWidth; moveCanvas.height = desktopHeight;
+                }
+                var renderStarted = performance.now();
+                if (hasCompleteFrame && (data.moves || []).length) {
+                    moveContext.clearRect(0, 0, moveCanvas.width, moveCanvas.height);
+                    moveContext.drawImage(image, 0, 0);
+                    (data.moves || []).forEach(function (move) {
+                        imageContext.drawImage(moveCanvas,
+                            Number(move.sourceX || 0), Number(move.sourceY || 0),
+                            Number(move.width || 0), Number(move.height || 0),
+                            Number(move.x || 0), Number(move.y || 0),
+                            Number(move.width || 0), Number(move.height || 0));
+                    });
+                }
+                (data.patches || []).forEach(function (patch) {
+                    imageContext.drawImage(decoded,
+                        Number(patch.atlasX || 0), Number(patch.atlasY || 0),
+                        Number(patch.atlasWidth || decoded.width), Number(patch.atlasHeight || decoded.height),
+                        Number(patch.x || 0), Number(patch.y || 0),
+                        Number(patch.width || desktopWidth), Number(patch.height || desktopHeight));
+                });
+                if (data.fullFrame === true) hasCompleteFrame = true;
+                localCursor.style.display = "";
+                localCursor.style.left = (Number(data.cursorX || 0) / desktopWidth * 100) + "%";
+                localCursor.style.top = (Number(data.cursorY || 0) / desktopHeight * 100) + "%";
+                decoded.close();
+                var capturedAt = Number(data.capturedAtUnixMilliseconds || 0);
+                updateStats(data, capturedAt > 0 ? Math.max(0, Date.now() - capturedAt) :
+                    performance.now() - requestStarted, renderStarted - decodeStarted,
+                    performance.now() - renderStarted);
+                setStreamStatus("Połączono · kafelki dirty-region · " + desktopWidth + " × " + desktopHeight +
+                    " · atlas " + Number(data.width || 0) + " × " + Number(data.height || 0));
+            });
+        }
         function startDesktopSocket(generation) {
             if (desktopSocket) { try { desktopSocket.close(); } catch (error) {} }
             if (desktopInputSocket) { try { desktopInputSocket.close(); } catch (error) {} }
@@ -516,13 +561,25 @@
                 var data;
                 try { data = JSON.parse(desktopTextDecoder.decode(packet.subarray(4, 4 + metadataLength))); }
                 catch (error) { return; }
-                snapshot.sequence = Number(data.sequence || snapshot.sequence || 0);
+                var previousSequence = Number(snapshot.sequence || 0);
+                snapshot.sequence = Number(data.sequence || previousSequence);
                 if (data.cursorOnly === true) {
                     sourceWidth = Number(data.sourceWidth || sourceWidth || data.width || 1);
                     sourceHeight = Number(data.sourceHeight || sourceHeight || data.height || 1);
                     localCursor.style.display = "";
                     localCursor.style.left = (Number(data.cursorX || 0) / sourceWidth * 100) + "%";
                     localCursor.style.top = (Number(data.cursorY || 0) / sourceHeight * 100) + "%";
+                    return;
+                }
+                if (data.contentType === "image/jpeg") {
+                    if (data.fullFrame !== true && (!hasCompleteFrame ||
+                        (previousSequence > 0 && snapshot.sequence !== previousSequence + 1))) {
+                        hasCompleteFrame = false;
+                        input({ action: "requestKeyframe" }).catch(function () {});
+                        return;
+                    }
+                    renderJpegFrame(packet.subarray(4 + metadataLength), data, generation, performance.now())
+                        .catch(function () { input({ action: "requestKeyframe" }).catch(function () {}); });
                     return;
                 }
                 if (data.contentType !== "video/h264") { socket.close(); return; }

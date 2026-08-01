@@ -65,6 +65,9 @@ assert(workspace.indexOf('smooth: { maxWidth: 1920, quality: 72, targetKbps: 100
     "smooth GUI profile must request 120 Hz dirty-region delivery within its bandwidth target");
 assert(workspace.indexOf('value="video">Wideo H.264') >= 0,
     "full-motion content must keep an explicit H.264 profile instead of forcing full-frame video on GUI sessions");
+assert(workspace.indexOf('function renderJpegFrame(') >= 0 &&
+    workspace.indexOf('data.contentType === "image/jpeg"') >= 0,
+    "binary desktop WebSocket must render dirty-region JPEG atlases without falling back to polling");
 assert(workspace.indexOf("function effectiveProfile()") >= 0);
 assert(workspace.indexOf('"&after=" + encodeURIComponent(snapshot.sequence || 0)') >= 0);
 assert(workspace.indexOf('"&waitMilliseconds=25000"') >= 0);
