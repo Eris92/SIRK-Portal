@@ -305,10 +305,10 @@
         var frameTimes = [], inputTimes = [], byteSamples = [], frameRenderTimes = [];
         var activeAutoProfile = "smooth", lastAutoChangeAt = 0, lastStatsPaintAt = 0;
         var profiles = {
-            smooth: { maxWidth: 1920, quality: 72, targetKbps: 1000 },
-            text: { maxWidth: 1920, quality: 80, targetKbps: 1500 },
-            weak: { maxWidth: 1280, quality: 55, targetKbps: 700 },
-            minimum: { maxWidth: 960, quality: 35, targetKbps: 350 }
+            smooth: { maxWidth: 1920, quality: 72, targetKbps: 1000, targetFps: 60 },
+            text: { maxWidth: 1920, quality: 80, targetKbps: 1800, targetFps: 30 },
+            weak: { maxWidth: 1600, quality: 65, targetKbps: 700, targetFps: 20 },
+            minimum: { maxWidth: 1920, quality: 68, targetKbps: 550, targetFps: 8 }
         };
         function percentile(values, fraction) {
             if (!values.length) return 0;
@@ -346,7 +346,8 @@
                     lastAutoChangeAt = now;
                     var adaptive = profiles[nextProfile];
                     input({ action: "streamProfile", maxWidth: adaptive.maxWidth,
-                        quality: adaptive.quality, targetKbps: adaptive.targetKbps }).catch(function () {});
+                        quality: adaptive.quality, targetKbps: adaptive.targetKbps,
+                        targetFps: adaptive.targetFps }).catch(function () {});
                 }
             }
             if (now - lastStatsPaintAt < 250) return;
@@ -453,7 +454,7 @@
             snapshot.sequence = 0;
             var settings = effectiveProfile();
             input({ action: "streamProfile", maxWidth: settings.maxWidth, quality: settings.quality,
-                targetKbps: settings.targetKbps })
+                targetKbps: settings.targetKbps, targetFps: settings.targetFps })
                 .catch(function () {});
             startDesktopSocket(streamGeneration);
         }

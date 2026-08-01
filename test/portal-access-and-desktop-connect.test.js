@@ -57,6 +57,10 @@ assert(workspace.indexOf("waitMilliseconds: 25000") >= 0);
 assert(workspace.indexOf("setTimeout(poll, 0)") >= 0);
 assert(workspace.indexOf('value="auto"') >= 0);
 assert(workspace.indexOf('value="minimum"') >= 0);
+assert(workspace.indexOf('minimum: { maxWidth: 1920, quality: 68, targetKbps: 550, targetFps: 8 }') >= 0,
+    "minimum-transfer desktop profile must preserve readable resolution and save bandwidth with frame rate");
+assert(workspace.indexOf('targetFps: settings.targetFps') >= 0,
+    "desktop profile must send its target frame rate to the Agent");
 assert(workspace.indexOf("function effectiveProfile()") >= 0);
 assert(workspace.indexOf('"&after=" + encodeURIComponent(snapshot.sequence || 0)') >= 0);
 assert(workspace.indexOf('"&waitMilliseconds=25000"') >= 0);
