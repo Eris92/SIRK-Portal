@@ -7,6 +7,7 @@ var https = require("https");
 var os = require("os");
 var path = require("path");
 var WebSocket = require("ws");
+var commandDispatcherFactory = require("./central-agent-command-dispatcher.js");
 
 function base64Url(value) {
     return Buffer.from(value).toString("base64")
@@ -29,6 +30,7 @@ function create(options) {
     var socket = null;
     var reconnectTimer = null;
     var heartbeatTimer = null;
+    var commandDispatcher = null;
     var stopped = false;
     var retryMilliseconds = 1000;
 
@@ -53,6 +55,19 @@ function create(options) {
             /^[a-z0-9][a-z0-9-]{2,62}$/.test(portalId) &&
             portalToken.length >= 32 &&
             Number.isInteger(localPort) && localPort > 0 && localPort < 65536;
+    }
+
+    function ensureCommandDispatcher() {
+        if (!commandDispatcher) {
+            commandDispatcher = commandDispatcherFactory.create({
+                centralOrigin: centralOrigin(),
+                portalId: portalId,
+                portalToken: portalToken,
+                dataRoot: dataRoot,
+                pollIntervalMilliseconds: options.commandPollIntervalMilliseconds
+            });
+        }
+        return commandDispatcher;
     }
 
     function agentSummary() {
@@ -239,6 +254,7 @@ function create(options) {
         socket.on("open", function () {
             retryMilliseconds = 1000;
             startHeartbeat();
+            ensureCommandDispatcher().start();
         });
         socket.on("message", function (raw) {
             var message;
@@ -251,6 +267,8 @@ function create(options) {
         socket.on("close", function () {
             socket = null;
             stopHeartbeat();
+            if (commandDispatcher) commandDispatcher.stop();
+            commandDispatcher = null;
             scheduleReconnect();
         });
     }
@@ -260,6 +278,8 @@ function create(options) {
         if (reconnectTimer) clearTimeout(reconnectTimer);
         reconnectTimer = null;
         stopHeartbeat();
+        if (commandDispatcher) commandDispatcher.stop();
+        commandDispatcher = null;
         if (socket) socket.close(1000, "Portal stopping.");
         socket = null;
     }
@@ -271,7 +291,8 @@ function create(options) {
         publishHeartbeat: publishHeartbeat,
         heartbeatBody: heartbeatBody,
         agentSummary: agentSummary,
-        centralOrigin: centralOrigin
+        centralOrigin: centralOrigin,
+        ensureCommandDispatcher: ensureCommandDispatcher
     };
 }
 

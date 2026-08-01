@@ -4,6 +4,8 @@ var crypto = require("crypto");
 var fs = require("fs");
 var path = require("path");
 
+var instances = new Map();
+
 function safePart(value) {
     value = String(value || "");
     return /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$/.test(value) ? value : "";
@@ -16,7 +18,9 @@ function writeJsonAtomic(file, value) {
 }
 
 module.exports.create = function (options) {
-    var root = path.join(path.resolve(options.dataRoot), "agent-commands");
+    var dataRoot = path.resolve(options.dataRoot);
+    if (instances.has(dataRoot)) return instances.get(dataRoot);
+    var root = path.join(dataRoot, "agent-commands");
     var pendingWaiters = new Map();
     var resultWaiters = new Map();
     var commandStores = new Map();
@@ -153,7 +157,6 @@ module.exports.create = function (options) {
             var values = pendingWaiters.get(key) || [];
             values.push(waiter);
             pendingWaiters.set(key, values);
-            // Close the race between the initial check and waiter registration.
             if (pending(tenantId, deviceId, limit).length) notifyPending(tenantId, deviceId);
         });
     }
@@ -215,6 +218,8 @@ module.exports.create = function (options) {
         });
     }
 
-    return { queue: queue, pending: pending, claimPending: claimPending, waitForPending: waitForPending,
+    var api = { queue: queue, pending: pending, claimPending: claimPending, waitForPending: waitForPending,
         acceptResults: acceptResults, get: get, waitForResult: waitForResult };
+    instances.set(dataRoot, api);
+    return api;
 };
