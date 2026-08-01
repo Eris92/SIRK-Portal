@@ -57,11 +57,13 @@ assert(workspace.indexOf("waitMilliseconds: 25000") >= 0);
 assert(workspace.indexOf("setTimeout(poll, 0)") >= 0);
 assert(workspace.indexOf('value="auto"') >= 0);
 assert(workspace.indexOf('value="minimum"') >= 0);
-assert(workspace.indexOf('minimum: { maxWidth: 1920, quality: 68, targetKbps: 550, targetFps: 15, frameMode: "tiles" }') >= 0,
+assert(workspace.indexOf('minimum: { maxWidth: 1920, quality: 68, targetKbps: 550, targetFps: 15, frameMode: "tiles", deltaScalePercent: 50 }') >= 0,
     "minimum-transfer desktop profile must preserve readable resolution and save bandwidth with frame rate");
 assert(workspace.indexOf('targetFps: settings.targetFps') >= 0,
     "desktop profile must send its target frame rate to the Agent");
-assert(workspace.indexOf('smooth: { maxWidth: 1920, quality: 72, targetKbps: 1000, targetFps: 120, frameMode: "tiles" }') >= 0,
+assert(workspace.indexOf('deltaScalePercent: settings.deltaScalePercent') >= 0,
+    "desktop profile must send its motion-delta scale to the Agent");
+assert(workspace.indexOf('smooth: { maxWidth: 1920, quality: 72, targetKbps: 1000, targetFps: 120, frameMode: "tiles", deltaScalePercent: 25 }') >= 0,
     "smooth GUI profile must request 120 Hz dirty-region delivery within its bandwidth target");
 assert(workspace.indexOf('value="video">Wideo H.264') >= 0,
     "full-motion content must keep an explicit H.264 profile instead of forcing full-frame video on GUI sessions");
@@ -73,6 +75,11 @@ assert(workspace.indexOf('"&after=" + encodeURIComponent(snapshot.sequence || 0)
 assert(workspace.indexOf('"&waitMilliseconds=25000"') >= 0);
 assert(workspace.indexOf("data-agent-desktop-stats") >= 0);
 assert(workspace.indexOf("data-stat-latency") >= 0);
+assert(workspace.indexOf("data-stat-delta") >= 0);
+assert(workspace.indexOf('"bez zmian · 0 B"') >= 0,
+    "desktop statistics must decay to zero traffic when DXGI reports no changes");
+assert((workspace.match(/value="event-viewer"/g) || []).length === 1);
+assert((workspace.match(/value="device-manager"/g) || []).length === 1);
 assert(workspace.indexOf("setTimeout(function () { snapshot(generation); }, 0)") >= 0);
 assert(workspace.indexOf('return fetch(endpoint, {\n            method: "POST",') >= 0);
 console.log("Portal allowAll save and Desktop connection controls: OK");

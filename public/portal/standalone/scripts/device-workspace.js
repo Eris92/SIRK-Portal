@@ -281,7 +281,7 @@
 
     function renderAgentDesktop(host, node) {
         var stopped = false;
-        host.innerHTML = '<div class="sirk-agent-operation sirk-agent-desktop"><header><strong>Pulpit SIRK Agent Live</strong><small>Natychmiastowa pomoc zdalna w wybranej sesji użytkownika</small></header><div class="sirk-agent-desktop-controls"><label>Sesja<select data-agent-desktop-session disabled></select></label><label>Monitor<select data-agent-desktop-monitor disabled><option value="-1">Wszystkie monitory</option></select></label><label>Profil<select data-agent-desktop-profile><option value="auto">Auto</option><option value="smooth">Płynny GUI 120 Hz</option><option value="text">Ostry tekst</option><option value="video">Wideo H.264</option><option value="weak">Słabe łącze</option><option value="minimum">Minimalny transfer</option></select></label><button type="button" data-agent-desktop-connect>Połącz</button><button type="button" data-agent-desktop-disconnect disabled>Rozłącz</button></div><div class="sirk-agent-desktop-stats" data-agent-desktop-stats><span>FPS <b data-stat-fps>0</b></span><span>latencja p50/p95 <b data-stat-latency>—</b></span><span>input dispatch <b data-stat-input>—</b></span><span>capture/encode/session/decode/render <b data-stat-pipeline>—</b></span><span>bitrate <b data-stat-bitrate>0</b></span><span>łącze <b data-stat-link>pomiar…</b></span><span>backend <b data-stat-backend>—</b></span></div><div class="sirk-agent-desktop-admin"><strong>Pulpit administracyjny</strong><select data-agent-admin-tool><option value="powershell">PowerShell SYSTEM</option><option value="computer-management">Zarządzanie komputerem</option><option value="services">Usługi</option><option value="registry">Edytor rejestru</option><option value="task-manager">Menedżer zadań</option><option value="event-viewer">Podgląd zdarzeń</option><option value="device-manager">Menedżer urządzeń</option></select><button type="button" data-agent-admin-start disabled>Uruchom w sesji użytkownika</button></div><div class="sirk-agent-desktop-stage" style="position:relative"><canvas data-agent-desktop-image aria-label="Zdalny pulpit" tabindex="0"></canvas><span data-agent-desktop-cursor style="position:absolute;width:12px;height:12px;border:2px solid #fff;border-radius:50%;background:#111;box-shadow:0 0 0 1px #111;pointer-events:none;transform:translate(-2px,-2px)"></span></div><div class="sirk-agent-desktop-input"><input data-agent-desktop-text placeholder="Tekst do aktywnego okna"><button type="button" data-agent-desktop-send>Wyślij tekst</button><select data-agent-desktop-key><option>Enter</option><option>Tab</option><option>Escape</option><option>Backspace</option><option>Delete</option><option>Up</option><option>Down</option><option>Left</option><option>Right</option><option>Home</option><option>End</option><option>PageUp</option><option>PageDown</option><option>F5</option></select><button type="button" data-agent-desktop-key-send>Klawisz</button></div><div class="sirk-agent-desktop-clipboard"><textarea data-agent-desktop-clipboard placeholder="Schowek wybranej sesji"></textarea><button type="button" data-agent-desktop-clipboard-get>Pobierz schowek</button><button type="button" data-agent-desktop-clipboard-set>Ustaw schowek</button></div><pre data-agent-operation-status>Gotowy do natychmiastowego połączenia.</pre></div>';
+        host.innerHTML = '<div class="sirk-agent-operation sirk-agent-desktop"><header><strong>Pulpit SIRK Agent Live</strong><small>Natychmiastowa pomoc zdalna w wybranej sesji użytkownika</small></header><div class="sirk-agent-desktop-controls"><label>Sesja<select data-agent-desktop-session disabled></select></label><label>Monitor<select data-agent-desktop-monitor disabled><option value="-1">Wszystkie monitory</option></select></label><label>Profil<select data-agent-desktop-profile><option value="auto">Auto</option><option value="smooth">Płynny GUI 120 Hz</option><option value="text">Ostry tekst</option><option value="video">Wideo H.264</option><option value="weak">Słabe łącze</option><option value="minimum">Minimalny transfer</option></select></label><button type="button" data-agent-desktop-connect>Połącz</button><button type="button" data-agent-desktop-disconnect disabled>Rozłącz</button></div><div class="sirk-agent-desktop-stats" data-agent-desktop-stats><span>FPS <b data-stat-fps>0</b></span><span>latencja p50/p95 <b data-stat-latency>—</b></span><span>input dispatch <b data-stat-input>—</b></span><span>capture/encode/session/decode/render <b data-stat-pipeline>—</b></span><span>bitrate <b data-stat-bitrate>0</b></span><span>delta <b data-stat-delta>—</b></span><span>łącze <b data-stat-link>pomiar…</b></span><span>backend <b data-stat-backend>—</b></span></div><div class="sirk-agent-desktop-admin"><strong>Pulpit administracyjny</strong><select data-agent-admin-tool><option value="powershell">PowerShell SYSTEM</option><option value="computer-management">Zarządzanie komputerem</option><option value="services">Usługi</option><option value="registry">Edytor rejestru</option><option value="task-manager">Menedżer zadań</option><option value="event-viewer">Podgląd zdarzeń</option><option value="device-manager">Menedżer urządzeń</option></select><button type="button" data-agent-admin-start disabled>Uruchom w sesji użytkownika</button></div><div class="sirk-agent-desktop-stage" style="position:relative"><canvas data-agent-desktop-image aria-label="Zdalny pulpit" tabindex="0"></canvas><span data-agent-desktop-cursor style="position:absolute;width:12px;height:12px;border:2px solid #fff;border-radius:50%;background:#111;box-shadow:0 0 0 1px #111;pointer-events:none;transform:translate(-2px,-2px)"></span></div><div class="sirk-agent-desktop-input"><input data-agent-desktop-text placeholder="Tekst do aktywnego okna"><button type="button" data-agent-desktop-send>Wyślij tekst</button><select data-agent-desktop-key><option>Enter</option><option>Tab</option><option>Escape</option><option>Backspace</option><option>Delete</option><option>Up</option><option>Down</option><option>Left</option><option>Right</option><option>Home</option><option>End</option><option>PageUp</option><option>PageDown</option><option>F5</option></select><button type="button" data-agent-desktop-key-send>Klawisz</button></div><div class="sirk-agent-desktop-clipboard"><textarea data-agent-desktop-clipboard placeholder="Schowek wybranej sesji"></textarea><button type="button" data-agent-desktop-clipboard-get>Pobierz schowek</button><button type="button" data-agent-desktop-clipboard-set>Ustaw schowek</button></div><pre data-agent-operation-status>Gotowy do natychmiastowego połączenia.</pre></div>';
         var image = host.querySelector("[data-agent-desktop-image]");
         var imageContext = image.getContext("2d", { alpha: false, desynchronized: true });
         var moveCanvas = document.createElement("canvas");
@@ -303,13 +303,14 @@
         var inputSequence = 0, pendingInput = new Map();
         var hasCompleteFrame = false;
         var frameTimes = [], inputTimes = [], byteSamples = [], frameRenderTimes = [];
-        var activeAutoProfile = "smooth", lastAutoChangeAt = 0, lastStatsPaintAt = 0;
+        var activeAutoProfile = "smooth", lastAutoChangeAt = 0, lastStatsPaintAt = 0, lastFrameAt = 0;
+        var lastTargetFps = 0;
         var profiles = {
-            smooth: { maxWidth: 1920, quality: 72, targetKbps: 1000, targetFps: 120, frameMode: "tiles" },
-            text: { maxWidth: 1920, quality: 80, targetKbps: 1000, targetFps: 60, frameMode: "tiles" },
-            video: { maxWidth: 1920, quality: 72, targetKbps: 1000, targetFps: 60, frameMode: "h264" },
-            weak: { maxWidth: 1600, quality: 65, targetKbps: 700, targetFps: 30, frameMode: "tiles" },
-            minimum: { maxWidth: 1920, quality: 68, targetKbps: 550, targetFps: 15, frameMode: "tiles" }
+            smooth: { maxWidth: 1920, quality: 72, targetKbps: 1000, targetFps: 120, frameMode: "tiles", deltaScalePercent: 25 },
+            text: { maxWidth: 1920, quality: 80, targetKbps: 1000, targetFps: 60, frameMode: "tiles", deltaScalePercent: 50 },
+            video: { maxWidth: 1920, quality: 72, targetKbps: 1000, targetFps: 60, frameMode: "h264", deltaScalePercent: 100 },
+            weak: { maxWidth: 1600, quality: 65, targetKbps: 700, targetFps: 30, frameMode: "tiles", deltaScalePercent: 35 },
+            minimum: { maxWidth: 1920, quality: 68, targetKbps: 550, targetFps: 15, frameMode: "tiles", deltaScalePercent: 50 }
         };
         function percentile(values, fraction) {
             if (!values.length) return 0;
@@ -327,6 +328,8 @@
         function updateStats(data, frameMs, decodeMs, renderMs) {
             frameTimes.push(frameMs); if (frameTimes.length > 120) frameTimes.shift();
             var now = performance.now();
+            lastFrameAt = now;
+            lastTargetFps = Number(data.targetFps || lastTargetFps || effectiveProfile().targetFps || 0);
             frameRenderTimes.push(now);
             frameRenderTimes = frameRenderTimes.filter(function (at) { return now - at <= 2000; });
             byteSamples.push({ at: now, bytes: Number(data.encodedBytes || 0) });
@@ -348,19 +351,38 @@
                     var adaptive = profiles[nextProfile];
                     input({ action: "streamProfile", maxWidth: adaptive.maxWidth,
                         quality: adaptive.quality, targetKbps: adaptive.targetKbps,
-                        targetFps: adaptive.targetFps, frameMode: adaptive.frameMode }).catch(function () {});
+                        targetFps: adaptive.targetFps, frameMode: adaptive.frameMode,
+                        deltaScalePercent: adaptive.deltaScalePercent }).catch(function () {});
                 }
             }
             if (now - lastStatsPaintAt < 250) return;
             lastStatsPaintAt = now;
-            host.querySelector("[data-stat-fps]").textContent = fps.toFixed(1);
+            host.querySelector("[data-stat-fps]").textContent = fps.toFixed(1) + " / " + lastTargetFps + " Hz";
             host.querySelector("[data-stat-latency]").textContent = Math.round(percentile(frameTimes, 0.5)) + " / " + Math.round(percentile(frameTimes, 0.95)) + " ms";
             host.querySelector("[data-stat-input]").textContent = inputP95 ? Math.round(inputP95) + " ms p95" : "—";
             host.querySelector("[data-stat-pipeline]").textContent = Number(data.captureMilliseconds || 0).toFixed(1) + " / " + Number(data.encodeMilliseconds || 0).toFixed(1) + " / " + Number(data.sessionMilliseconds || 0).toFixed(1) + " / " + decodeMs.toFixed(1) + " / " + renderMs.toFixed(1) + " ms";
             host.querySelector("[data-stat-bitrate]").textContent = (bits / 5000000).toFixed(2) + " Mb/s";
+            host.querySelector("[data-stat-delta]").textContent = data.fullFrame === true ? "pełna" :
+                (data.refinement === true ? "wyostrzenie" : Number(data.dirtyRectangleCount || 0) +
+                    " rect · " + Number(data.deltaScalePercent || 100) + "%");
             host.querySelector("[data-stat-link]").textContent = percentile(frameTimes, 0.95) > 350 ? "bardzo słabe" : percentile(frameTimes, 0.95) > 190 ? "słabe" : "dobre";
             host.querySelector("[data-stat-backend]").textContent = (data.captureBackend || "—") + " · " + (data.encoding || "—");
         }
+        var statsTimer = setInterval(function () {
+            if (!host.isConnected) { clearInterval(statsTimer); return; }
+            if (!connected) return;
+            var now = performance.now();
+            frameRenderTimes = frameRenderTimes.filter(function (at) { return now - at <= 2000; });
+            byteSamples = byteSamples.filter(function (item) { return now - item.at <= 5000; });
+            var fpsSeconds = frameRenderTimes.length > 1
+                ? Math.max(0.001, (now - frameRenderTimes[0]) / 1000) : 1;
+            var fps = frameRenderTimes.length > 1 ? (frameRenderTimes.length - 1) / fpsSeconds : 0;
+            var bits = byteSamples.reduce(function (sum, item) { return sum + item.bytes * 8; }, 0);
+            host.querySelector("[data-stat-fps]").textContent = fps.toFixed(1) + " / " + lastTargetFps + " Hz";
+            host.querySelector("[data-stat-bitrate]").textContent = (bits / 5000000).toFixed(2) + " Mb/s";
+            if (lastFrameAt && now - lastFrameAt > 250)
+                host.querySelector("[data-stat-delta]").textContent = "bez zmian · 0 B";
+        }, 250);
         function selected() {
             return { sessionId: Number(session.value), monitorIndex: Number(monitor.value) };
         }
@@ -456,7 +478,7 @@
             var settings = effectiveProfile();
             input({ action: "streamProfile", maxWidth: settings.maxWidth, quality: settings.quality,
                 targetKbps: settings.targetKbps, targetFps: settings.targetFps,
-                frameMode: settings.frameMode })
+                frameMode: settings.frameMode, deltaScalePercent: settings.deltaScalePercent })
                 .catch(function () {});
             startDesktopSocket(streamGeneration);
         }
@@ -920,7 +942,8 @@
             status.textContent = "Nawiązywanie połączenia live…";
             loadSessions().then(function () {
                 frameTimes = []; inputTimes = []; byteSamples = []; frameRenderTimes = [];
-                activeAutoProfile = "smooth"; lastAutoChangeAt = 0; lastStatsPaintAt = 0;
+                activeAutoProfile = "smooth"; lastAutoChangeAt = 0; lastStatsPaintAt = 0; lastFrameAt = 0;
+                lastTargetFps = effectiveProfile().targetFps;
                 connected = true;
                 session.disabled = false;
                 monitor.disabled = false;
@@ -966,6 +989,7 @@
         var observer = new MutationObserver(function () {
             if (!host.isConnected) {
                 stopped = true;
+                clearInterval(statsTimer);
                 if (desktopSocket) { try { desktopSocket.close(); } catch (error) {} desktopSocket = null; }
                 if (desktopInputSocket) { try { desktopInputSocket.close(); } catch (error) {} desktopInputSocket = null; }
                 rejectPendingInputs("Desktop workspace closed.");
