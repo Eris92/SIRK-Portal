@@ -18,6 +18,15 @@ function ConvertFrom-SecureStringPlain {
     finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($pointer) }
 }
 
+function New-RandomBase64 {
+    param([ValidateRange(16,4096)][int]$ByteCount = 48)
+    $bytes = New-Object byte[] $ByteCount
+    $rng = [Security.Cryptography.RandomNumberGenerator]::Create()
+    try { $rng.GetBytes($bytes) }
+    finally { $rng.Dispose() }
+    return [Convert]::ToBase64String($bytes)
+}
+
 function Invoke-Native {
     param(
         [Parameter(Mandatory)][string]$FilePath,
@@ -197,8 +206,8 @@ try {
     $pfxPath = Join-Path $tlsRoot 'portal.pfx'
     $pfxPasswordPath = Join-Path $tlsRoot 'portal-pfx-password.txt'
     $enrollmentTokenPath = Join-Path $dataRoot 'agent-enrollment-token.txt'
-    $pfxPassword = [Convert]::ToBase64String([Security.Cryptography.RandomNumberGenerator]::GetBytes(48))
-    $enrollmentToken = [Convert]::ToBase64String([Security.Cryptography.RandomNumberGenerator]::GetBytes(48))
+    $pfxPassword = New-RandomBase64 -ByteCount 48
+    $enrollmentToken = New-RandomBase64 -ByteCount 48
     Set-Content $pfxPasswordPath $pfxPassword -Encoding ASCII -NoNewline
     Set-Content $enrollmentTokenPath $enrollmentToken -Encoding ASCII -NoNewline
     $certificate = New-SelfSignedCertificate -DnsName @($env:COMPUTERNAME,"$($env:COMPUTERNAME).local",'localhost') `
