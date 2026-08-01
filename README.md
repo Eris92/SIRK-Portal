@@ -1,4 +1,4 @@
-# SIRK Management Platform 2.0.0-dev.21
+# SIRK Management Platform 2.0.0-dev.22
 
 **Repozytorium:** `SIRK-Portal`  
 **Techniczny identyfikator pluginu MeshCentral:** `SIRKPortal`  
@@ -32,6 +32,22 @@ develop -> beta -> main
 ```
 
 Szczegóły: [Kanały aktualizacji i lifecycle](docs/UPDATE-CHANNELS.md).
+
+## Agent, Portal i Central
+
+Agent łączy się wyłącznie z lokalnym SIRK Portal. Portal agreguje stan Agentów i utrzymuje podpisany kanał control-plane do SIRK Central.
+
+```text
+SIRK Agent -> SIRK Portal -> SIRK Central
+```
+
+Wersja `2.0.0-dev.22` dodaje:
+
+- podpisany heartbeat Portal -> Central z liczbą wszystkich i aktywnych Agentów;
+- trwały routing komend Central -> Portal -> Agent;
+- idempotentne mapowanie Central command ID na lokalną komendę Agenta;
+- raportowanie `running`, `completed` i `failed` z powrotem do Central;
+- brak bezpośredniego połączenia lub poświadczenia Central w Agencie.
 
 ## Instalacja i dalsze aktualizacje
 
