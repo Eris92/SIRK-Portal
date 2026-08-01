@@ -71,7 +71,7 @@ async function start(options) {
             if (!equalHex(sha256(url.searchParams.get("access")), accessHash)) { res.statusCode = 404; res.end("Not found"); return; }
             res.statusCode = 302; res.setHeader("Cache-Control", "no-store");
             res.setHeader("Set-Cookie", "sirk_breakglass=" + accessHash + "; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=1800");
-            res.setHeader("Location", "/login?breakglass=1"); res.end(); return;
+            res.setHeader("Location", "/login"); res.end(); return;
         }
         if (req.method === "GET" && url.pathname === "/login" && !breakGlassAllowed(req, accessHash)) {
             res.statusCode = 200; res.setHeader("Content-Type", "text/html; charset=utf-8"); res.setHeader("Cache-Control", "no-store");
