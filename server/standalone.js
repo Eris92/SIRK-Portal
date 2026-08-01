@@ -4,6 +4,7 @@ var crypto = require("crypto");
 var fs = require("fs");
 var http = require("http");
 var path = require("path");
+var WebSocket = require("ws");
 var adapter = require("./adapters/standalone/index.js");
 var agentGatewayFactory = require("./core/agent-gateway.js");
 var agentCommandBrokerFactory = require("./core/agent-command-broker.js");
@@ -339,6 +340,55 @@ function start(options) {
             }
             res.statusCode = 404;
             res.end("Not found");
+        });
+        var desktopSockets = new WebSocket.WebSocketServer({ noServer: true, perMessageDeflate: false });
+        var agentDesktopSockets = new WebSocket.WebSocketServer({ noServer: true, perMessageDeflate: false });
+        server.on("upgrade", function (req, socket, head) {
+            var url;
+            try { url = new URL(req.url, "http://sirk.local"); } catch (error) { socket.destroy(); return; }
+            if (url.pathname === "/api/agent/v1/desktop/stream") {
+                var identity = agentGateway.authorizeDesktopSocket(req);
+                if (!identity) { socket.destroy(); return; }
+                agentDesktopSockets.handleUpgrade(req, socket, head, function (client) {
+                    client.on("message", function (packet, binary) {
+                        if (!binary) { client.close(1003); return; }
+                        try { agentGateway.publishDesktopSocket(identity, Buffer.from(packet)); }
+                        catch (error) { client.close(1007); }
+                    });
+                });
+                return;
+            }
+            if (url.pathname !== "/api/agent-desktop/stream") { socket.destroy(); return; }
+            sessionUser(req).then(function (user) {
+                if (!user.isAdmin || !requireSameOrigin(req)) { socket.destroy(); return; }
+                desktopSockets.handleUpgrade(req, socket, head, function (client) {
+                    var tenantId = String(url.searchParams.get("tenantId") || "");
+                    var deviceId = String(url.searchParams.get("deviceId") || "");
+                    var sequence = Math.max(0, Number(url.searchParams.get("after")) || 0);
+                    var closed = false;
+                    host.agentDesktopRelay.touchViewer(tenantId, deviceId);
+                    var viewerHeartbeat = setInterval(function () {
+                        host.agentDesktopRelay.touchViewer(tenantId, deviceId);
+                    }, 10000);
+                    client.binaryType = "arraybuffer";
+                    client.once("close", function () { closed = true; clearInterval(viewerHeartbeat); });
+                    client.once("error", function () { closed = true; clearInterval(viewerHeartbeat); });
+                    (async function pump() {
+                        while (!closed && client.readyState === WebSocket.OPEN) {
+                            var value = await host.agentDesktopRelay.wait(tenantId, deviceId, sequence, 25000);
+                            if (!value) continue;
+                            sequence = value.sequence;
+                            var metadata = Buffer.from(JSON.stringify(value.metadata || {}), "utf8");
+                            var prefix = Buffer.allocUnsafe(4);
+                            prefix.writeUInt32BE(metadata.length, 0);
+                            await new Promise(function (resolve, reject) {
+                                client.send(Buffer.concat([prefix, metadata, value.frame]), { binary: true },
+                                    function (error) { if (error) reject(error); else resolve(); });
+                            });
+                        }
+                    }()).catch(function () { try { client.close(); } catch (error) {} });
+                });
+            }).catch(function () { socket.destroy(); });
         });
         return new Promise(function (resolve) {
             var port = options.port == null ? Number(process.env.PORT || 8080) : Number(options.port);

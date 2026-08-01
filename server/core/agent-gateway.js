@@ -107,6 +107,26 @@ module.exports.create = function (options) {
         }
     }
 
+    function authorizeDesktopSocket(req) {
+        var tenantId = safeId(req.headers["x-sirk-tenant"]);
+        var deviceId = safeId(req.headers["x-sirk-device"]);
+        var device = readRegistry().devices[tenantId + "/" + deviceId];
+        if (!tenantId || !deviceId || !device || !authorizedHash(req, device.credentialHash) ||
+            !validDeviceSignature(req, Buffer.alloc(0), device)) return null;
+        return { tenantId: tenantId, deviceId: deviceId };
+    }
+
+    function publishDesktopSocket(identity, packet) {
+        if (!desktopRelay || !identity || !Buffer.isBuffer(packet) || packet.length < 5)
+            throw new Error("Invalid desktop stream packet.");
+        var metadataLength = packet.readUInt32BE(0);
+        if (metadataLength < 2 || metadataLength > 65536 || packet.length <= 4 + metadataLength)
+            throw new Error("Invalid desktop stream metadata.");
+        var metadata = JSON.parse(packet.subarray(4, 4 + metadataLength).toString("utf8"));
+        var frame = packet.subarray(4 + metadataLength);
+        return desktopRelay.publish(identity.tenantId, identity.deviceId, frame, metadata);
+    }
+
     function pendingPolicies(tenantId, deviceId, acknowledged) {
         var directory = path.join(policyRoot, tenantId, deviceId);
         var acknowledgedIds = new Set(Array.isArray(acknowledged)
@@ -407,5 +427,6 @@ module.exports.create = function (options) {
         return true;
     }
 
-    return { handle: handler, readRegistry: readRegistry };
+    return { handle: handler, readRegistry: readRegistry,
+        authorizeDesktopSocket: authorizeDesktopSocket, publishDesktopSocket: publishDesktopSocket };
 };

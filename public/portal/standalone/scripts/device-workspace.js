@@ -412,7 +412,41 @@
             input({ action: "streamProfile", maxWidth: settings.maxWidth, quality: settings.quality,
                 targetKbps: settings.targetKbps })
                 .catch(function () {});
-            snapshot(streamGeneration);
+            startDesktopSocket(streamGeneration);
+        }
+        var desktopSocket = null;
+        function startDesktopSocket(generation) {
+            if (desktopSocket) { try { desktopSocket.close(); } catch (error) {} }
+            var scheme = location.protocol === "https:" ? "wss:" : "ws:";
+            var url = scheme + "//" + location.host + "/api/agent-desktop/stream?tenantId=" +
+                encodeURIComponent(node.tenantId) + "&deviceId=" + encodeURIComponent(node.deviceId) +
+                "&after=" + encodeURIComponent(snapshot.sequence || 0);
+            var socket = new WebSocket(url);
+            desktopSocket = socket;
+            socket.binaryType = "arraybuffer";
+            socket.onmessage = function (event) {
+                if (generation !== streamGeneration || socket !== desktopSocket) return;
+                var packet = new Uint8Array(event.data);
+                if (packet.length < 5) return;
+                var metadataLength = new DataView(packet.buffer, packet.byteOffset, 4).getUint32(0, false);
+                if (metadataLength < 2 || metadataLength + 4 >= packet.length) return;
+                var data;
+                try { data = JSON.parse(new TextDecoder().decode(packet.subarray(4, 4 + metadataLength))); }
+                catch (error) { return; }
+                snapshot.sequence = Number(data.sequence || snapshot.sequence || 0);
+                if (data.contentType !== "video/h264") { socket.close(); return; }
+                if (videoDecoder && videoDecoder.decodeQueueSize > 1 && !data.keyFrame) return;
+                decodeH264Frame({ buffer: packet.slice(4 + metadataLength).buffer, data: data },
+                    generation, performance.now(), false).catch(function () {
+                        input({ action: "requestKeyframe" }).catch(function () {});
+                    });
+            };
+            socket.onclose = function () {
+                if (generation !== streamGeneration || socket !== desktopSocket) return;
+                desktopSocket = null;
+                setTimeout(function () { snapshot(generation); }, 250);
+            };
+            socket.onerror = function () { try { socket.close(); } catch (error) {} };
         }
         function snapshot(generation) {
             if (stopped || !connected || !host.isConnected || generation !== streamGeneration) return;
@@ -453,7 +487,7 @@
                 nativeHeight = Number(data.height || 0);
                 var decodeStarted = performance.now();
                 if (value.contentType.indexOf("video/h264") === 0 && "VideoDecoder" in window)
-                    return decodeH264Frame(value, generation, requestStarted);
+                    return decodeH264Frame(value, generation, requestStarted, true);
                 return createImageBitmap(new Blob([value.buffer], { type: value.contentType })).then(function (decoded) {
                     if (generation !== streamGeneration) return;
                     if (image.width !== nativeWidth || image.height !== nativeHeight) {
@@ -501,39 +535,53 @@
             });
         }
         var videoDecoder = null;
-        function decodeH264Frame(value, generation, requestStarted) {
+        var videoMetadata = new Map();
+        var videoGeneration = 0;
+        function decodeH264Frame(value, generation, requestStarted, continuePolling) {
             var data = value.data || {};
-            return new Promise(function (resolve, reject) {
-                if (!videoDecoder || videoDecoder.state === "closed") {
-                    videoDecoder = new VideoDecoder({
-                        output: function (decoded) {
-                            if (generation === streamGeneration) {
-                                nativeWidth = Number(data.width || decoded.displayWidth);
-                                nativeHeight = Number(data.height || decoded.displayHeight);
+            if (!videoDecoder || videoDecoder.state === "closed" || videoGeneration !== generation) {
+                if (videoDecoder && videoDecoder.state !== "closed") { try { videoDecoder.close(); } catch (error) {} }
+                videoMetadata.clear();
+                videoGeneration = generation;
+                videoDecoder = new VideoDecoder({
+                    output: function (decoded) {
+                            var metadata = videoMetadata.get(decoded.timestamp) || {};
+                            videoMetadata.delete(decoded.timestamp);
+                            var frameData = metadata.data || {};
+                            if (videoGeneration === streamGeneration) {
+                                nativeWidth = Number(frameData.width || decoded.displayWidth);
+                                nativeHeight = Number(frameData.height || decoded.displayHeight);
                                 if (image.width !== nativeWidth || image.height !== nativeHeight) {
                                     image.width = nativeWidth; image.height = nativeHeight;
                                 }
                                 imageContext.drawImage(decoded, 0, 0, nativeWidth, nativeHeight);
                                 hasCompleteFrame = true;
                                 localCursor.style.display = "";
-                                localCursor.style.left = (Number(data.cursorX || 0) / nativeWidth * 100) + "%";
-                                localCursor.style.top = (Number(data.cursorY || 0) / nativeHeight * 100) + "%";
-                                var capturedAt = Number(data.capturedAtUnixMilliseconds || 0);
-                                updateStats(data, capturedAt ? Math.max(0, Date.now() - capturedAt) : performance.now() - requestStarted, 0);
+                                localCursor.style.left = (Number(frameData.cursorX || 0) / nativeWidth * 100) + "%";
+                                localCursor.style.top = (Number(frameData.cursorY || 0) / nativeHeight * 100) + "%";
+                                var capturedAt = Number(frameData.capturedAtUnixMilliseconds || 0);
+                                updateStats(frameData, capturedAt ? Math.max(0, Date.now() - capturedAt) :
+                                    performance.now() - Number(metadata.requestStarted || requestStarted), 0);
                                 status.textContent = "Połączono · H.264 low-latency · " + nativeWidth + " × " + nativeHeight;
                             }
-                            decoded.close(); resolve();
-                        },
-                        error: reject
-                    });
-                    videoDecoder.configure({ codec: "avc1.42E01F", optimizeForLatency: true, hardwareAcceleration: "prefer-hardware" });
+                            decoded.close();
+                    },
+                    error: function () { input({ action: "requestKeyframe" }).catch(function () {}); }
+                });
+                videoDecoder.configure({ codec: "avc1.42E01F", optimizeForLatency: true, hardwareAcceleration: "prefer-hardware" });
+            }
+            var timestamp = Number(data.sequence || data.capturedAtUnixMilliseconds || Date.now()) * 1000;
+            videoMetadata.set(timestamp, { data: data, requestStarted: requestStarted });
+            videoDecoder.decode(new EncodedVideoChunk({
+                type: data.keyFrame ? "key" : "delta", timestamp: timestamp, data: new Uint8Array(value.buffer)
+            }));
+            if (continuePolling) setTimeout(function () { snapshot(generation); }, 0);
+            return Promise.resolve().then(function () {
+                if (videoMetadata.size > 8) {
+                    var oldest = videoMetadata.keys().next().value;
+                    videoMetadata.delete(oldest);
                 }
-                videoDecoder.decode(new EncodedVideoChunk({
-                    type: data.keyFrame ? "key" : "delta",
-                    timestamp: Number(data.capturedAtUnixMilliseconds || Date.now()) * 1000,
-                    data: new Uint8Array(value.buffer)
-                }));
-            }).then(function () { setTimeout(function () { snapshot(generation); }, 0); });
+            });
         }
         var lastMouseMoveAt = 0;
         function coordinates(event) {
@@ -703,6 +751,7 @@
             input({ action: "streamStop" }).catch(function () {});
             connected = false;
             streamGeneration += 1;
+            if (desktopSocket) { try { desktopSocket.close(); } catch (error) {} desktopSocket = null; }
             hasCompleteFrame = false;
             snapshot.sequence = 0;
             imageContext.clearRect(0, 0, image.width, image.height);
@@ -727,7 +776,11 @@
             }).then(function () { adminStart.disabled = !connected; });
         });
         var observer = new MutationObserver(function () {
-            if (!host.isConnected) { stopped = true; observer.disconnect(); }
+            if (!host.isConnected) {
+                stopped = true;
+                if (desktopSocket) { try { desktopSocket.close(); } catch (error) {} desktopSocket = null; }
+                observer.disconnect();
+            }
         });
         observer.observe(document.body, { childList: true, subtree: true });
     }

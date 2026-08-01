@@ -3,6 +3,7 @@
 var fs = require("fs");
 var http = require("http");
 var https = require("https");
+var net = require("net");
 var standalone = require("./standalone.js");
 
 function proxyRequest(targetPort, req, res, activeRequests) {
@@ -61,6 +62,21 @@ async function start(options) {
     var activeRequests = new Set();
     var gateway = https.createServer(tlsOptions, function (req, res) {
         proxyRequest(internalPort, req, res, activeRequests);
+    });
+    gateway.on("upgrade", function (req, socket, head) {
+        var upstream = net.connect(internalPort, "127.0.0.1", function () {
+            var headers = Object.assign({}, req.headers, {
+                "x-forwarded-proto": "https",
+                "x-forwarded-host": req.headers.host || "",
+                "x-forwarded-for": req.socket && req.socket.remoteAddress || ""
+            });
+            var lines = [req.method + " " + req.url + " HTTP/1.1"];
+            Object.keys(headers).forEach(function (name) { lines.push(name + ": " + headers[name]); });
+            upstream.write(lines.join("\r\n") + "\r\n\r\n");
+            if (head && head.length) upstream.write(head);
+            socket.pipe(upstream).pipe(socket);
+        });
+        upstream.on("error", function () { socket.destroy(); });
     });
     await new Promise(function (resolve, reject) {
         gateway.once("error", reject);

@@ -16,6 +16,11 @@ var relay = require("../server/core/agent-desktop-relay.js").create();
     await new Promise(function (resolve) { setTimeout(resolve, 10); });
     var second = relay.publish("tenant", "device", Buffer.from([4]), { fullFrame: false });
     assert.strictEqual(second.viewers, 1);
+
+    var pendingControl = relay.control("tenant-a", "device-a", 1000);
+    relay.touchViewer("tenant-a", "device-a");
+    var activeControl = await pendingControl;
+    assert.strictEqual(activeControl.viewerActive, true);
     assert.strictEqual(second.inputs.length, 1);
     assert.strictEqual(second.inputs[0].action, "move");
     frame = await waiting;

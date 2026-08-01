@@ -37,9 +37,7 @@ module.exports.create = function () {
 
     function wait(tenantId, deviceId, after, milliseconds) {
         var value = state(tenantId, deviceId);
-        value.viewerLeaseUntil = Date.now() + 30000;
-        value.controlWaiters.forEach(function (resolve) { resolve(); });
-        value.controlWaiters.clear();
+        touchViewer(tenantId, deviceId);
         function result() {
             return value.sequence > after && value.frame
                 ? { sequence: value.sequence, frame: value.frame, metadata: value.metadata }
@@ -61,6 +59,13 @@ module.exports.create = function () {
             var timer = setTimeout(complete, Math.min(25000, Math.max(1, milliseconds)));
             value.waiters.add(complete);
         });
+    }
+
+    function touchViewer(tenantId, deviceId) {
+        var value = state(tenantId, deviceId);
+        value.viewerLeaseUntil = Date.now() + 30000;
+        value.controlWaiters.forEach(function (resolve) { resolve(); });
+        value.controlWaiters.clear();
     }
 
     function input(tenantId, deviceId, command) {
@@ -98,5 +103,5 @@ module.exports.create = function () {
         });
     }
 
-    return { publish: publish, wait: wait, input: input, control: control };
+    return { publish: publish, wait: wait, touchViewer: touchViewer, input: input, control: control };
 };
