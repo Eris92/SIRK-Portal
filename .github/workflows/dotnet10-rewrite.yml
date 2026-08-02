@@ -1,0 +1,55 @@
+name: SIRK Portal .NET 10 Rewrite
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ rewrite/dotnet10 ]
+    paths:
+      - 'global.json'
+      - 'Directory.Build.props'
+      - 'Dockerfile.dotnet10'
+      - 'src/Sirk.Portal/**'
+      - 'public/**'
+      - '.github/workflows/dotnet10-rewrite.yml'
+  pull_request:
+    branches: [ develop ]
+    paths:
+      - 'global.json'
+      - 'Directory.Build.props'
+      - 'Dockerfile.dotnet10'
+      - 'src/Sirk.Portal/**'
+      - 'public/**'
+      - '.github/workflows/dotnet10-rewrite.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: SDK contract
+        run: |
+          dotnet --info
+          grep -R --line-number --include='*.csproj' --include='*.props' --include='global.json' -E 'net8\.0|net9\.0' src/Sirk.Portal Directory.Build.props global.json && exit 1 || true
+
+      - name: Restore
+        run: dotnet restore src/Sirk.Portal/Sirk.Portal.csproj
+
+      - name: Build
+        run: dotnet build src/Sirk.Portal/Sirk.Portal.csproj --configuration Release --no-restore
+
+      - name: Publish Windows x64
+        run: dotnet publish src/Sirk.Portal/Sirk.Portal.csproj --configuration Release --no-build --runtime win-x64 --self-contained false --output artifacts/win-x64
+
+      - name: Publish Linux x64
+        run: dotnet publish src/Sirk.Portal/Sirk.Portal.csproj --configuration Release --no-build --runtime linux-x64 --self-contained false --output artifacts/linux-x64
+
+      - name: Container build
+        run: docker build --file Dockerfile.dotnet10 --tag sirk-portal:dotnet10 .
