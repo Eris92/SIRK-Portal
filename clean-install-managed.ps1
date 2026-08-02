@@ -1,10 +1,8 @@
 #Requires -RunAsAdministrator
-[CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'High')]
+[CmdletBinding()]
 param(
     [string]$PortalName,
     [switch]$RemoveData,
-    [switch]$SkipBackup,
-    [switch]$SkipRcTest,
     [switch]$Force
 )
 
@@ -29,20 +27,19 @@ function Invoke-RemotePowerShellScript {
     }
 }
 
-Write-Host '=== SIRK managed Windows prerequisites ==='
+Write-Host "`n============================================================" -ForegroundColor Cyan
+Write-Host ' SIRK PORTAL MANAGED INSTALLATION' -ForegroundColor Cyan
+Write-Host ' WinGet + Node.js LTS + .NET LTS + WinSW' -ForegroundColor Cyan
+Write-Host "============================================================" -ForegroundColor Cyan
+
 Invoke-RemotePowerShellScript `
     -Uri 'https://raw.githubusercontent.com/Eris92/SIRK-Portal/develop/tools/install/Ensure-SirkWindowsPrerequisites.ps1' `
     -Parameters @{ UpgradeExisting = $true }
 
-$cleanParameters = @{
-    PortalName = $PortalName
-    RemoveData = $RemoveData
-    SkipBackup = $SkipBackup
-    SkipRcTest = $SkipRcTest
-    Force = $Force
-}
-
-Write-Host '=== SIRK Portal managed clean installation ==='
 Invoke-RemotePowerShellScript `
-    -Uri 'https://raw.githubusercontent.com/Eris92/SIRK-Portal/develop/clean-install.ps1' `
-    -Parameters $cleanParameters
+    -Uri 'https://raw.githubusercontent.com/Eris92/SIRK-Portal/develop/install-v2.ps1' `
+    -Parameters @{
+        PortalName = $PortalName
+        RemoveData = $RemoveData
+        Force = $Force
+    }
