@@ -160,15 +160,17 @@ internal sealed class CentralHeartbeatService(
         centralUrl = null!;
         error = string.Empty;
 
-        if (!Uri.TryCreate(options.BaseUrl.Trim(), UriKind.Absolute, out centralUrl) ||
-            !string.IsNullOrEmpty(centralUrl.UserInfo) ||
-            !string.IsNullOrEmpty(centralUrl.Query) ||
-            !string.IsNullOrEmpty(centralUrl.Fragment))
+        if (!Uri.TryCreate(options.BaseUrl.Trim(), UriKind.Absolute, out var parsedCentralUrl) ||
+            parsedCentralUrl is null ||
+            !string.IsNullOrEmpty(parsedCentralUrl.UserInfo) ||
+            !string.IsNullOrEmpty(parsedCentralUrl.Query) ||
+            !string.IsNullOrEmpty(parsedCentralUrl.Fragment))
         {
             error = "BaseUrl must be an absolute URL without credentials, query or fragment.";
             return false;
         }
 
+        centralUrl = parsedCentralUrl;
         var secure = centralUrl.Scheme == Uri.UriSchemeHttps;
         var localDevelopment = environment.IsDevelopment() &&
                                centralUrl.Scheme == Uri.UriSchemeHttp &&
@@ -211,6 +213,7 @@ internal sealed class CentralHeartbeatService(
 
         if (options.PublicUrl.Length > 0 &&
             (!Uri.TryCreate(options.PublicUrl, UriKind.Absolute, out var publicUrl) ||
+             publicUrl is null ||
              publicUrl.Scheme != Uri.UriSchemeHttps ||
              !string.IsNullOrEmpty(publicUrl.UserInfo)))
         {
