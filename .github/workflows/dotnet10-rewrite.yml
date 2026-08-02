@@ -10,6 +10,7 @@ on:
       - 'Dockerfile.dotnet10'
       - 'src/Sirk.Portal/**'
       - 'tests/Sirk.Portal.ProtocolTests/**'
+      - '.github/scripts/test-dotnet10-central-heartbeat.py'
       - 'public/**'
       - '.github/workflows/dotnet10-rewrite.yml'
   pull_request:
@@ -20,6 +21,7 @@ on:
       - 'Dockerfile.dotnet10'
       - 'src/Sirk.Portal/**'
       - 'tests/Sirk.Portal.ProtocolTests/**'
+      - '.github/scripts/test-dotnet10-central-heartbeat.py'
       - 'public/**'
       - '.github/workflows/dotnet10-rewrite.yml'
 
@@ -55,6 +57,9 @@ jobs:
 
       - name: Publish Linux x64
         run: dotnet publish src/Sirk.Portal/Sirk.Portal.csproj --configuration Release --runtime linux-x64 --self-contained false --output artifacts/linux-x64
+
+      - name: Live Central heartbeat smoke
+        run: python3 .github/scripts/test-dotnet10-central-heartbeat.py artifacts/linux-x64/Sirk.Portal.dll
 
       - name: Container build
         run: docker build --file Dockerfile.dotnet10 --tag sirk-portal:dotnet10 .
