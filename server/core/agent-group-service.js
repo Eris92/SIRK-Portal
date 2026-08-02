@@ -71,7 +71,11 @@ module.exports.create = function (options) {
         group.enrollmentTokenHash = hash(token);
         group.enrollmentExpiresAtUtc = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
         write(state);
-        return token;
+        return {
+            group: publicGroup(group),
+            token: token,
+            expiresAtUtc: group.enrollmentExpiresAtUtc
+        };
     }
     function resolveEnrollment(token) {
         if (!token) return null;
@@ -93,7 +97,8 @@ module.exports.create = function (options) {
     }
     function bootstrapScript(id, mode, portalOrigin) {
         mode = mode === "run" ? "run" : "silent";
-        var token = issue(id);
+        var enrollment = issue(id);
+        var token = enrollment.token;
         var endpoint = String(portalOrigin || "").replace(/\/+$/, "") + "/api/agent/v1/enroll";
         var installPath = mode === "silent" ? "$env:ProgramFiles\\SIRK\\Agent" : "$env:TEMP\\SIRK-Agent-Run";
         return [
@@ -101,14 +106,14 @@ module.exports.create = function (options) {
             mode === "silent" ? "#requires -RunAsAdministrator" : "",
             "$ErrorActionPreference = 'Stop'",
             "$ProgressPreference = 'SilentlyContinue'",
-            "$release = Invoke-RestMethod -Uri 'https://api.github.com/repos/Eris92/SIRK-Agent/releases/latest' -Headers @{ 'User-Agent'='SIRK-Portal' }",
-            "$asset = $release.assets | Where-Object { $_.name -match 'win-x64-framework-dependent.*\\.zip$' } | Select-Object -First 1",
-            "if (-not $asset) { throw 'Brak pakietu Windows x64 framework-dependent w najnowszym Release.' }",
+            "$releases = Invoke-RestMethod -Uri 'https://api.github.com/repos/Eris92/SIRK-Agent/releases?per_page=20' -Headers @{ 'User-Agent'='SIRK-Portal' }",
+            "$asset = @($releases | Where-Object { -not $_.draft } | ForEach-Object { $_.assets } | Where-Object { $_.name -match 'win-x64-framework-dependent.*\\.zip$' } | Select-Object -First 1)",
+            "if ($asset.Count -ne 1) { throw 'Brak pakietu Windows x64 .NET 10 w ostatnich wydaniach.' }",
             "$packageRoot = Join-Path $env:TEMP ('SIRK-Agent-Package-' + [guid]::NewGuid().ToString('N'))",
             mode === "silent" ? "$agentRoot = " + JSON.stringify(installPath) : "$agentRoot = $packageRoot",
             "New-Item -ItemType Directory -Path $packageRoot -Force | Out-Null",
             "$zip = Join-Path $env:TEMP ('SIRK-Agent-' + [guid]::NewGuid().ToString('N') + '.zip')",
-            "Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $zip -UseBasicParsing",
+            "Invoke-WebRequest -Uri $asset[0].browser_download_url -OutFile $zip -UseBasicParsing",
             "Expand-Archive -LiteralPath $zip -DestinationPath $packageRoot -Force",
             "$tokenFile = Join-Path $env:TEMP ('sirk-enroll-' + [guid]::NewGuid().ToString('N') + '.txt')",
             "Set-Content -LiteralPath $tokenFile -Value " + JSON.stringify(token) + " -Encoding ASCII",
@@ -126,6 +131,6 @@ module.exports.create = function (options) {
         ].filter(Boolean).join("\r\n") + "\r\n";
     }
 
-    return { list: list, create: create, remove: remove, assign: assign,
+    return { list: list, create: create, remove: remove, issue: issue, assign: assign,
         resolveEnrollment: resolveEnrollment, bootstrapScript: bootstrapScript };
 };
