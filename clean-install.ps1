@@ -15,6 +15,7 @@ Set-StrictMode -Version Latest
 $InstallRoot = 'C:\Program Files\SIRK\Portal'
 $DataRoot = 'C:\ProgramData\SIRK\Portal'
 $BackupRoot = 'C:\ProgramData\SIRK\Backups\Portal'
+$NodeRoot = 'C:\Program Files\SIRK\Runtime\Node'
 $Timestamp = Get-Date -Format 'yyyyMMdd-HHmmss'
 $LegacyServices = @(
     'SirkPortal',
@@ -91,6 +92,69 @@ function Backup-PortalState {
     return $destination
 }
 
+function Ensure-NodeRuntime {
+    $existing = Get-Command node.exe -ErrorAction SilentlyContinue
+    if ($existing) {
+        Write-Host "Node.js available: $($existing.Source)"
+        return $existing.Source
+    }
+
+    $portableNode = Join-Path $NodeRoot 'node.exe'
+    if (Test-Path -LiteralPath $portableNode) {
+        $env:Path = "$NodeRoot;$env:Path"
+        Write-Host "Portable Node.js available: $portableNode"
+        return $portableNode
+    }
+
+    Write-Host '=== Install verified portable Node.js 24 runtime ==='
+    $work = Join-Path $env:TEMP ('sirk-node-' + [guid]::NewGuid().ToString('N'))
+    $zip = Join-Path $work 'node.zip'
+    $extract = Join-Path $work 'extract'
+    $baseUri = 'https://nodejs.org/dist/latest-v24.x/'
+
+    try {
+        New-Item -ItemType Directory -Path $work, $extract -Force | Out-Null
+        $checksums = (Invoke-WebRequest -UseBasicParsing -Uri ($baseUri + 'SHASUMS256.txt')).Content
+        $match = [regex]::Match($checksums, '(?im)^([a-f0-9]{64})\s+(node-v24\.[0-9.]+-win-x64\.zip)\s*$')
+        if (-not $match.Success) {
+            throw 'Official Node.js checksum list does not contain a Windows x64 Node.js 24 ZIP.'
+        }
+
+        $expectedHash = $match.Groups[1].Value.ToUpperInvariant()
+        $archiveName = $match.Groups[2].Value
+        Invoke-WebRequest -UseBasicParsing -Uri ($baseUri + $archiveName) -OutFile $zip
+        $actualHash = (Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash.ToUpperInvariant()
+        if ($actualHash -ne $expectedHash) {
+            throw "Node.js archive SHA-256 mismatch. Expected=$expectedHash Actual=$actualHash"
+        }
+
+        Expand-Archive -LiteralPath $zip -DestinationPath $extract -Force
+        $sourceNode = Get-ChildItem -LiteralPath $extract -Filter node.exe -File -Recurse | Select-Object -First 1
+        if (-not $sourceNode) { throw 'Downloaded Node.js archive does not contain node.exe.' }
+
+        $sourceRoot = $sourceNode.Directory.FullName
+        if (Test-Path -LiteralPath $NodeRoot) {
+            Remove-Item -LiteralPath $NodeRoot -Recurse -Force
+        }
+        New-Item -ItemType Directory -Path $NodeRoot -Force | Out-Null
+        Copy-Item -Path (Join-Path $sourceRoot '*') -Destination $NodeRoot -Recurse -Force
+
+        if (-not (Test-Path -LiteralPath $portableNode)) {
+            throw "Portable Node.js installation failed: $portableNode"
+        }
+        $env:Path = "$NodeRoot;$env:Path"
+        $version = & $portableNode --version
+        if ($LASTEXITCODE -ne 0 -or $version -notmatch '^v24\.') {
+            throw "Portable Node.js runtime validation failed. Version=$version"
+        }
+        Write-Host "Portable Node.js installed: $portableNode ($version)"
+        return $portableNode
+    }
+    finally {
+        Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
+
 if (-not $PortalName) {
     $defaultName = 'portal.' + $env:COMPUTERNAME.ToLowerInvariant() + '.local'
     $PortalName = (Read-Host "Portal DNS name [$defaultName]").Trim().ToLowerInvariant()
@@ -139,6 +203,8 @@ if ($RemoveData -and (Test-Path -LiteralPath $DataRoot)) {
     Remove-Item -LiteralPath $DataRoot -Recurse -Force
 }
 
+Ensure-NodeRuntime | Out-Null
+
 Write-Host '=== Run canonical one-line installer ==='
 $installerPath = Join-Path $env:TEMP ('sirk-portal-install-' + [guid]::NewGuid().ToString('N') + '.ps1')
 try {
@@ -180,4 +246,5 @@ Write-Host ''
 Write-Host 'SIRK_PORTAL_CLEAN_INSTALL_OK'
 Write-Host "Portal URL: $loginUrl"
 Write-Host "System status: $statusUrl"
-if ($backup) { Write-Host "Backup: $backup" }
+if ($backup) { Write-Host "Backup: $backup"
+}
