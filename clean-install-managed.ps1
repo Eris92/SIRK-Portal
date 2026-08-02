@@ -43,7 +43,7 @@ function Invoke-RemotePowerShellProcess {
         $updaterNonce = [guid]::NewGuid().ToString('N')
         $content = $content.Replace(
             'https://raw.githubusercontent.com/Eris92/SIRK-Updater/main/install-release.ps1',
-            "https://raw.githubusercontent.com/Eris92/SIRK-Updater/main/install-release.ps1?nocache=$updaterNonce"
+            "https://raw.githubusercontent.com/Eris92/SIRK-Updater/main/install-release-v2.ps1?nocache=$updaterNonce"
         )
 
         $oldUpdaterInvocation = @'
@@ -51,22 +51,22 @@ function Invoke-RemotePowerShellProcess {
         if ($LASTEXITCODE -ne 0) { throw "SIRK Updater installation failed. ExitCode=$LASTEXITCODE" }
 '@
         $newUpdaterInvocation = @'
-        Write-Host '[UPDATER] Installing verified prebuilt release package.' -ForegroundColor DarkCyan
-        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $installer | Out-Host
+        Write-Host '[UPDATER] Installing transactional verified release package v2.' -ForegroundColor DarkCyan
+        & powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File $installer | Out-Host
         $updaterInstallerExitCode = $LASTEXITCODE
         if ($updaterInstallerExitCode -ne 0) {
-            throw "SIRK Updater release installation failed. ExitCode=$updaterInstallerExitCode. No local source-build fallback is allowed. Verify the latest GitHub Release and retry."
+            throw "SIRK Updater release v2 installation failed. ExitCode=$updaterInstallerExitCode. Local source build is disabled."
         }
 '@
         if (-not $content.Contains($oldUpdaterInvocation.Trim())) {
-            throw 'Unable to apply release-only Updater integration patch to install-v3.ps1.'
+            throw 'Unable to apply Updater v2 integration patch to install-v3.ps1.'
         }
         $content = $content.Replace($oldUpdaterInvocation.Trim(), $newUpdaterInvocation.Trim())
         Set-Content -LiteralPath $path -Value $content -Encoding UTF8
 
         Write-Host '[BOOTSTRAP] Starting SIRK Portal installer v3.' -ForegroundColor DarkCyan
         Write-Host '[BOOTSTRAP] Nested installers use cache-busting.' -ForegroundColor DarkCyan
-        Write-Host '[BOOTSTRAP] SIRK Updater policy: verified release package only.' -ForegroundColor DarkCyan
+        Write-Host '[BOOTSTRAP] SIRK Updater policy: transactional verified release v2 only.' -ForegroundColor DarkCyan
 
         & powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File $path @ArgumentList
         $exitCode = $LASTEXITCODE
@@ -83,7 +83,7 @@ Write-Host "`n============================================================" -For
 Write-Host ' SIRK PORTAL MANAGED INSTALLATION' -ForegroundColor Cyan
 Write-Host ' WinGet + Node.js LTS + npm latest + .NET LTS + WinSW' -ForegroundColor Cyan
 Write-Host ' Shared SIRK Installer Framework v3' -ForegroundColor Cyan
-Write-Host ' Updater installation: verified GitHub Release only' -ForegroundColor Cyan
+Write-Host ' Updater: verified release v2 with transactional rollback' -ForegroundColor Cyan
 Write-Host "============================================================" -ForegroundColor Cyan
 
 Invoke-RemotePowerShellScript `
