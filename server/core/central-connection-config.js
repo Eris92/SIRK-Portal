@@ -3,6 +3,7 @@
 var crypto = require("crypto");
 var fs = require("fs");
 var path = require("path");
+var fileSecurity = require("./windows-file-security.js");
 
 function cleanText(value, maximum) {
     return String(value == null ? "" : value).replace(/[\u0000-\u001f\u007f]/g, "").trim().slice(0, maximum);
@@ -64,10 +65,13 @@ function create(options) {
     function write(input) {
         var value = normalize(Object.assign({}, input, { updatedAtUtc: new Date().toISOString() }));
         fs.mkdirSync(dataRoot, { recursive: true, mode: 0o700 });
+        fileSecurity.hardenDirectory(dataRoot);
         var temporary = filePath + ".tmp-" + process.pid + "-" + crypto.randomBytes(6).toString("hex");
         fs.writeFileSync(temporary, JSON.stringify(value, null, 2) + "\n", { encoding: "utf8", mode: 0o600, flag: "wx" });
+        fileSecurity.hardenFile(temporary);
         fs.renameSync(temporary, filePath);
         try { fs.chmodSync(filePath, 0o600); } catch (_) {}
+        fileSecurity.hardenFile(filePath);
         return publicValue(value);
     }
 
