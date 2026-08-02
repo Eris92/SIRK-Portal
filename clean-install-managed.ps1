@@ -29,6 +29,25 @@ function Invoke-RemotePowerShellScript {
     }
 }
 
+function Invoke-RemotePowerShellProcess {
+    param(
+        [Parameter(Mandatory)][string]$Uri,
+        [Parameter(Mandatory)][string[]]$ArgumentList
+    )
+
+    $path = Join-Path $env:TEMP ('sirk-installer-' + [guid]::NewGuid().ToString('N') + '.ps1')
+    try {
+        Invoke-WebRequest -UseBasicParsing -Uri ($Uri + '?nocache=' + [guid]::NewGuid()) -OutFile $path
+        & powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File $path @ArgumentList
+        if ($LASTEXITCODE -ne 0) {
+            throw "SIRK Portal installer failed. ExitCode=$LASTEXITCODE"
+        }
+    }
+    finally {
+        Remove-Item -LiteralPath $path -Force -ErrorAction SilentlyContinue
+    }
+}
+
 Write-Host "`n============================================================" -ForegroundColor Cyan
 Write-Host ' SIRK PORTAL MANAGED INSTALLATION' -ForegroundColor Cyan
 Write-Host ' WinGet + Node.js LTS + npm latest + .NET LTS + WinSW' -ForegroundColor Cyan
@@ -39,12 +58,13 @@ Invoke-RemotePowerShellScript `
     -Uri 'https://raw.githubusercontent.com/Eris92/SIRK-Portal/develop/tools/install/Ensure-SirkWindowsPrerequisites.ps1' `
     -Parameters @{ UpgradeExisting = $true }
 
-Invoke-RemotePowerShellScript `
+$installerArguments = @()
+if ($PortalName) { $installerArguments += @('-PortalName', $PortalName) }
+if ($RemoveData) { $installerArguments += '-RemoveData' }
+if ($Force) { $installerArguments += '-Force' }
+if ($TrustCertificate) { $installerArguments += '-TrustCertificate' }
+if ($DoNotTrustCertificate) { $installerArguments += '-DoNotTrustCertificate' }
+
+Invoke-RemotePowerShellProcess `
     -Uri 'https://raw.githubusercontent.com/Eris92/SIRK-Portal/develop/install-v3.ps1' `
-    -Parameters @{
-        PortalName = $PortalName
-        RemoveData = $RemoveData
-        Force = $Force
-        TrustCertificate = $TrustCertificate
-        DoNotTrustCertificate = $DoNotTrustCertificate
-    }
+    -ArgumentList $installerArguments
