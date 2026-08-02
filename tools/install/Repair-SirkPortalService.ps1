@@ -130,8 +130,6 @@ Write-Step 'Remove bootstrap password from service configuration'
 (Get-Service -Name $serviceName).WaitForStatus('Stopped', [TimeSpan]::FromSeconds(30))
 $xml = $xml -replace '(?m)^\s*<env name="SIRK_LOGIN_(USER|DISPLAY_NAME|PASSWORD)"[^\r\n]*\r?\n?', ''
 Set-Content -LiteralPath $serviceXml -Value $xml -Encoding UTF8
-& $serviceExe refresh
-if ($LASTEXITCODE -ne 0) { throw "WinSW service refresh failed. ExitCode=$LASTEXITCODE" }
 & $serviceExe start
 if ($LASTEXITCODE -ne 0) { throw "WinSW service restart failed. ExitCode=$LASTEXITCODE" }
 (Get-Service -Name $serviceName).WaitForStatus('Running', [TimeSpan]::FromSeconds(60))
