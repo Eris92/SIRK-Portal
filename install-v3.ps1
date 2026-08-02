@@ -19,7 +19,6 @@ if ($TrustCertificate -and $DoNotTrustCertificate) {
 $PortalRoot = 'C:\Program Files\SIRK\Portal'
 $WatchdogRoot = 'C:\Program Files\SIRK\Portal Watchdog'
 $DataRoot = 'C:\ProgramData\SIRK\Portal'
-$BackupRoot = 'C:\ProgramData\SIRK\Backups\Portal'
 $LogPath = 'C:\ProgramData\SIRK\Logs\Portal-Install.log'
 $WinSwUri = 'https://github.com/winsw/winsw/releases/download/v2.12.0/WinSW-x64.exe'
 $WinSwSha256 = '05B82D46AD331CC16BDC00DE5C6332C1EF818DF8CEEFCD49C726553209B3A0DA'
@@ -70,7 +69,7 @@ function Remove-ServiceIfPresent([string]$Name) {
     if (-not $service) { return }
     Stop-Service -Name $Name -Force -ErrorAction SilentlyContinue
     & sc.exe delete $Name | Out-Null
-    for ($i = 0; $i -lt 45; $i++) {
+    for ($index = 0; $index -lt 45; $index++) {
         if (-not (Get-Service -Name $Name -ErrorAction SilentlyContinue)) { return }
         Start-Sleep -Seconds 1
     }
@@ -95,9 +94,7 @@ function Install-WinSwService {
 
     Invoke-SirkDownload -Uri $WinSwUri -Destination $serviceExe -DisplayName "$DisplayName service wrapper"
     $hash = (Get-FileHash -LiteralPath $serviceExe -Algorithm SHA256).Hash.ToUpperInvariant()
-    if ($hash -ne $WinSwSha256) {
-        throw "WinSW SHA-256 mismatch for $ServiceName. Actual=$hash"
-    }
+    if ($hash -ne $WinSwSha256) { throw "WinSW SHA-256 mismatch for $ServiceName. Actual=$hash" }
     Write-SirkOk "$DisplayName WinSW SHA-256 verified."
 
     $envXml = ($Environment.GetEnumerator() | Sort-Object Name | ForEach-Object {
@@ -138,30 +135,13 @@ $envXml
 
 function Wait-Portal([string]$Name, [int]$TimeoutSeconds = 120) {
     $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    $code = '000'
     do {
         $code = & curl.exe -k -sS -o NUL -w '%{http_code}' --resolve "$Name`:443`:127.0.0.1" "https://$Name/login" 2>$null
         if ($code -eq '200') { return }
         Start-Sleep -Seconds 2
     } while ((Get-Date) -lt $deadline)
     throw "Portal readiness failed. HTTP=$code"
-}
-
-function Ensure-SirkUpdater {
-    $service = Get-Service -Name SirkUpdater -ErrorAction SilentlyContinue
-    $cli = 'C:\Program Files\SIRK\Updater\SirkUpdater.exe'
-    if (-not $service -or -not (Test-Path -LiteralPath $cli)) {
-        $installer = Join-Path $Work 'install-updater.ps1'
-        Invoke-SirkDownload -Uri 'https://raw.githubusercontent.com/Eris92/SIRK-Updater/main/install-release.ps1' -Destination $installer -DisplayName 'SIRK Updater installer'
-        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $installer -AllowSourceFallback
-        if ($LASTEXITCODE -ne 0) { throw "SIRK Updater installation failed. ExitCode=$LASTEXITCODE" }
-    }
-    $service = Get-Service -Name SirkUpdater -ErrorAction Stop
-    if ($service.Status -ne 'Running') {
-        Start-Service SirkUpdater
-        $service.WaitForStatus('Running',[TimeSpan]::FromSeconds(30))
-    }
-    if (-not (Test-Path -LiteralPath $cli)) { throw "SIRK Updater CLI missing: $cli" }
-    return $cli
 }
 
 New-Item -ItemType Directory -Path $Work -Force | Out-Null
@@ -185,7 +165,7 @@ try {
     Write-SirkKeyValue -Name 'Portal URL' -Value "https://$PortalName/login" -ValueColor Cyan
     Write-SirkKeyValue -Name 'Install root' -Value $PortalRoot
     Write-SirkKeyValue -Name 'Data root' -Value $DataRoot
-    Write-SirkKeyValue -Name 'Remove data' -Value ([string]$RemoveData)
+    Write-SirkKeyValue -Name 'Installation mode' -Value 'Clean install; existing data is deleted'
 
     Write-SirkInputRequired 'Enter Break-Glass administrator password (minimum 12 characters).'
     $passwordSecure = Read-Host 'Break-Glass administrator password' -AsSecureString
@@ -197,12 +177,16 @@ try {
     if ($password -cne $passwordAgain) { throw 'Passwords do not match.' }
     Write-SirkOk 'Break-Glass password accepted.'
 
-    Write-SirkStep 1 $TotalSteps 'Validate prerequisites'
+    Write-SirkStep 1 $TotalSteps 'Validate Node.js 24 and .NET 10 prerequisites'
     $node = (Get-Command node.exe -ErrorAction Stop).Source
     $npm = (Get-Command npm.cmd -ErrorAction Stop).Source
     $dotnet = (Get-Command dotnet.exe -ErrorAction Stop).Source
-    Write-SirkOk "Node.js $(& $node --version)"
-    Write-SirkOk ".NET SDK $(& $dotnet --version)"
+    $nodeVersion = (& $node --version).Trim()
+    $dotnetVersion = (& $dotnet --version).Trim()
+    if ($nodeVersion -notmatch '^v24\.') { throw "Node.js 24 LTS is required. Detected=$nodeVersion" }
+    if ($dotnetVersion -notmatch '^10\.') { throw ".NET 10 SDK is required. Detected=$dotnetVersion" }
+    Write-SirkOk "Node.js $nodeVersion"
+    Write-SirkOk ".NET SDK $dotnetVersion"
 
     Write-SirkStep 2 $TotalSteps 'Update npm to latest release'
     & $npm install --global npm@latest --no-audit --no-fund
@@ -210,22 +194,17 @@ try {
     $npm = (Get-Command npm.cmd -ErrorAction Stop).Source
     Write-SirkOk "npm $(& $npm --version)"
 
-    Write-SirkStep 3 $TotalSteps 'Stop and remove previous Portal services'
+    Write-SirkStep 3 $TotalSteps 'Stop and remove all Portal services'
     foreach ($name in @('SirkPortalWatchdog','sirkportalwatchdog.exe','SirkPortal','SirkPortalStandalone','sirkportal.exe')) {
         Remove-ServiceIfPresent $name
     }
     Write-SirkOk 'Previous services removed.'
 
-    Write-SirkStep 4 $TotalSteps 'Backup and clean previous installation'
-    if ((Test-Path $PortalRoot) -or (Test-Path $DataRoot)) {
-        $backup = Join-Path $BackupRoot (Get-Date -Format 'yyyyMMdd-HHmmss')
-        New-Item -ItemType Directory -Path $backup -Force | Out-Null
-        if (Test-Path $PortalRoot) { Copy-Item $PortalRoot (Join-Path $backup 'Install') -Recurse -Force }
-        if (Test-Path $DataRoot) { Copy-Item $DataRoot (Join-Path $backup 'Data') -Recurse -Force }
-        Write-SirkOk "Backup: $backup"
-    }
-    Remove-Item $PortalRoot, $WatchdogRoot -Recurse -Force -ErrorAction SilentlyContinue
-    if ($RemoveData) { Remove-Item $DataRoot -Recurse -Force -ErrorAction SilentlyContinue }
+    Write-SirkStep 4 $TotalSteps 'Delete previous installation and data'
+    Remove-Item -LiteralPath $PortalRoot -Recurse -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $WatchdogRoot -Recurse -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $DataRoot -Recurse -Force -ErrorAction SilentlyContinue
+    Write-SirkOk 'Previous binaries and data removed.'
 
     Write-SirkStep 5 $TotalSteps 'Download Portal package'
     New-Item -ItemType Directory -Path $Extract -Force | Out-Null
@@ -247,22 +226,20 @@ try {
     }
     Write-SirkOk 'Production dependencies installed.'
 
-    Write-SirkStep 7 $TotalSteps 'Prepare persistent data and TLS'
+    Write-SirkStep 7 $TotalSteps 'Prepare fresh persistent data and TLS'
     $tlsRoot = Join-Path $DataRoot 'TLS'
     New-Item -ItemType Directory -Path $tlsRoot -Force | Out-Null
     $pfxPath = Join-Path $tlsRoot 'portal.pfx'
     $pfxPasswordPath = Join-Path $tlsRoot 'portal-pfx-password.txt'
-    $enrollmentTokenPath = Join-Path $DataRoot 'agent-enrollment-token.txt'
     $pfxPassword = New-RandomBase64
-    $enrollmentToken = New-RandomBase64
-    Set-Content $pfxPasswordPath $pfxPassword -Encoding ASCII -NoNewline
-    Set-Content $enrollmentTokenPath $enrollmentToken -Encoding ASCII -NoNewline
+    Set-Content -LiteralPath $pfxPasswordPath -Value $pfxPassword -Encoding ASCII -NoNewline
     $certificate = New-SelfSignedCertificate -DnsName @($PortalName,$env:COMPUTERNAME,"$($env:COMPUTERNAME).local",'localhost') -CertStoreLocation 'Cert:\LocalMachine\My' -FriendlyName 'SIRK Portal HTTPS' -NotAfter (Get-Date).AddYears(3) -KeyAlgorithm RSA -KeyLength 3072 -HashAlgorithm SHA256
     Export-PfxCertificate -Cert $certificate -FilePath $pfxPath -Password (ConvertTo-SecureString $pfxPassword -AsPlainText -Force) | Out-Null
     Write-SirkOk "TLS certificate created for $PortalName."
 
-    $trust = if ($TrustCertificate) { $true } elseif ($DoNotTrustCertificate) { $false } else { Read-SirkYesNo -Prompt 'Trust the generated TLS certificate in LocalMachine\\Root?' -DefaultYes $true }
-    if ($trust) { Add-SirkTrustedCertificate -Certificate $certificate } else { Write-SirkWarning 'TLS certificate was not added to the trusted root store.' }
+    $trust = if ($TrustCertificate) { $true } elseif ($DoNotTrustCertificate) { $false } else { Read-SirkYesNo -Prompt 'Trust the generated TLS certificate in LocalMachine\Root?' -DefaultYes $true }
+    if ($trust) { Add-SirkTrustedCertificate -Certificate $certificate }
+    else { Write-SirkWarning 'TLS certificate was not added to the trusted root store.' }
 
     Write-SirkStep 8 $TotalSteps 'Install SIRK Portal WinSW service'
     $accessToken = New-AccessToken
@@ -272,7 +249,6 @@ try {
         SIRK_SERVICE_NAME = 'SirkPortal'
         SIRK_TLS_PFX = $pfxPath
         SIRK_TLS_PFX_PASSWORD_FILE = $pfxPasswordPath
-        SIRK_ENROLLMENT_TOKEN_FILE = $enrollmentTokenPath
         SIRK_HTTPS_PORT = '443'
         SIRK_INTERNAL_PORT = '9080'
         SIRK_PORTAL_FQDN = $PortalName
@@ -299,64 +275,52 @@ try {
 
     Write-SirkStep 10 $TotalSteps 'Install SIRK Portal Watchdog WinSW service'
     $watchdogScript = Join-Path $PortalRoot 'tools\watchdog\portal-watchdog.js'
-    if (Test-Path $watchdogScript) {
-        $watchdogEnv = @{
-            SIRK_PORTAL_SERVICE_NAME = 'SirkPortal'
-            SIRK_PORTAL_HEALTH_URL = 'https://127.0.0.1/login'
-            SIRK_DATA_ROOT = $DataRoot
-        }
-        Install-WinSwService -ServiceName 'SirkPortalWatchdog' -DisplayName 'SIRK Portal Watchdog' -Description 'Monitors and automatically recovers SIRK Portal.' -Executable $node -Arguments ('"' + $watchdogScript + '"') -WorkingDirectory $PortalRoot -Environment $watchdogEnv -DaemonRoot (Join-Path $WatchdogRoot 'daemon') | Out-Null
-        Write-SirkOk 'SIRK Portal Watchdog installed and running.'
+    if (-not (Test-Path -LiteralPath $watchdogScript)) { throw 'Portal Watchdog script is missing.' }
+    $watchdogEnv = @{
+        SIRK_PORTAL_SERVICE_NAME = 'SirkPortal'
+        SIRK_PORTAL_HEALTH_URL = 'https://127.0.0.1/login'
+        SIRK_DATA_ROOT = $DataRoot
     }
-    else { Write-SirkWarning 'Watchdog script is missing; Watchdog was not installed.' }
+    Install-WinSwService -ServiceName 'SirkPortalWatchdog' -DisplayName 'SIRK Portal Watchdog' -Description 'Monitors and automatically recovers SIRK Portal.' -Executable $node -Arguments ('"' + $watchdogScript + '"') -WorkingDirectory $PortalRoot -Environment $watchdogEnv -DaemonRoot (Join-Path $WatchdogRoot 'daemon') | Out-Null
+    Write-SirkOk 'SIRK Portal Watchdog installed and running.'
 
-    Write-SirkStep 11 $TotalSteps 'Install and register shared SIRK Updater'
-    $updaterCli = Ensure-SirkUpdater
-    $manifestPath = Join-Path $Work 'sirk-portal-updater.json'
-    $manifest = [ordered]@{
-        schemaVersion = 1
-        applicationId = 'sirk-portal'
-        displayName = 'SIRK Portal'
-        serviceName = 'SirkPortal'
-        watchdogServiceName = 'SirkPortalWatchdog'
-        installRoot = $PortalRoot
-        dataRoot = $DataRoot
-        healthUrl = 'https://127.0.0.1/login'
-        channel = 'dev'
-        updateSource = 'https://github.com/Eris92/SIRK-Portal'
-        packageSha256Url = $null
-        signatureRequired = $false
-    }
-    $manifest | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $manifestPath -Encoding UTF8
-    & $updaterCli register $manifestPath | Out-Host
-    if ($LASTEXITCODE -ne 0) { throw "Portal registration in SIRK Updater failed. ExitCode=$LASTEXITCODE" }
-    Write-SirkOk 'SIRK Updater running; sirk-portal registered.'
+    Write-SirkStep 11 $TotalSteps 'Install and register transactional SIRK Updater v2'
+    $ensureUpdater = Join-Path $PortalRoot 'tools\installer\Ensure-SirkUpdater.ps1'
+    if (-not (Test-Path -LiteralPath $ensureUpdater)) { throw "Updater integration script is missing: $ensureUpdater" }
+    & powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File $ensureUpdater -PortalServiceName SirkPortal -PortalWatchdogServiceName SirkPortalWatchdog -InstallPath $PortalRoot -DataPath $DataRoot -Channel dev | Out-Host
+    if ($LASTEXITCODE -ne 0) { throw "SIRK Updater v2 integration failed. ExitCode=$LASTEXITCODE" }
+    Write-SirkOk 'SIRK Updater v2 running; sirk-portal registered.'
 
     Write-SirkStep 12 $TotalSteps 'Verify services, HTTPS and prepare summary'
     Wait-Portal $PortalName
     $portalStatus = (Get-Service SirkPortal).Status
-    $watchdogService = Get-Service SirkPortalWatchdog -ErrorAction SilentlyContinue
+    $watchdogStatus = (Get-Service SirkPortalWatchdog).Status
     $updaterStatus = (Get-Service SirkUpdater).Status
+    if ($portalStatus -ne 'Running' -or $watchdogStatus -ne 'Running' -or $updaterStatus -ne 'Running') {
+        throw "Service verification failed. Portal=$portalStatus Watchdog=$watchdogStatus Updater=$updaterStatus"
+    }
+
     $portalUrl = "https://$PortalName/login"
     $breakGlassUrl = "https://$PortalName/login?access=$accessToken"
     $statusUrl = "https://$PortalName/api/system/status"
     $summaryPath = Join-Path $DataRoot 'installation-summary.txt'
     @"
-SIRK Portal installation completed
+SIRK Portal clean installation completed
 Portal URL: $portalUrl
 Break-Glass URL: $breakGlassUrl
 System status: $statusUrl
 Portal service: $portalStatus
-Watchdog service: $(if ($watchdogService) { $watchdogService.Status } else { 'Not installed' })
+Watchdog service: $watchdogStatus
 Updater service: $updaterStatus
 Certificate trusted: $trust
+Runtime: Node.js 24 LTS + .NET 10 LTS
 Installation log: $LogPath
 "@ | Set-Content -LiteralPath $summaryPath -Encoding UTF8
     try { Set-Clipboard -Value (Get-Content -LiteralPath $summaryPath -Raw) } catch { Write-SirkWarning 'Installation summary could not be copied to clipboard.' }
 
     Show-SirkInstallationSummary -Values ([ordered]@{
         'Portal service' = [string]$portalStatus
-        'Watchdog service' = if ($watchdogService) { [string]$watchdogService.Status } else { 'Not installed' }
+        'Watchdog service' = [string]$watchdogStatus
         'Updater service' = [string]$updaterStatus
         'Certificate' = if ($trust) { 'Trusted' } else { 'Not trusted' }
         'Portal URL' = $portalUrl
@@ -370,7 +334,7 @@ catch {
     throw
 }
 finally {
-    Remove-Item $Work -Recurse -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $Work -Recurse -Force -ErrorAction SilentlyContinue
     $password = $null
     $passwordAgain = $null
 }
