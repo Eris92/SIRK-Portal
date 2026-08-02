@@ -102,14 +102,14 @@ internal static class PortalModuleEndpoints
                 {
                     ok = true,
                     requests = approvals.List(
-                        context.Request.Query["type"],
-                        context.Request.Query["status"],
+                        context.Request.Query["type"].ToString(),
+                        context.Request.Query["status"].ToString(),
                         CanReviewAll(identity.Role) ? null : identity.Id,
                         ParseLimit(context, 500))
                 }),
                 ("approvalcenter", "request") => ApprovalRequest(
                     approvals,
-                    context.Request.Query["id"]),
+                    context.Request.Query["id"].ToString()),
                 ("approvalcenter", "settings") => Results.Ok(new
                 {
                     ok = true,
@@ -126,7 +126,7 @@ internal static class PortalModuleEndpoints
                     ok = true,
                     requests = approvals.List(
                         "moverequests",
-                        context.Request.Query["status"],
+                        context.Request.Query["status"].ToString(),
                         CanReviewAll(identity.Role) ? null : identity.Id,
                         ParseLimit(context, 500))
                 }),
@@ -149,15 +149,15 @@ internal static class PortalModuleEndpoints
                 }),
                 ("mycommands", "script") or ("myscripts", "script") => ScriptResult(
                     scripts,
-                    context.Request.Query["path"]),
+                    context.Request.Query["path"].ToString()),
                 ("mycommands", "output") or ("myscripts", "output") => OutputResult(
                     commands,
-                    context.Request.Query["id"]),
+                    context.Request.Query["id"].ToString()),
                 ("mycommands", "results") or ("myscripts", "results") => Results.Ok(new
                 {
                     ok = true,
                     rows = commands.List(
-                        context.Request.Query["deviceId"],
+                        context.Request.Query["deviceId"].ToString(),
                         ParseLimit(context, 500))
                 }),
                 ("mycommands", "settings") or ("myscripts", "settings") => Results.Ok(new
