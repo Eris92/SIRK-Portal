@@ -5,6 +5,7 @@
     <Version>3.0.0-dev.1</Version>
     <FileVersion>3.0.0.1</FileVersion>
     <InformationalVersion>3.0.0-dev.1</InformationalVersion>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
     <InvariantGlobalization>false</InvariantGlobalization>
   </PropertyGroup>
 
