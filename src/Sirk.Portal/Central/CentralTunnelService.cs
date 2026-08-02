@@ -375,7 +375,7 @@ internal sealed class CentralTunnelService : BackgroundService
     {
         if (!Uri.TryCreate(value, UriKind.Absolute, out var uri) ||
             uri is null ||
-            uri.Scheme is not (Uri.UriSchemeHttp or Uri.UriSchemeHttps) ||
+            (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps) ||
             !IPAddress.TryParse(uri.Host, out var address) ||
             !IPAddress.IsLoopback(address) ||
             !string.IsNullOrEmpty(uri.UserInfo) ||
