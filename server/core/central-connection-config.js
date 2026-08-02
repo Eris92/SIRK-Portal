@@ -16,6 +16,7 @@ function normalize(input) {
     var portalName = cleanText(input.portalName || portalId, 100);
     var portalToken = cleanText(input.portalToken, 512);
     var publicUrl = cleanText(input.publicUrl, 500).replace(/\/+$/, "");
+    var updatedAt = Date.parse(input.updatedAtUtc || "");
     var central;
     var tunnel;
     try { central = new URL(centralUrl); } catch (_) { throw new Error("Central URL is invalid."); }
@@ -43,7 +44,7 @@ function normalize(input) {
         portalName: portalName,
         portalToken: portalToken,
         publicUrl: publicUrl,
-        updatedAtUtc: new Date().toISOString()
+        updatedAtUtc: Number.isFinite(updatedAt) ? new Date(updatedAt).toISOString() : new Date().toISOString()
     };
 }
 
@@ -61,7 +62,7 @@ function create(options) {
     }
 
     function write(input) {
-        var value = normalize(input);
+        var value = normalize(Object.assign({}, input, { updatedAtUtc: new Date().toISOString() }));
         fs.mkdirSync(dataRoot, { recursive: true, mode: 0o700 });
         var temporary = filePath + ".tmp-" + process.pid + "-" + crypto.randomBytes(6).toString("hex");
         fs.writeFileSync(temporary, JSON.stringify(value, null, 2) + "\n", { encoding: "utf8", mode: 0o600, flag: "wx" });
