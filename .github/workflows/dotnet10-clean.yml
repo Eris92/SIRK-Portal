@@ -7,6 +7,7 @@ on:
       - rewrite/dotnet10-clean
   pull_request:
     branches:
+      - rewrite/dotnet10
       - develop
       - main
 
