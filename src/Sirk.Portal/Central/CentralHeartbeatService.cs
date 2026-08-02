@@ -10,7 +10,7 @@ internal sealed class CentralHeartbeatService(
     CentralConnectionResolver connectionResolver,
     CentralConnectionState connectionState,
     IHostEnvironment environment,
-    global::PortalRuntimeState runtimeState,
+    PortalRuntimeState runtimeState,
     ILogger<CentralHeartbeatService> logger) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -80,7 +80,7 @@ internal sealed class CentralHeartbeatService(
     {
         var payload = new PortalHeartbeatPayload(
             1,
-            global::VersionInfo.Current,
+            VersionInfo.Current,
             Environment.GetEnvironmentVariable("SIRK_BUILD_COMMIT") ?? string.Empty,
             RuntimeInformation.RuntimeIdentifier,
             Dns.GetHostName(),
@@ -89,12 +89,14 @@ internal sealed class CentralHeartbeatService(
             0,
             0,
             options.UpdateChannel.Trim(),
-            global::VersionInfo.Current,
+            VersionInfo.Current,
             [
                 "dotnet10-runtime",
                 "signed-heartbeat",
                 "central-config-v1",
-                "protected-central-config"
+                "protected-central-config",
+                "signed-agent-channel",
+                "central-tunnel-v1"
             ]);
 
         var signed = PortalHeartbeatSigner.Create(
