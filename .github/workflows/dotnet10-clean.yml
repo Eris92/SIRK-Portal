@@ -61,6 +61,9 @@ jobs:
       - name: Live Central heartbeat smoke
         run: python3 .github/scripts/test-dotnet10-central-heartbeat.py artifacts/linux-x64/Sirk.Portal.dll
 
+      - name: Native API end-to-end smoke
+        run: python3 .github/scripts/test-dotnet10-native-api.py artifacts/linux-x64/Sirk.Portal.dll
+
       - name: Container build
         run: docker build --file Dockerfile.dotnet10 --tag sirk-portal:dotnet10-clean .
 
