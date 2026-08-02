@@ -25,6 +25,38 @@ function normalizeCentralUrl(value) {
     return parsed.origin;
 }
 
+function decryptBootstrap(privateKeyPem, encodedEnvelope) {
+    var envelope;
+    try { envelope = JSON.parse(Buffer.from(String(encodedEnvelope || ""), "base64").toString("utf8")); }
+    catch (_) { throw new Error("Encrypted bootstrap envelope is invalid."); }
+    if (!envelope || envelope.schemaVersion !== 1 || envelope.algorithm !== "RSA-OAEP-256+A256GCM") {
+        throw new Error("Encrypted bootstrap envelope uses an unsupported format.");
+    }
+
+    var encryptedKey = Buffer.from(String(envelope.encryptedKey || ""), "base64");
+    var iv = Buffer.from(String(envelope.iv || ""), "base64");
+    var tag = Buffer.from(String(envelope.tag || ""), "base64");
+    var ciphertext = Buffer.from(String(envelope.ciphertext || ""), "base64");
+    if (!encryptedKey.length || iv.length !== 12 || tag.length !== 16 || !ciphertext.length) {
+        throw new Error("Encrypted bootstrap envelope is incomplete.");
+    }
+
+    var contentKey = crypto.privateDecrypt({
+        key: privateKeyPem,
+        padding: crypto.constants.RSA_PKCS1_OAEP_PADDING,
+        oaepHash: "sha256"
+    }, encryptedKey);
+    try {
+        if (contentKey.length !== 32) throw new Error("Encrypted bootstrap content key is invalid.");
+        var decipher = crypto.createDecipheriv("aes-256-gcm", contentKey, iv);
+        decipher.setAAD(Buffer.from("SIRK-Portal-Enrollment-v1", "utf8"));
+        decipher.setAuthTag(tag);
+        var plaintext = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
+        return JSON.parse(plaintext.toString("utf8"));
+    }
+    finally { contentKey.fill(0); }
+}
+
 function requestJson(method, target, authorization, body, options) {
     options = options || {};
     var url = new URL(target);
@@ -172,12 +204,7 @@ function create(options) {
                 if (!enrollment.encryptedBootstrap) throw new Error("Approved enrollment does not contain encrypted bootstrap data.");
 
                 var privateKeyPem = fs.readFileSync(privateKeyPath, "utf8");
-                var plaintext = crypto.privateDecrypt({
-                    key: privateKeyPem,
-                    padding: crypto.constants.RSA_PKCS1_OAEP_PADDING,
-                    oaepHash: "sha256"
-                }, Buffer.from(enrollment.encryptedBootstrap, "base64"));
-                var bundle = JSON.parse(plaintext.toString("utf8"));
+                var bundle = decryptBootstrap(privateKeyPem, enrollment.encryptedBootstrap);
                 var saved = connectionStore.write({
                     centralUrl: bundle.centralUrl,
                     tunnelUrl: bundle.tunnelUrl,
@@ -225,4 +252,9 @@ function create(options) {
     };
 }
 
-module.exports = { create: create, normalizeCentralUrl: normalizeCentralUrl, requestJson: requestJson };
+module.exports = {
+    create: create,
+    normalizeCentralUrl: normalizeCentralUrl,
+    requestJson: requestJson,
+    decryptBootstrap: decryptBootstrap
+};
