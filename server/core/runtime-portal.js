@@ -2,6 +2,7 @@
 
 var shared = require("./shared.js");
 var baseFactory = require("./runtime.js");
+var centralConnectionFactory = require("./central-connection-config.js");
 var portalFactory = require("../modules/portal/index.js");
 var VERSION = require("../../config.json").version;
 
@@ -45,6 +46,7 @@ var PORTAL_DEFAULTS = {
 module.exports.createRuntime = function (options) {
     var runtime = baseFactory.createRuntime(options);
     var context = runtime.context;
+    var centralConnection = centralConnectionFactory.create({ dataRoot: options && options.dataRoot });
     context.settings.defaults.modules = context.settings.defaults.modules || {};
     context.settings.defaults.modules.portal = shared.copy(PORTAL_DEFAULTS);
     runtime.modules.portal = portalFactory.createModule(context);
@@ -209,6 +211,7 @@ module.exports.createRuntime = function (options) {
             value.plugin.shortName = "SIRK-Portal";
             value.plugin.version = VERSION;
             value.userGroups = knownGroups();
+            value.centralConnection = centralConnection.status();
         }
         return value;
     };
@@ -249,6 +252,32 @@ module.exports.createRuntime = function (options) {
             shared.sendJson(res, 200, runtime.bootstrap(user));
             return;
         }
+        if (moduleName === "_central" && asset === "bootstrap") {
+            if (!shared.isSiteAdmin(user)) {
+                shared.sendJson(res, 403, { ok: false, error: "Permission denied." });
+                return;
+            }
+            if (method === "GET") {
+                shared.sendJson(res, 200, { ok: true, value: centralConnection.status() });
+                return;
+            }
+            if (method === "POST") {
+                try {
+                    var value = centralConnection.write(req && req.body || {});
+                    shared.sendJson(res, 200, {
+                        ok: true,
+                        value: value,
+                        restartRequired: true,
+                        restartService: process.env.SIRK_SERVICE_NAME || "SirkPortal"
+                    });
+                } catch (error) {
+                    shared.sendJson(res, 400, { ok: false, error: String(error && error.message || error) });
+                }
+                return;
+            }
+            shared.sendJson(res, 405, { ok: false, error: "Method not allowed." });
+            return;
+        }
         moduleName = String(moduleName || "").toLowerCase();
         if (moduleName && runtime.modules[moduleName] && !moduleGroupAccess(user, moduleName)) {
             shared.sendJson(res, 403, { ok: false, error: "Permission denied." });
@@ -257,6 +286,7 @@ module.exports.createRuntime = function (options) {
         return baseRequest(method, moduleName, asset, req, res, user);
     };
 
+    runtime.centralConnection = centralConnection;
     runtime.version = VERSION;
     return runtime;
 };
