@@ -269,7 +269,6 @@ def main() -> int:
                 {
                     "groupId": "test-group",
                     "enrollmentToken": enrollment_token,
-                    "deviceId": "dev-native-test",
                     "tenantId": "tenant-test",
                     "name": "Native Test Device",
                     "hostName": "native-test",
@@ -281,6 +280,8 @@ def main() -> int:
             )
             device_id = enrollment["credential"]["deviceId"]
             device_token = enrollment["credential"]["deviceToken"]
+            if not device_id.startswith("dev-"):
+                raise RuntimeError("Portal did not assign the canonical Agent device ID.")
 
             heartbeat_payload = {
                 "name": "Native Test Device",
