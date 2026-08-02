@@ -1,7 +1,6 @@
 using System.Net;
 using System.Security.Claims;
 using System.Security.Cryptography;
-using System.Text;
 using Sirk.Portal.Security;
 
 namespace Sirk.Portal.Central;
@@ -55,7 +54,8 @@ internal sealed class InternalTunnelAuthenticationMiddleware
 
     public async Task InvokeAsync(
         HttpContext context,
-        InternalTunnelCredential credential)
+        InternalTunnelCredential credential,
+        PortalCentralIdentityMapper mapper)
     {
         var supplied = context.Request.Headers[CredentialHeader].ToString();
         if (string.IsNullOrEmpty(supplied))
@@ -70,25 +70,45 @@ internal sealed class InternalTunnelAuthenticationMiddleware
             return;
         }
 
-        var actorId = Normalize(context.Request.Headers[ActorIdHeader], 160);
-        var actorName = Normalize(context.Request.Headers[ActorNameHeader], 160);
-        var role = Normalize(context.Request.Headers[ActorRoleHeader], 64);
-        if (string.IsNullOrWhiteSpace(actorId) ||
+        var centralActorId = Normalize(context.Request.Headers[ActorIdHeader], 160);
+        var actorName = Normalize(context.Request.Headers[ActorNameHeader], 128);
+        var centralRole = Normalize(context.Request.Headers[ActorRoleHeader], 64);
+        if (string.IsNullOrWhiteSpace(centralActorId) ||
             string.IsNullOrWhiteSpace(actorName) ||
-            !PortalRoles.All.Contains(role, StringComparer.Ordinal))
+            string.IsNullOrWhiteSpace(centralRole))
         {
             context.Response.StatusCode = StatusCodes.Status403Forbidden;
             return;
         }
 
+        PortalAuthenticatedIdentity mapped;
+        try
+        {
+            mapped = mapper.Resolve(centralActorId, actorName, centralRole);
+        }
+        catch (Exception exception) when (
+            exception is InvalidDataException or InvalidOperationException or UnauthorizedAccessException)
+        {
+            context.Response.StatusCode = StatusCodes.Status403Forbidden;
+            await context.Response.WriteAsJsonAsync(new
+            {
+                ok = false,
+                code = "CENTRAL_IDENTITY_MAPPING_FAILED",
+                error = exception.Message
+            });
+            return;
+        }
+
         var claims = new List<Claim>
         {
-            new(ClaimTypes.NameIdentifier, actorId),
-            new(ClaimTypes.Name, actorName),
-            new(ClaimTypes.Role, role),
-            new("sirk:user_name", actorName),
-            new("sirk:session_version", "0"),
+            new(ClaimTypes.NameIdentifier, mapped.Id),
+            new(ClaimTypes.Name, mapped.DisplayName),
+            new(ClaimTypes.Role, mapped.Role),
+            new("sirk:user_name", mapped.UserName),
+            new("sirk:session_version", mapped.SessionVersion.ToString(System.Globalization.CultureInfo.InvariantCulture)),
             new("sirk:identity_source", "central"),
+            new("sirk:central_actor_id", centralActorId),
+            new("sirk:central_actor_role", centralRole),
             new("amr", "delegated")
         };
         context.User = new ClaimsPrincipal(new ClaimsIdentity(
