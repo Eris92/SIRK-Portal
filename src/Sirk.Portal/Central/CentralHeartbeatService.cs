@@ -1,47 +1,64 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Runtime.InteropServices;
-using Microsoft.Extensions.Options;
 
 namespace Sirk.Portal.Central;
 
 internal sealed class CentralHeartbeatService(
     IHttpClientFactory httpClientFactory,
-    IOptions<CentralConnectionOptions> options,
+    CentralConnectionResolver connectionResolver,
     CentralConnectionState connectionState,
     IHostEnvironment environment,
     global::PortalRuntimeState runtimeState,
     ILogger<CentralHeartbeatService> logger) : BackgroundService
 {
-    private readonly CentralConnectionOptions _options = options.Value;
-
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        if (!_options.Enabled)
+        ResolvedCentralConnection resolved;
+        try
         {
-            connectionState.MarkDisabled("disabled");
+            resolved = connectionResolver.Resolve();
+        }
+        catch (Exception exception) when (
+            exception is IOException or UnauthorizedAccessException or JsonException)
+        {
+            connectionState.MarkDisabled("configuration-invalid", "protected-file");
+            logger.LogError(
+                exception,
+                "SIRK Central protected connection configuration could not be loaded.");
+            return;
+        }
+
+        var options = resolved.Options;
+        if (!options.Enabled)
+        {
+            connectionState.MarkDisabled("disabled", resolved.Source);
             logger.LogInformation("SIRK Central connection is disabled.");
             return;
         }
 
-        if (!TryValidateConfiguration(_options, environment, out var centralUrl, out var error))
+        if (!TryValidateConfiguration(options, environment, out var centralUrl, out var error))
         {
-            connectionState.MarkDisabled("configuration-invalid");
+            connectionState.MarkDisabled("configuration-invalid", resolved.Source);
             logger.LogError("SIRK Central connection configuration is invalid: {Error}", error);
             return;
         }
 
-        connectionState.MarkConfigured(centralUrl, _options.PortalId);
+        connectionState.MarkConfigured(centralUrl, options.PortalId, resolved.Source);
         var consecutiveFailures = 0;
 
         while (!stoppingToken.IsCancellationRequested)
         {
-            var succeeded = await SendHeartbeatAsync(centralUrl, stoppingToken);
+            var succeeded = await SendHeartbeatAsync(
+                centralUrl,
+                options,
+                resolved.Source,
+                stoppingToken);
             consecutiveFailures = succeeded ? 0 : consecutiveFailures + 1;
 
             var delay = succeeded
-                ? TimeSpan.FromSeconds(_options.HeartbeatIntervalSeconds)
-                : CalculateRetryDelay(consecutiveFailures, _options.HeartbeatIntervalSeconds);
+                ? TimeSpan.FromSeconds(options.HeartbeatIntervalSeconds)
+                : CalculateRetryDelay(consecutiveFailures, options.HeartbeatIntervalSeconds);
 
             try
             {
@@ -54,7 +71,11 @@ internal sealed class CentralHeartbeatService(
         }
     }
 
-    private async Task<bool> SendHeartbeatAsync(Uri centralUrl, CancellationToken stoppingToken)
+    private async Task<bool> SendHeartbeatAsync(
+        Uri centralUrl,
+        CentralConnectionOptions options,
+        string configurationSource,
+        CancellationToken stoppingToken)
     {
         var payload = new PortalHeartbeatPayload(
             1,
@@ -62,22 +83,23 @@ internal sealed class CentralHeartbeatService(
             Environment.GetEnvironmentVariable("SIRK_BUILD_COMMIT") ?? string.Empty,
             RuntimeInformation.RuntimeIdentifier,
             Dns.GetHostName(),
-            _options.PublicUrl.Trim(),
+            options.PublicUrl.Trim(),
             runtimeState.IsReady ? "ok" : "warning",
             0,
             0,
-            _options.UpdateChannel.Trim(),
+            options.UpdateChannel.Trim(),
             global::VersionInfo.Current,
             [
                 "dotnet10-runtime",
                 "signed-heartbeat",
-                "central-config-v1"
+                "central-config-v1",
+                "protected-central-config"
             ]);
 
         var signed = PortalHeartbeatSigner.Create(
             payload,
-            _options.PortalId,
-            _options.PortalToken);
+            options.PortalId,
+            options.PortalToken);
         var endpoint = new Uri(centralUrl, "/api/portal/v1/heartbeat");
 
         using var request = new HttpRequestMessage(HttpMethod.Post, endpoint);
@@ -92,7 +114,7 @@ internal sealed class CentralHeartbeatService(
         };
 
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
-        timeout.CancelAfter(TimeSpan.FromSeconds(_options.RequestTimeoutSeconds));
+        timeout.CancelAfter(TimeSpan.FromSeconds(options.RequestTimeoutSeconds));
 
         try
         {
@@ -106,7 +128,8 @@ internal sealed class CentralHeartbeatService(
             {
                 connectionState.MarkSuccess(
                     centralUrl,
-                    _options.PortalId,
+                    options.PortalId,
+                    configurationSource,
                     (int)response.StatusCode);
                 logger.LogDebug("Portal heartbeat accepted by SIRK Central.");
                 return true;
@@ -115,7 +138,8 @@ internal sealed class CentralHeartbeatService(
             var error = $"Central returned HTTP {(int)response.StatusCode} {response.ReasonPhrase}.";
             connectionState.MarkFailure(
                 centralUrl,
-                _options.PortalId,
+                options.PortalId,
+                configurationSource,
                 (int)response.StatusCode,
                 error);
             logger.LogWarning(
@@ -126,7 +150,12 @@ internal sealed class CentralHeartbeatService(
         catch (OperationCanceledException) when (!stoppingToken.IsCancellationRequested)
         {
             const string error = "Central heartbeat request timed out.";
-            connectionState.MarkFailure(centralUrl, _options.PortalId, null, error);
+            connectionState.MarkFailure(
+                centralUrl,
+                options.PortalId,
+                configurationSource,
+                null,
+                error);
             logger.LogWarning("{Error}", error);
             return false;
         }
@@ -134,7 +163,8 @@ internal sealed class CentralHeartbeatService(
         {
             connectionState.MarkFailure(
                 centralUrl,
-                _options.PortalId,
+                options.PortalId,
+                configurationSource,
                 exception.StatusCode is null ? null : (int)exception.StatusCode.Value,
                 exception.Message);
             logger.LogWarning(
