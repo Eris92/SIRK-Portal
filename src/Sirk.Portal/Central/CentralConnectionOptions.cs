@@ -21,4 +21,6 @@ internal sealed class CentralConnectionOptions
     public int HeartbeatIntervalSeconds { get; set; } = 60;
 
     public int RequestTimeoutSeconds { get; set; } = 15;
+
+    public string ConnectionFile { get; set; } = string.Empty;
 }
