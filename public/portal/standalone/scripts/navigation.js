@@ -67,6 +67,111 @@
         return !!(modules && modules.mycommands && modules.mycommands.enabled === true);
     }
 
+    function csrfToken() {
+        var runtime = window.SirkPlatformRuntime;
+        return String(runtime && runtime.state && runtime.state.bootstrap && runtime.state.bootstrap.csrfToken || "");
+    }
+
+    function centralApi(method, body) {
+        var headers = { Accept: "application/json", "Cache-Control": "no-store" };
+        if (method !== "GET") {
+            headers["Content-Type"] = "application/json";
+            headers["X-SIRK-CSRF"] = csrfToken();
+        }
+        return fetch("/api/modules/_central/bootstrap", {
+            method: method,
+            credentials: "same-origin",
+            cache: "no-store",
+            headers: headers,
+            body: body ? JSON.stringify(body) : undefined
+        }).then(function (response) {
+            return response.json().catch(function () { throw new Error("Central API returned an invalid response."); })
+                .then(function (value) {
+                    if (!response.ok || value.ok === false) throw new Error(value.error || ("HTTP " + response.status));
+                    return value;
+                });
+        });
+    }
+
+    function restartPortal(serviceName) {
+        return fetch("/api/admin/runtime?action=server-restart", {
+            method: "POST",
+            credentials: "same-origin",
+            cache: "no-store",
+            headers: { "Content-Type": "application/json", "X-SIRK-CSRF": csrfToken() },
+            body: JSON.stringify({ serviceName: serviceName || "SirkPortal" })
+        }).then(function (response) {
+            return response.json().catch(function () { throw new Error("Restart API returned an invalid response."); })
+                .then(function (value) {
+                    if (!response.ok || value.ok === false) throw new Error(value.error || ("HTTP " + response.status));
+                    return value;
+                });
+        });
+    }
+
+    function centralStatusMarkup(value) {
+        value = value || {};
+        if (!value.configured) return '<div class="sirk-card"><strong>Portal nie jest połączony z Central</strong><small>Utwórz Portal w Central i zaimportuj pobrany plik bootstrap JSON.</small></div>';
+        return '<div class="sirk-card"><strong>Połączenie z Central skonfigurowane</strong>' +
+            '<small>Portal ID: ' + String(value.portalId || "—") + '</small>' +
+            '<small>Central: ' + String(value.centralUrl || "—") + '</small>' +
+            '<small>Tunnel: ' + String(value.tunnelUrl || "—") + '</small>' +
+            '<small>Aktualizacja: ' + String(value.updatedAtUtc || "—") + '</small></div>';
+    }
+
+    function showCentralSettings(workspace) {
+        var details = workspace && workspace.querySelector(":scope > .sirk-column-details");
+        if (!details) return;
+        details.setAttribute("data-custom-settings-key", "central-connection");
+        details.innerHTML = '<div data-central-status><div class="sirk-card"><strong>Ładowanie konfiguracji Central…</strong></div></div>' +
+            '<div class="sirk-card"><strong>Import bootstrap JSON</strong><small>Plik jest generowany w SIRK Central. Token zostanie zapisany w chronionym pliku danych Portalu i nie będzie ponownie wyświetlany.</small>' +
+            '<input type="file" accept="application/json,.json" data-central-bootstrap-file>' +
+            '<div class="sirk-toolbar-group sirk-toolbar-left"><button type="button" class="sirk-button" data-central-bootstrap-save disabled>Zapisz i połącz</button><span data-central-message></span></div></div>';
+        var fileInput = details.querySelector("[data-central-bootstrap-file]");
+        var saveButton = details.querySelector("[data-central-bootstrap-save]");
+        var message = details.querySelector("[data-central-message]");
+        var payload = null;
+        fileInput.onchange = function () {
+            payload = null;
+            saveButton.disabled = true;
+            message.textContent = "";
+            var file = fileInput.files && fileInput.files[0];
+            if (!file) return;
+            if (file.size > 65536) { message.textContent = "Plik bootstrap jest zbyt duży."; return; }
+            file.text().then(function (text) {
+                var parsed = JSON.parse(text);
+                payload = parsed && parsed.bootstrap || parsed;
+                if (!payload || typeof payload !== "object") throw new Error("Nieprawidłowy plik bootstrap.");
+                saveButton.disabled = false;
+                message.textContent = "Plik gotowy do importu.";
+            }).catch(function (error) { message.textContent = error.message || String(error); });
+        };
+        saveButton.onclick = function () {
+            if (!payload) return;
+            saveButton.disabled = true;
+            message.textContent = "Zapisywanie konfiguracji…";
+            centralApi("POST", payload).then(function (result) {
+                payload = null;
+                fileInput.value = "";
+                details.querySelector("[data-central-status]").innerHTML = centralStatusMarkup(result.value);
+                message.textContent = "Konfiguracja zapisana. Restartowanie SIRK Portal…";
+                return restartPortal(result.restartService);
+            }).then(function () {
+                window.setTimeout(function () { window.location.replace("/login"); }, 3000);
+            }).catch(function (error) {
+                message.textContent = error.message || String(error);
+                saveButton.disabled = false;
+            });
+        };
+        centralApi("GET").then(function (result) {
+            var host = details.querySelector("[data-central-status]");
+            if (host) host.innerHTML = centralStatusMarkup(result.value);
+        }).catch(function (error) {
+            var host = details.querySelector("[data-central-status]");
+            if (host) host.innerHTML = '<div class="sirk-card" data-error="1">' + String(error.message || error) + '</div>';
+        });
+    }
+
     function normalizeDeviceWorkspace() {
         var content = document.getElementById("sirkStandaloneContent");
         var workspace = content && content.querySelector(":scope > .sirk-device-workspace");
@@ -95,9 +200,25 @@
         header.setAttribute("data-compact-tabs-mounted", "1");
     }
 
-    function normalizeServerNavigation(primary, secondary) {
+    function normalizeServerNavigation(primary, secondary, workspace) {
         var activePrimary = primary && primary.querySelector(":scope > .sirk-nav-item.active,:scope > .sirk-nav-item.is-active");
         if (!activePrimary || String(activePrimary.textContent || "").trim() !== "Server") return;
+        var existingCentral = secondary.querySelector("[data-central-settings-button]");
+        if (!existingCentral) {
+            var central = document.createElement("button");
+            central.type = "button";
+            central.className = "sirk-nav-item sirk-settings-nav-leaf";
+            central.textContent = "Central";
+            central.setAttribute("data-central-settings-button", "1");
+            central.onclick = function () {
+                Array.prototype.forEach.call(secondary.querySelectorAll(".sirk-nav-item.active,.sirk-nav-item.is-active"), function (item) {
+                    item.classList.remove("active", "is-active");
+                });
+                central.classList.add("active");
+                showCentralSettings(workspace);
+            };
+            secondary.appendChild(central);
+        }
         if (secondary.querySelector(":scope > .sirk-settings-nav-group")) return;
 
         var buttons = {};
@@ -218,7 +339,7 @@
         }
         var secondary = workspace.querySelector(":scope > .sirk-column-secondary");
         if (!secondary) return;
-        normalizeServerNavigation(primary, secondary);
+        normalizeServerNavigation(primary, secondary, workspace);
         removeModuleCardWrappers(workspace);
         normalizeUnifiedModuleToggle(workspace);
     }
@@ -233,10 +354,12 @@
             window.requestAnimationFrame(function () {
                 scheduled = false;
                 normalizeDeviceWorkspace();
+                normalizeSettingsNavigation();
             });
         });
         observer.observe(content, { childList: true, subtree: true });
         normalizeDeviceWorkspace();
+        normalizeSettingsNavigation();
     }
 
     function navigate(view) {
