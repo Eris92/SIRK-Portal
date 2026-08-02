@@ -24,6 +24,7 @@ function packageUrl(value) {
     return parsed.toString();
 }
 function psQuote(value) { return "'" + String(value).replace(/'/g, "''") + "'"; }
+function encodedPowerShell(value) { return Buffer.from(String(value), "utf16le").toString("base64"); }
 
 function create(options) {
     options = options || {};
@@ -36,7 +37,12 @@ function create(options) {
         var id = safeId(commandId);
         if (!id) throw new Error("Command ID is invalid.");
         var root = path.join(jobsRoot, id);
-        return { root: root, script: path.join(root, "run.ps1"), result: path.join(root, "result.json") };
+        return {
+            root: root,
+            script: path.join(root, "run.ps1"),
+            result: path.join(root, "result.json"),
+            taskName: "SIRK-Portal-" + id
+        };
     }
     function validate(command) {
         if (!command || !safeId(command.id)) throw new Error("Portal operation command is invalid.");
@@ -77,12 +83,30 @@ function create(options) {
             "  Invoke-WebRequest -UseBasicParsing -Uri " + psQuote(operation.packageUrl) + " -OutFile $package",
             "  $actual=(Get-FileHash -LiteralPath $package -Algorithm SHA256).Hash.ToUpperInvariant()",
             "  if($actual -ne " + psQuote(operation.sha256) + "){throw 'Downloaded package SHA256 mismatch.'}",
-            "  & " + psQuote(updaterCli) + " update sirk-portal $package " + psQuote(operation.sha256) + " " + psQuote(operation.targetVersion) + " 2>&1 | Out-String | Set-Variable output",
+            "  $output=(& " + psQuote(updaterCli) + " update sirk-portal $package " + psQuote(operation.sha256) + " " + psQuote(operation.targetVersion) + " 2>&1 | Out-String)",
             "  if($LASTEXITCODE -ne 0){throw ('SIRK Updater failed with ExitCode='+$LASTEXITCODE+'. '+$output)}",
             "  Save-Result 'completed' 'SIRK Portal update completed.' @{targetVersion=" + psQuote(operation.targetVersion) + ";output=$output}",
             "} catch { Save-Result 'failed' $_.Exception.Message @{exception=$_.Exception.ToString()} ; exit 1 }",
             "finally { Remove-Item -LiteralPath $package -Force -ErrorAction SilentlyContinue }"
         ]).join("\r\n");
+    }
+    function registerAndStartTask(job) {
+        var command = [
+            "$ErrorActionPreference='Stop'",
+            "$action=New-ScheduledTaskAction -Execute 'powershell.exe' -Argument " + psQuote("-NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"" + job.script + "\""),
+            "$trigger=New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(5)",
+            "$principal=New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest",
+            "Register-ScheduledTask -TaskName " + psQuote(job.taskName) + " -Action $action -Trigger $trigger -Principal $principal -Force | Out-Null",
+            "Start-ScheduledTask -TaskName " + psQuote(job.taskName)
+        ].join(";");
+        var result = childProcess.spawnSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-EncodedCommand", encodedPowerShell(command)], {
+            encoding: "utf8", windowsHide: true, timeout: 30000
+        });
+        if (result.status !== 0) throw new Error("Unable to schedule Portal operation: " + String(result.stderr || result.stdout || "unknown error").trim());
+    }
+    function removeTask(taskName) {
+        if (process.platform !== "win32") return;
+        childProcess.spawnSync("schtasks.exe", ["/Delete", "/TN", taskName, "/F"], { encoding: "utf8", windowsHide: true, timeout: 10000 });
     }
     function queue(command) {
         if (process.platform !== "win32") throw new Error("Portal operations require Windows.");
@@ -91,24 +115,23 @@ function create(options) {
         fs.mkdirSync(job.root, { recursive: true, mode: 0o700 });
         if (fs.existsSync(job.result)) return status(command.id);
         fs.writeFileSync(job.script, scriptFor(command, job.result), { encoding: "utf8", mode: 0o600 });
-        var child = childProcess.spawn("powershell.exe", ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", job.script], {
-            detached: true, windowsHide: true, stdio: "ignore"
-        });
-        child.unref();
-        atomicWrite(path.join(job.root, "queued.json"), { commandId: command.id, type: command.type, queuedAtUtc: new Date().toISOString() });
+        registerAndStartTask(job);
+        atomicWrite(path.join(job.root, "queued.json"), { commandId: command.id, type: command.type, taskName: job.taskName, queuedAtUtc: new Date().toISOString() });
         return { state: "running", message: command.type === "update" ? "SIRK Portal update started." : "SIRK Portal restart scheduled." };
     }
     function status(commandId) {
         var job = paths(commandId);
         try {
             var value = JSON.parse(fs.readFileSync(job.result, "utf8").replace(/^\uFEFF/, ""));
+            removeTask(job.taskName);
             return { state: value.state === "completed" ? "completed" : "failed", message: String(value.message || ""), result: value.detail || {} };
         } catch (error) {
             if (error.code === "ENOENT") return { state: "running", message: "Portal operation is still running." };
+            removeTask(job.taskName);
             return { state: "failed", message: error.message, result: { code: "PORTAL_OPERATION_RESULT_INVALID" } };
         }
     }
     return { queue: queue, status: status, validate: validate, jobsRoot: jobsRoot };
 }
 
-module.exports = { create: create, packageUrl: packageUrl, safeId: safeId };
+module.exports = { create: create, packageUrl: packageUrl, safeId: safeId, encodedPowerShell: encodedPowerShell };
