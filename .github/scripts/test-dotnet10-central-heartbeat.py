@@ -8,9 +8,9 @@ import os
 import signal
 import subprocess
 import sys
+import tempfile
 import threading
 import time
-import urllib.error
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -60,8 +60,11 @@ def validate_heartbeat(handler: BaseHTTPRequestHandler, body: bytes) -> None:
         raise ValueError("Portal protocol version is invalid.")
     if payload.get("portalVersion") != "3.0.0-dev.1":
         raise ValueError("Portal version is invalid.")
-    if "signed-heartbeat" not in payload.get("capabilities", []):
+    capabilities = payload.get("capabilities", [])
+    if "signed-heartbeat" not in capabilities:
         raise ValueError("Portal signed-heartbeat capability is missing.")
+    if "protected-central-config" not in capabilities:
+        raise ValueError("Portal protected-central-config capability is missing.")
 
 
 class CentralHandler(BaseHTTPRequestHandler):
@@ -109,6 +112,23 @@ def wait_portal_status(timeout_seconds: int) -> dict:
     raise RuntimeError(f"Portal did not report a connected Central state: {last_error}")
 
 
+def write_protected_connection_file(directory: Path) -> Path:
+    path = directory / "central-connection.json"
+    document = {
+        "schemaVersion": 1,
+        "centralUrl": CENTRAL_URL,
+        "tunnelUrl": "ws://127.0.0.1:19090/tunnel",
+        "portalId": PORTAL_ID,
+        "portalName": "Portal Test",
+        "portalToken": PORTAL_TOKEN,
+        "publicUrl": "https://portal.example",
+        "updatedAtUtc": "2026-08-02T12:00:00Z",
+    }
+    path.write_text(json.dumps(document, separators=(",", ":")), encoding="utf-8")
+    path.chmod(0o600)
+    return path
+
+
 def main() -> int:
     if len(sys.argv) != 2:
         raise RuntimeError("Usage: test-dotnet10-central-heartbeat.py <Sirk.Portal.dll>")
@@ -121,61 +141,60 @@ def main() -> int:
     server_thread = threading.Thread(target=server.serve_forever, daemon=True)
     server_thread.start()
 
-    environment = os.environ.copy()
-    environment.update(
-        {
-            "ASPNETCORE_ENVIRONMENT": "Development",
-            "ASPNETCORE_URLS": PORTAL_URL,
-            "Sirk__Central__Enabled": "true",
-            "Sirk__Central__BaseUrl": CENTRAL_URL,
-            "Sirk__Central__PortalId": PORTAL_ID,
-            "Sirk__Central__PortalName": "Portal Test",
-            "Sirk__Central__PortalToken": PORTAL_TOKEN,
-            "Sirk__Central__PublicUrl": "https://portal.example",
-            "Sirk__Central__UpdateChannel": "dev",
-            "Sirk__Central__HeartbeatIntervalSeconds": "30",
-            "Sirk__Central__RequestTimeoutSeconds": "5",
-        }
-    )
+    with tempfile.TemporaryDirectory(prefix="sirk-portal-central-") as temporary_directory:
+        connection_file = write_protected_connection_file(Path(temporary_directory))
+        environment = os.environ.copy()
+        environment.update(
+            {
+                "ASPNETCORE_ENVIRONMENT": "Development",
+                "ASPNETCORE_URLS": PORTAL_URL,
+                "Sirk__Central__ConnectionFile": str(connection_file),
+                "Sirk__Central__UpdateChannel": "dev",
+                "Sirk__Central__HeartbeatIntervalSeconds": "30",
+                "Sirk__Central__RequestTimeoutSeconds": "5",
+            }
+        )
 
-    process = subprocess.Popen(
-        ["dotnet", str(portal_dll)],
-        cwd=portal_dll.parent,
-        env=environment,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True,
-    )
+        process = subprocess.Popen(
+            ["dotnet", str(portal_dll)],
+            cwd=portal_dll.parent,
+            env=environment,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+        )
 
-    try:
-        if not HEARTBEAT_RECEIVED.wait(timeout=30):
-            raise RuntimeError("Portal did not send a heartbeat within 30 seconds.")
-        if HEARTBEAT_ERROR:
-            raise RuntimeError(HEARTBEAT_ERROR[0])
+        try:
+            if not HEARTBEAT_RECEIVED.wait(timeout=30):
+                raise RuntimeError("Portal did not send a heartbeat within 30 seconds.")
+            if HEARTBEAT_ERROR:
+                raise RuntimeError(HEARTBEAT_ERROR[0])
 
-        status = wait_portal_status(15)
-        central = status["central"]
-        if central.get("lastStatusCode") != 202 or central.get("portalId") != PORTAL_ID:
-            raise RuntimeError("Portal Central status does not contain the accepted heartbeat state.")
-        if PORTAL_TOKEN in json.dumps(status, separators=(",", ":")):
-            raise RuntimeError("Portal status response exposes the Portal token.")
+            status = wait_portal_status(15)
+            central = status["central"]
+            if central.get("lastStatusCode") != 202 or central.get("portalId") != PORTAL_ID:
+                raise RuntimeError("Portal Central status does not contain the accepted heartbeat state.")
+            if central.get("configurationSource") != "protected-file":
+                raise RuntimeError("Portal did not load the protected Central connection file.")
+            if PORTAL_TOKEN in json.dumps(status, separators=(",", ":")):
+                raise RuntimeError("Portal status response exposes the Portal token.")
 
-        print("SIRK Portal live Central heartbeat smoke: OK")
-        return 0
-    finally:
-        if process.poll() is None:
-            process.send_signal(signal.SIGTERM)
-            try:
-                process.wait(timeout=10)
-            except subprocess.TimeoutExpired:
-                process.kill()
-                process.wait(timeout=5)
-        output = process.stdout.read() if process.stdout else ""
-        server.shutdown()
-        server.server_close()
-        server_thread.join(timeout=5)
-        if process.returncode not in (0, -signal.SIGTERM) and output:
-            print(output, file=sys.stderr)
+            print("SIRK Portal protected-file Central heartbeat smoke: OK")
+            return 0
+        finally:
+            if process.poll() is None:
+                process.send_signal(signal.SIGTERM)
+                try:
+                    process.wait(timeout=10)
+                except subprocess.TimeoutExpired:
+                    process.kill()
+                    process.wait(timeout=5)
+            output = process.stdout.read() if process.stdout else ""
+            if process.returncode not in (0, -signal.SIGTERM) and output:
+                print(output, file=sys.stderr)
+            server.shutdown()
+            server.server_close()
+            server_thread.join(timeout=5)
 
 
 if __name__ == "__main__":
