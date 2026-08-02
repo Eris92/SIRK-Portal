@@ -348,13 +348,7 @@ internal sealed class PortalSettingsStore
             key => new PortalModuleSettings(
                 key is not ("myjira" or "defendertools"),
                 [],
-                JsonSerializer.SerializeToElement(key switch
-                {
-                    "approvalcenter" => new { retentionDays = 365 },
-                    "moverequests" => new { hostButtonEnabled = true },
-                    "mycommands" => new { showOnDevice = true, maxMultiHostNodes = 200, multiHostConcurrency = 8 },
-                    _ => new { }
-                })),
+                DefaultModuleOptions(key)),
             StringComparer.Ordinal);
         var portal = JsonSerializer.SerializeToElement(new
         {
@@ -391,6 +385,23 @@ internal sealed class PortalSettingsStore
             new Dictionary<string, JsonElement>(StringComparer.Ordinal),
             new Dictionary<string, string>(StringComparer.Ordinal),
             DateTimeOffset.UtcNow);
+    }
+
+    private static JsonElement DefaultModuleOptions(string key)
+    {
+        object value = key switch
+        {
+            "approvalcenter" => new { retentionDays = 365 },
+            "moverequests" => new { hostButtonEnabled = true },
+            "mycommands" => new
+            {
+                showOnDevice = true,
+                maxMultiHostNodes = 200,
+                multiHostConcurrency = 8
+            },
+            _ => new { }
+        };
+        return JsonSerializer.SerializeToElement(value, value.GetType());
     }
 
     private static string NormalizeKey(string value, string field)
