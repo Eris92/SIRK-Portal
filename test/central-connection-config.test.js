@@ -64,6 +64,18 @@ try {
     var httpsText = fs.readFileSync(path.join(__dirname, "..", "server", "standalone-https.js"), "utf8");
     assert.ok(httpsText.indexOf("applyCentralConnection(dataRoot)") >= 0);
     assert.ok(httpsText.indexOf("SIRK_CENTRAL_TOKEN") >= 0);
+
+    var navigationText = fs.readFileSync(path.join(__dirname, "..", "public", "portal", "standalone", "scripts", "navigation.js"), "utf8");
+    assert.ok(navigationText.indexOf("/api/modules/_central/bootstrap") >= 0);
+    assert.ok(navigationText.indexOf("Import bootstrap JSON") >= 0);
+    assert.ok(navigationText.indexOf("data-central-bootstrap-file") >= 0);
+    assert.ok(navigationText.indexOf("restartPortal(result.restartService)") >= 0);
+    assert.ok(navigationText.indexOf("localStorage.setItem") < 0 || navigationText.indexOf("portalToken") < 0);
+
+    var configureText = fs.readFileSync(path.join(__dirname, "..", "tools", "Configure-SirkCentral.ps1"), "utf8");
+    assert.ok(configureText.indexOf("central-connection.json") >= 0);
+    assert.ok(configureText.indexOf("CurrentControlSet\\Services") < 0);
+    assert.ok(configureText.indexOf("icacls.exe") >= 0);
     console.log("central-connection-config test passed");
 } finally {
     fs.rmSync(root, { recursive: true, force: true });
