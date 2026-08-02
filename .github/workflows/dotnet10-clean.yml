@@ -1,0 +1,89 @@
+name: SIRK Portal .NET 10 Clean
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - rewrite/dotnet10-clean
+    paths:
+      - global.json
+      - Directory.Build.props
+      - Dockerfile.dotnet10
+      - src/Sirk.Portal/**
+      - tests/Sirk.Portal.ProtocolTests/**
+      - .github/scripts/**
+      - public/**
+      - .github/workflows/dotnet10-clean.yml
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: SDK contract
+        run: |
+          dotnet --info
+          python3 - <<'PY'
+          from pathlib import Path
+          roots = [Path('src/Sirk.Portal'), Path('tests/Sirk.Portal.ProtocolTests'), Path('Directory.Build.props'), Path('global.json')]
+          forbidden = ('net8.0', 'net9.0')
+          failures = []
+          for root in roots:
+              paths = [root] if root.is_file() else list(root.rglob('*'))
+              for path in paths:
+                  if path.is_file() and path.suffix in {'.csproj', '.props', '.json'}:
+                      text = path.read_text(encoding='utf-8', errors='ignore')
+                      if any(value in text for value in forbidden):
+                          failures.append(str(path))
+          if failures:
+              raise SystemExit('Unsupported target framework reference: ' + ', '.join(failures))
+          PY
+
+      - name: Restore
+        run: dotnet restore tests/Sirk.Portal.ProtocolTests/Sirk.Portal.ProtocolTests.csproj
+
+      - name: Build
+        run: dotnet build tests/Sirk.Portal.ProtocolTests/Sirk.Portal.ProtocolTests.csproj --configuration Release --no-restore
+
+      - name: Protocol contracts
+        run: dotnet run --project tests/Sirk.Portal.ProtocolTests/Sirk.Portal.ProtocolTests.csproj --configuration Release --no-build
+
+      - name: Publish Windows x64
+        run: dotnet publish src/Sirk.Portal/Sirk.Portal.csproj --configuration Release --runtime win-x64 --self-contained false --output artifacts/win-x64
+
+      - name: Publish Linux x64
+        run: dotnet publish src/Sirk.Portal/Sirk.Portal.csproj --configuration Release --runtime linux-x64 --self-contained false --output artifacts/linux-x64
+
+      - name: Live Central heartbeat smoke
+        run: python3 .github/scripts/test-dotnet10-central-heartbeat.py artifacts/linux-x64/Sirk.Portal.dll
+
+      - name: Container build
+        run: docker build --file Dockerfile.dotnet10 --tag sirk-portal:dotnet10-clean .
+
+      - name: Container runtime health smoke
+        run: |
+          docker run --detach --name sirk-portal-dotnet10-clean-smoke --health-interval 1s --health-timeout 5s --health-start-period 1s --health-retries 20 sirk-portal:dotnet10-clean
+          for attempt in $(seq 1 60); do
+            status=$(docker inspect --format '{{.State.Health.Status}}' sirk-portal-dotnet10-clean-smoke)
+            if [ "$status" = healthy ]; then
+              docker rm --force --volumes sirk-portal-dotnet10-clean-smoke
+              exit 0
+            fi
+            if [ "$status" = unhealthy ]; then
+              docker logs sirk-portal-dotnet10-clean-smoke
+              docker rm --force --volumes sirk-portal-dotnet10-clean-smoke
+              exit 1
+            fi
+            sleep 1
+          done
+          docker logs sirk-portal-dotnet10-clean-smoke
+          docker rm --force --volumes sirk-portal-dotnet10-clean-smoke
+          exit 1
