@@ -38,7 +38,7 @@ function Wait-ServiceDeletion {
 
     $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
     do {
-        $output = & sc.exe query $Name 2>&1
+        & sc.exe query $Name 2>&1 | Out-Null
         $code = $LASTEXITCODE
         if ($code -eq 1060) { return }
         if ($code -eq 1072) {
@@ -147,8 +147,7 @@ try {
         -Uri ('https://raw.githubusercontent.com/Eris92/SIRK-Portal/develop/install.ps1?nocache=' + [guid]::NewGuid()) `
         -OutFile $installerPath
 
-    # The canonical installer reads the DNS name from stdin and then asks only for the Break-Glass password.
-    $PortalName | & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $installerPath
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $installerPath -PortalName $PortalName
     if ($LASTEXITCODE -ne 0) {
         throw "Canonical Portal installer failed. ExitCode=$LASTEXITCODE"
     }
