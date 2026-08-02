@@ -1,0 +1,59 @@
+name: SIRK Portal Product Test Readiness
+
+on:
+  push:
+    branches: [develop]
+  pull_request:
+    branches: [develop]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  portal-readiness:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.x'
+          cache: npm
+
+      - name: Install dependencies
+        shell: pwsh
+        run: npm ci
+
+      - name: Validate JavaScript syntax
+        shell: pwsh
+        run: |
+          $files = Get-ChildItem server,public,test -Recurse -File -Filter '*.js'
+          foreach ($file in $files) {
+            node --check $file.FullName
+            if ($LASTEXITCODE -ne 0) { throw "Syntax validation failed: $($file.FullName)" }
+          }
+
+      - name: Validate clean-install-only contract
+        shell: pwsh
+        run: |
+          $text = Get-ChildItem clean-install-managed.ps1,tools,server,test,.github -Recurse -File -ErrorAction SilentlyContinue |
+            Where-Object { $_.Extension -in '.ps1','.js','.yml','.yaml' } |
+            ForEach-Object { Get-Content $_.FullName -Raw }
+          $joined = $text -join "`n"
+          if ($joined -match 'AllowSourceFallback|install-release\.ps1|Microsoft\.DotNet\.Runtime\.8|Microsoft\.NETCore\.App 8|net8\.0') {
+            throw 'Legacy updater or .NET 8 compatibility reference detected.'
+          }
+          if ($joined -notmatch 'install-release-v2\.ps1') {
+            throw 'Canonical Updater v2 installer reference is missing.'
+          }
+
+      - name: Run Central enrollment and platform tests
+        shell: pwsh
+        run: |
+          node test/central-enrollment-client.test.js
+          node test/platform-management-service.test.js
+
+      - name: Run Portal test suite
+        shell: pwsh
+        run: npm test
