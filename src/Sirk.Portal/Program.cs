@@ -1,5 +1,7 @@
+using System.Net;
 using System.Reflection;
 using Microsoft.AspNetCore.HttpOverrides;
+using Sirk.Portal.Central;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -9,7 +11,19 @@ builder.WebHost.ConfigureKestrel(options => options.AddServerHeader = false);
 
 builder.Services.AddProblemDetails();
 builder.Services.AddSingleton<PortalRuntimeState>();
+builder.Services.AddSingleton<CentralConnectionState>();
+builder.Services.Configure<CentralConnectionOptions>(
+    builder.Configuration.GetSection(CentralConnectionOptions.SectionName));
+builder.Services.AddHttpClient("SirkCentral")
+    .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+    {
+        AllowAutoRedirect = false,
+        AutomaticDecompression = DecompressionMethods.GZip |
+                                 DecompressionMethods.Deflate |
+                                 DecompressionMethods.Brotli
+    });
 builder.Services.AddHostedService<PortalLifecycleService>();
+builder.Services.AddHostedService<CentralHeartbeatService>();
 builder.Services.Configure<HostOptions>(options =>
 {
     options.ShutdownTimeout = TimeSpan.FromSeconds(20);
@@ -30,6 +44,7 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
 
 var app = builder.Build();
 var runtimeState = app.Services.GetRequiredService<PortalRuntimeState>();
+var centralConnectionState = app.Services.GetRequiredService<CentralConnectionState>();
 
 app.UseForwardedHeaders();
 
@@ -106,7 +121,8 @@ app.MapGet("/api/v1/portal/status", () => Results.Ok(new
     version = VersionInfo.Current,
     environment = app.Environment.EnvironmentName,
     ready = runtimeState.IsReady,
-    startedAtUtc = runtimeState.StartedAtUtc
+    startedAtUtc = runtimeState.StartedAtUtc,
+    central = centralConnectionState.Snapshot()
 }));
 
 app.MapFallback(() => Results.Problem(
