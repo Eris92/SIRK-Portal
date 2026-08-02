@@ -64,8 +64,11 @@ builder.Services.AddSingleton<WorkflowExecutionService>();
 
 builder.Services.AddSingleton<CentralConnectionState>();
 builder.Services.AddSingleton<CentralConnectionResolver>();
+builder.Services.AddSingleton<InternalTunnelCredential>();
 builder.Services.Configure<CentralConnectionOptions>(
     builder.Configuration.GetSection(CentralConnectionOptions.SectionName));
+builder.Services.Configure<CentralTunnelOptions>(
+    builder.Configuration.GetSection(CentralTunnelOptions.SectionName));
 builder.Services.AddHttpClient("SirkCentral")
     .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
     {
@@ -195,6 +198,7 @@ builder.Services.AddRateLimiter(options =>
 
 builder.Services.AddHostedService<PortalLifecycleService>();
 builder.Services.AddHostedService<CentralHeartbeatService>();
+builder.Services.AddHostedService<CentralTunnelService>();
 builder.Services.Configure<HostOptions>(options =>
 {
     options.ShutdownTimeout = TimeSpan.FromSeconds(30);
@@ -255,10 +259,10 @@ app.Use(async (context, next) =>
 app.UseRateLimiter();
 app.UseWebSockets(new WebSocketOptions
 {
-    KeepAliveInterval = TimeSpan.FromSeconds(20),
-    AllowedOrigins = { }
+    KeepAliveInterval = TimeSpan.FromSeconds(20)
 });
 app.UseAuthentication();
+app.UseMiddleware<InternalTunnelAuthenticationMiddleware>();
 app.UseAuthorization();
 app.UseStaticFiles();
 
