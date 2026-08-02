@@ -46,9 +46,26 @@ function Invoke-RemotePowerShellProcess {
             'https://raw.githubusercontent.com/Eris92/SIRK-Updater/main/install-release.ps1',
             "https://raw.githubusercontent.com/Eris92/SIRK-Updater/main/install-release.ps1?nocache=$updaterNonce"
         )
+
+        # PowerShell captures every success-stream line emitted by a function. Without
+        # Out-Host the complete Updater installer log became the value of $updaterCli.
+        $oldUpdaterInvocation = @'
+        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $installer -AllowSourceFallback
+        if ($LASTEXITCODE -ne 0) { throw "SIRK Updater installation failed. ExitCode=$LASTEXITCODE" }
+'@
+        $newUpdaterInvocation = @'
+        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $installer -AllowSourceFallback | Out-Host
+        $updaterInstallerExitCode = $LASTEXITCODE
+        if ($updaterInstallerExitCode -ne 0) { throw "SIRK Updater installation failed. ExitCode=$updaterInstallerExitCode" }
+'@
+        if (-not $content.Contains($oldUpdaterInvocation.Trim())) {
+            throw 'Unable to apply Updater stdout isolation patch to install-v3.ps1.'
+        }
+        $content = $content.Replace($oldUpdaterInvocation.Trim(), $newUpdaterInvocation.Trim())
         Set-Content -LiteralPath $path -Value $content -Encoding UTF8
 
         Write-Host '[BOOTSTRAP] Starting SIRK Portal installer v3 with cache-busted nested installers.' -ForegroundColor DarkCyan
+        Write-Host '[BOOTSTRAP] Updater child output is isolated from the CLI return value.' -ForegroundColor DarkCyan
         & powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File $path @ArgumentList
         $exitCode = $LASTEXITCODE
         if ($exitCode -ne 0) {
