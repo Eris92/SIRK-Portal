@@ -1,5 +1,6 @@
 "use strict";
 
+var childProcess = require("child_process");
 var crypto = require("crypto");
 var fs = require("fs");
 var http = require("http");
@@ -25,6 +26,8 @@ function create(options) {
     var portalVersion = String(options.portalVersion || "");
     var dataRoot = path.resolve(options.dataRoot || process.env.SIRK_DATA_ROOT ||
         path.join(path.dirname(path.resolve(__dirname, "../..")), "sirk-platform-data"));
+    var updaterRoot = path.resolve(options.updaterRoot || process.env.SIRK_UPDATER_DATA_ROOT ||
+        (process.platform === "win32" ? "C:\\ProgramData\\SIRK\\Updater" : path.join(dataRoot, "updater")));
     var heartbeatIntervalMilliseconds = Math.max(15000, Math.min(300000,
         Number(options.heartbeatIntervalMilliseconds || process.env.SIRK_CENTRAL_HEARTBEAT_INTERVAL_MS) || 60000));
     var socket = null;
@@ -89,8 +92,63 @@ function create(options) {
         }
     }
 
+    function latestOperation(applicationId) {
+        var operationsRoot = path.join(updaterRoot, "operations", applicationId);
+        try {
+            return fs.readdirSync(operationsRoot, { withFileTypes: true })
+                .filter(function (entry) { return entry.isDirectory(); })
+                .map(function (entry) {
+                    var statePath = path.join(operationsRoot, entry.name, "state.json");
+                    try {
+                        var state = JSON.parse(fs.readFileSync(statePath, "utf8"));
+                        return { state: state, modified: fs.statSync(statePath).mtimeMs };
+                    } catch (error) { return null; }
+                })
+                .filter(Boolean)
+                .sort(function (left, right) { return right.modified - left.modified; })[0] || null;
+        } catch (error) { return null; }
+    }
+
+    function updaterSummary() {
+        var manifestPath = path.join(updaterRoot, "applications", "sirk-portal.json");
+        var summary = {
+            installed: false,
+            running: false,
+            channel: "",
+            targetVersion: "",
+            phase: "",
+            updatedAtUtc: null
+        };
+        try {
+            var manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+            summary.installed = manifest && manifest.applicationId === "sirk-portal";
+            summary.channel = String(manifest.channel || "").slice(0, 80);
+        } catch (error) {}
+        if (process.platform === "win32") {
+            try {
+                var service = childProcess.spawnSync("sc.exe", ["query", "SirkUpdater"], {
+                    encoding: "utf8", windowsHide: true, timeout: 5000
+                });
+                summary.running = service.status === 0 && /STATE\s*:\s*4\s+RUNNING/i.test(String(service.stdout || ""));
+            } catch (error) {}
+        } else summary.running = summary.installed;
+        var operation = latestOperation("sirk-portal");
+        if (operation && operation.state) {
+            summary.targetVersion = String(operation.state.targetVersion || "").slice(0, 80);
+            summary.phase = String(operation.state.phase || "").slice(0, 80);
+            summary.updatedAtUtc = operation.state.updatedAtUtc || null;
+        }
+        return summary;
+    }
+
     function heartbeatBody() {
         var agents = agentSummary();
+        var updater = updaterSummary();
+        var connected = socket && socket.readyState === WebSocket.OPEN;
+        var capabilities = ["agent-enrollment", "agent-checkin", "agent-commands", "agent-policies", "desktop-relay"];
+        if (updater.installed) capabilities.push("shared-updater");
+        if (updater.running) capabilities.push("shared-updater-running");
+        if (updater.phase) capabilities.push("shared-updater-phase:" + updater.phase.toLowerCase().replace(/[^a-z0-9._-]/g, "-"));
         return {
             protocolVersion: 1,
             portalVersion: portalVersion,
@@ -98,10 +156,12 @@ function create(options) {
             platform: process.platform + "/" + process.arch,
             hostname: os.hostname(),
             publicUrl: String(process.env.SIRK_PUBLIC_URL || ""),
-            health: socket && socket.readyState === WebSocket.OPEN ? "ok" : "warning",
+            health: connected && updater.installed && updater.running ? "ok" : "warning",
             agentCount: agents.agentCount,
             onlineAgents: agents.onlineAgents,
-            capabilities: ["agent-enrollment", "agent-checkin", "agent-commands", "agent-policies", "desktop-relay"]
+            updateChannel: updater.channel,
+            availableVersion: updater.targetVersion,
+            capabilities: capabilities
         };
     }
 
@@ -161,6 +221,7 @@ function create(options) {
     }
 
     function portalInfo(requestId) {
+        var updater = updaterSummary();
         socket.send(JSON.stringify({
             type: "response",
             requestId: requestId,
@@ -172,6 +233,7 @@ function create(options) {
                 architecture: process.arch,
                 nodeVersion: process.version,
                 portalVersion: portalVersion,
+                updater: updater,
                 connectedAtUtc: new Date().toISOString()
             }
         }));
@@ -291,6 +353,7 @@ function create(options) {
         publishHeartbeat: publishHeartbeat,
         heartbeatBody: heartbeatBody,
         agentSummary: agentSummary,
+        updaterSummary: updaterSummary,
         centralOrigin: centralOrigin,
         ensureCommandDispatcher: ensureCommandDispatcher
     };
