@@ -5,12 +5,24 @@ param(
     [switch]$RemoveData,
     [switch]$Force,
     [switch]$TrustCertificate,
-    [switch]$DoNotTrustCertificate
+    [switch]$DoNotTrustCertificate,
+    [string]$CentralUrl,
+    [string]$CentralPortalId,
+    [string]$CentralPortalName,
+    [string]$PublicUrl,
+    [switch]$WaitForCentralApproval
 )
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+
+function ConvertFrom-SecureStringPlain {
+    param([Parameter(Mandatory)][Security.SecureString]$Value)
+    $pointer = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($Value)
+    try { return [Runtime.InteropServices.Marshal]::PtrToStringBSTR($pointer) }
+    finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($pointer) }
+}
 
 function Invoke-RemotePowerShellScript {
     param(
@@ -79,6 +91,74 @@ function Invoke-RemotePowerShellProcess {
     }
 }
 
+function Invoke-CentralEnrollment {
+    param(
+        [Parameter(Mandatory)][string]$Url,
+        [string]$PortalId,
+        [string]$DisplayName,
+        [string]$PortalPublicUrl,
+        [switch]$Wait
+    )
+
+    $node = (Get-Command node.exe -ErrorAction Stop).Source
+    $cli = 'C:\Program Files\SIRK\Portal\tools\enrollment\sirk-central-enroll.js'
+    if (-not (Test-Path -LiteralPath $cli)) {
+        throw "Central enrollment CLI is missing: $cli"
+    }
+
+    if (-not $PortalId) {
+        $PortalId = $env:COMPUTERNAME.ToLowerInvariant() -replace '[^a-z0-9-]', '-'
+        $PortalId = $PortalId.Trim('-')
+    }
+    if (-not $DisplayName) { $DisplayName = $env:COMPUTERNAME }
+    if (-not $PortalPublicUrl -and $PortalName) { $PortalPublicUrl = "https://$PortalName" }
+
+    Write-Host "`n============================================================" -ForegroundColor Yellow -BackgroundColor DarkBlue
+    Write-Host ' INPUT REQUIRED' -ForegroundColor Yellow -BackgroundColor DarkBlue
+    Write-Host ' Enter the one-time Portal enrollment token from SIRK Central.' -ForegroundColor Yellow -BackgroundColor DarkBlue
+    Write-Host "============================================================" -ForegroundColor Yellow -BackgroundColor DarkBlue
+    $secureToken = Read-Host 'Central enrollment token' -AsSecureString
+    $plainToken = ConvertFrom-SecureStringPlain $secureToken
+    try {
+        if (-not $plainToken -or $plainToken.Length -lt 20) { throw 'Central enrollment token is invalid.' }
+        $previousToken = $env:SIRK_CENTRAL_ENROLLMENT_TOKEN
+        $env:SIRK_CENTRAL_ENROLLMENT_TOKEN = $plainToken
+        try {
+            $arguments = @(
+                $cli, 'begin',
+                '--central-url', $Url,
+                '--portal-id', $PortalId,
+                '--portal-name', $DisplayName
+            )
+            if ($PortalPublicUrl) { $arguments += @('--public-url', $PortalPublicUrl) }
+            & $node @arguments | Out-Host
+            if ($LASTEXITCODE -ne 0) { throw "Central enrollment request failed. ExitCode=$LASTEXITCODE" }
+        }
+        finally {
+            $env:SIRK_CENTRAL_ENROLLMENT_TOKEN = $previousToken
+        }
+    }
+    finally {
+        $plainToken = $null
+        $secureToken = $null
+    }
+
+    Write-Host '[OK] Portal enrollment request is pending approval in SIRK Central.' -ForegroundColor Green
+    if (-not $Wait) {
+        Write-Host 'Complete later:' -ForegroundColor Cyan
+        Write-Host ('  "{0}" "{1}" wait' -f $node, $cli) -ForegroundColor Cyan
+        return
+    }
+
+    Write-Host '[WAIT] Waiting for Central approval...' -ForegroundColor DarkCyan
+    & $node $cli wait '--wait-timeout-seconds' '1800' '--interval-seconds' '5' | Out-Host
+    if ($LASTEXITCODE -ne 0) { throw "Central enrollment approval failed or timed out. ExitCode=$LASTEXITCODE" }
+
+    Restart-Service -Name SirkPortal -Force
+    (Get-Service -Name SirkPortal).WaitForStatus('Running', [TimeSpan]::FromSeconds(60))
+    Write-Host '[OK] Portal connected to SIRK Central and service restarted.' -ForegroundColor Green
+}
+
 Write-Host "`n============================================================" -ForegroundColor Cyan
 Write-Host ' SIRK PORTAL MANAGED INSTALLATION' -ForegroundColor Cyan
 Write-Host ' WinGet + Node.js LTS + npm latest + .NET LTS + WinSW' -ForegroundColor Cyan
@@ -100,3 +180,12 @@ if ($DoNotTrustCertificate) { $installerArguments += '-DoNotTrustCertificate' }
 Invoke-RemotePowerShellProcess `
     -Uri 'https://raw.githubusercontent.com/Eris92/SIRK-Portal/develop/install-v3.ps1' `
     -ArgumentList $installerArguments
+
+if ($CentralUrl) {
+    Invoke-CentralEnrollment `
+        -Url $CentralUrl `
+        -PortalId $CentralPortalId `
+        -DisplayName $CentralPortalName `
+        -PortalPublicUrl $PublicUrl `
+        -Wait:$WaitForCentralApproval
+}
