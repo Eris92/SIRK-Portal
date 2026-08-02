@@ -3,7 +3,9 @@
 param(
     [string]$PortalName,
     [switch]$RemoveData,
-    [switch]$Force
+    [switch]$Force,
+    [switch]$TrustCertificate,
+    [switch]$DoNotTrustCertificate
 )
 
 $ErrorActionPreference = 'Stop'
@@ -29,7 +31,8 @@ function Invoke-RemotePowerShellScript {
 
 Write-Host "`n============================================================" -ForegroundColor Cyan
 Write-Host ' SIRK PORTAL MANAGED INSTALLATION' -ForegroundColor Cyan
-Write-Host ' WinGet + Node.js LTS + .NET LTS + WinSW' -ForegroundColor Cyan
+Write-Host ' WinGet + Node.js LTS + npm latest + .NET LTS + WinSW' -ForegroundColor Cyan
+Write-Host ' Shared SIRK Installer Framework v3' -ForegroundColor Cyan
 Write-Host "============================================================" -ForegroundColor Cyan
 
 Invoke-RemotePowerShellScript `
@@ -37,9 +40,11 @@ Invoke-RemotePowerShellScript `
     -Parameters @{ UpgradeExisting = $true }
 
 Invoke-RemotePowerShellScript `
-    -Uri 'https://raw.githubusercontent.com/Eris92/SIRK-Portal/develop/install-v2.ps1' `
+    -Uri 'https://raw.githubusercontent.com/Eris92/SIRK-Portal/develop/install-v3.ps1' `
     -Parameters @{
         PortalName = $PortalName
         RemoveData = $RemoveData
         Force = $Force
+        TrustCertificate = $TrustCertificate
+        DoNotTrustCertificate = $DoNotTrustCertificate
     }
