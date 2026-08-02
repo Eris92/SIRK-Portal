@@ -3,10 +3,13 @@ using System.Reflection;
 using Microsoft.AspNetCore.HttpOverrides;
 using Sirk.Portal.Central;
 
-var builder = WebApplication.CreateBuilder(args);
+var builder = WebApplication.CreateBuilder(new WebApplicationOptions
+{
+    Args = args,
+    WebRootPath = "public"
+});
 
 builder.Host.UseWindowsService(options => options.ServiceName = "SIRK Portal");
-builder.WebHost.UseWebRoot("public");
 builder.WebHost.ConfigureKestrel(options => options.AddServerHeader = false);
 
 builder.Services.AddProblemDetails();
