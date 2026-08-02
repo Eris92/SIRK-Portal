@@ -5,34 +5,45 @@ param(
     [Parameter(Mandatory)][string]$InstallPath,
     [string]$DataPath = "$env:ProgramData\SIRK\Portal",
     [ValidateRange(1, 65535)][int]$HttpsPort = 443,
-    [int]$InternalPort = 9080
+    [int]$InternalPort = 9080,
+    [string]$PortalDnsName = $env:COMPUTERNAME
 )
 $ErrorActionPreference = 'Stop'
-$serviceId = 'SirkPortalStandalone'
+Set-StrictMode -Version Latest
+$serviceId = 'SirkPortal'
 $wrapper = Join-Path $InstallPath 'server\daemon\sirkportal.exe'
 $xml = Join-Path $InstallPath 'server\daemon\sirkportal.xml'
 $node = Join-Path $InstallPath 'runtime\node.exe'
 $server = Join-Path $InstallPath 'server\standalone-https.js'
-foreach ($required in @($wrapper, $node, $server)) {
+$ensureUpdater = Join-Path $InstallPath 'tools\installer\Ensure-SirkUpdater.ps1'
+foreach ($required in @($wrapper, $node, $server, $ensureUpdater)) {
     if (-not (Test-Path -LiteralPath $required)) { throw "Brak wymaganego pliku: $required" }
 }
+
+$PortalDnsName = String($PortalDnsName).Trim().ToLowerInvariant()
+if ($PortalDnsName -notmatch '^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)(?:\.(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?))*$') {
+    throw 'PortalDnsName must be a valid hostname or FQDN without protocol, port or path.'
+}
+
 New-Item -ItemType Directory -Path $DataPath -Force | Out-Null
 $tls = Join-Path $DataPath 'TLS'
 New-Item -ItemType Directory -Path $tls -Force | Out-Null
 $tokenFile = Join-Path $DataPath 'agent-enrollment-token.txt'
 if (-not (Test-Path -LiteralPath $tokenFile)) {
     $bytes = New-Object byte[] 32
-    [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($bytes)
+    $rng = [Security.Cryptography.RandomNumberGenerator]::Create()
+    try { $rng.GetBytes($bytes) } finally { $rng.Dispose() }
     [Convert]::ToBase64String($bytes) | Set-Content -LiteralPath $tokenFile -Encoding ASCII
 }
 $pfx = Join-Path $tls 'portal.pfx'
 $passwordFile = Join-Path $tls 'portal-pfx-password.txt'
 if (-not (Test-Path -LiteralPath $pfx)) {
     $passwordBytes = New-Object byte[] 24
-    [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($passwordBytes)
+    $rng = [Security.Cryptography.RandomNumberGenerator]::Create()
+    try { $rng.GetBytes($passwordBytes) } finally { $rng.Dispose() }
     $password = [Convert]::ToBase64String($passwordBytes)
     $secure = ConvertTo-SecureString $password -AsPlainText -Force
-    $dns = @($env:COMPUTERNAME, 'localhost') | Select-Object -Unique
+    $dns = @($PortalDnsName, $env:COMPUTERNAME, "$($env:COMPUTERNAME).local", 'localhost') | Select-Object -Unique
     $cert = New-SelfSignedCertificate -DnsName $dns -CertStoreLocation 'Cert:\LocalMachine\My' `
         -FriendlyName 'SIRK Portal TLS' -NotAfter (Get-Date).AddYears(3) `
         -KeyAlgorithm RSA -KeyLength 3072 -HashAlgorithm SHA256
@@ -43,6 +54,7 @@ if (-not (Test-Path -LiteralPath $pfx)) {
 if ($LASTEXITCODE -ne 0) { throw 'Nie ustawiono bezpiecznych ACL katalogu danych Portalu.' }
 $escapedInstall = [Security.SecurityElement]::Escape($InstallPath)
 $escapedData = [Security.SecurityElement]::Escape($DataPath)
+$escapedDnsName = [Security.SecurityElement]::Escape($PortalDnsName)
 @"
 <service>
   <id>$serviceId</id>
@@ -60,30 +72,46 @@ $escapedData = [Security.SecurityElement]::Escape($DataPath)
   <env name="SIRK_DATA_ROOT" value="$escapedData"/>
   <env name="SIRK_INTERNAL_PORT" value="$InternalPort"/>
   <env name="SIRK_HTTPS_PORT" value="$HttpsPort"/>
+  <env name="SIRK_PORTAL_FQDN" value="$escapedDnsName"/>
+  <env name="SIRK_PUBLIC_URL" value="https://$escapedDnsName"/>
   <env name="SIRK_TLS_PFX" value="$escapedData\TLS\portal.pfx"/>
   <env name="SIRK_TLS_PFX_PASSWORD_FILE" value="$escapedData\TLS\portal-pfx-password.txt"/>
   <env name="SIRK_ENROLLMENT_TOKEN_FILE" value="$escapedData\agent-enrollment-token.txt"/>
 </service>
 "@ | Set-Content -LiteralPath $xml -Encoding UTF8
-$existing = Get-Service -Name $serviceId -ErrorAction SilentlyContinue
-if ($existing) {
-    if ($existing.Status -ne 'Stopped') { & $wrapper stop | Out-Null }
-    & $wrapper uninstall | Out-Null
-}
-$legacy = Get-Service -Name 'sirkportal.exe' -ErrorAction SilentlyContinue
-if ($legacy) {
-    if ($legacy.Status -ne 'Stopped') {
-        Stop-Service -Name 'sirkportal.exe' -Force
-        $legacy.WaitForStatus('Stopped', [TimeSpan]::FromSeconds(30))
+
+$serviceNames = @($serviceId, 'SirkPortalStandalone', 'sirkportal.exe') | Select-Object -Unique
+foreach ($name in $serviceNames) {
+    $existing = Get-Service -Name $name -ErrorAction SilentlyContinue
+    if (-not $existing) { continue }
+    if ($existing.Status -ne 'Stopped') {
+        try {
+            if ($name -eq $serviceId) { & $wrapper stop | Out-Null }
+            else { Stop-Service -Name $name -Force }
+            $existing.WaitForStatus('Stopped', [TimeSpan]::FromSeconds(30))
+        } catch {
+            Stop-Service -Name $name -Force -ErrorAction SilentlyContinue
+        }
     }
-    & sc.exe delete 'sirkportal.exe' | Out-Null
+    if ($name -eq $serviceId) { & $wrapper uninstall | Out-Null }
+    else { & sc.exe delete $name | Out-Null }
 }
+Start-Sleep -Seconds 2
+
 & $wrapper install | Out-Null
 & $wrapper start | Out-Null
 (Get-Service -Name $serviceId).WaitForStatus('Running', [TimeSpan]::FromSeconds(30))
+
 $firewallRule = 'SIRK Portal HTTPS'
 & netsh.exe advfirewall firewall delete rule name="$firewallRule" dir=in | Out-Null
 & netsh.exe advfirewall firewall add rule name="$firewallRule" dir=in action=allow `
     protocol=TCP localport=$HttpsPort program="$node" profile=domain,private | Out-Null
 if ($LASTEXITCODE -ne 0) { throw 'Nie skonfigurowano reguły Zapory Windows dla HTTPS Portalu.' }
-Write-Host "SIRK Portal działa pod adresem https://$($env:COMPUTERNAME):$HttpsPort/" -ForegroundColor Green
+
+& $ensureUpdater `
+    -PortalServiceName $serviceId `
+    -InstallPath $InstallPath `
+    -DataPath $DataPath `
+    -Channel dev
+
+Write-Host "SIRK Portal działa pod adresem https://$PortalDnsName`:$HttpsPort/login" -ForegroundColor Green
