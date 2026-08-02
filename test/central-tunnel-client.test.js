@@ -1,12 +1,28 @@
 "use strict";
 
 var assert = require("assert");
+var fs = require("fs");
 var http = require("http");
+var os = require("os");
+var path = require("path");
 var WebSocket = require("ws");
 var WebSocketServer = WebSocket.WebSocketServer;
 var clientFactory = require("../server/core/central-tunnel-client.js");
 
 async function run() {
+    var updaterRoot = fs.mkdtempSync(path.join(os.tmpdir(), "sirk-updater-telemetry-"));
+    fs.mkdirSync(path.join(updaterRoot, "applications"), { recursive: true });
+    fs.mkdirSync(path.join(updaterRoot, "operations", "sirk-portal", "operation-one"), { recursive: true });
+    fs.writeFileSync(path.join(updaterRoot, "applications", "sirk-portal.json"), JSON.stringify({
+        applicationId: "sirk-portal",
+        channel: "dev"
+    }));
+    fs.writeFileSync(path.join(updaterRoot, "operations", "sirk-portal", "operation-one", "state.json"), JSON.stringify({
+        phase: "Completed",
+        targetVersion: "2.0.0-dev.30",
+        updatedAtUtc: "2026-08-02T07:00:00.000Z"
+    }));
+
     var local = http.createServer(function (req, res) {
         res.setHeader("Content-Type", "application/json");
         res.end(JSON.stringify({ ok: true, path: req.url }));
@@ -22,10 +38,18 @@ async function run() {
         portalName: "Portal Test",
         portalToken: "12345678901234567890123456789012",
         localPort: local.address().port,
-        portalVersion: "test"
+        portalVersion: "test",
+        updaterRoot: updaterRoot
     });
     try {
         assert.strictEqual(tunnel.configured(), true);
+        var updater = tunnel.updaterSummary();
+        assert.strictEqual(updater.installed, true);
+        assert.strictEqual(updater.running, true);
+        assert.strictEqual(updater.channel, "dev");
+        assert.strictEqual(updater.targetVersion, "2.0.0-dev.30");
+        assert.strictEqual(updater.phase, "Completed");
+
         var connected = new Promise(function (resolve) {
             wss.once("connection", function (socket, request) {
                 assert.strictEqual(
@@ -38,6 +62,14 @@ async function run() {
         });
         tunnel.connect();
         var socket = await connected;
+        var heartbeat = tunnel.heartbeatBody();
+        assert.strictEqual(heartbeat.health, "ok");
+        assert.strictEqual(heartbeat.updateChannel, "dev");
+        assert.strictEqual(heartbeat.availableVersion, "2.0.0-dev.30");
+        assert.ok(heartbeat.capabilities.includes("shared-updater"));
+        assert.ok(heartbeat.capabilities.includes("shared-updater-running"));
+        assert.ok(heartbeat.capabilities.includes("shared-updater-phase:completed"));
+
         var response = new Promise(function (resolve) {
             socket.once("message", function (raw) { resolve(JSON.parse(String(raw))); });
         });
@@ -60,6 +92,7 @@ async function run() {
         await new Promise(function (resolve) { wss.close(resolve); });
         await new Promise(function (resolve) { central.close(resolve); });
         await new Promise(function (resolve) { local.close(resolve); });
+        fs.rmSync(updaterRoot, { recursive: true, force: true });
     }
 }
 
