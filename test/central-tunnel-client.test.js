@@ -1,6 +1,7 @@
 "use strict";
 
 var assert = require("assert");
+var childProcess = require("child_process");
 var fs = require("fs");
 var http = require("http");
 var os = require("os");
@@ -36,6 +37,23 @@ async function run() {
         targetVersion: "2.0.0-dev.30",
         updatedAtUtc: "2026-08-02T07:00:00.000Z"
     }));
+
+    var originalSpawnSync = childProcess.spawnSync;
+    if (process.platform === "win32") {
+        childProcess.spawnSync = function (command, args, options) {
+            if (String(command).toLowerCase() === "sc.exe" &&
+                Array.isArray(args) &&
+                String(args[0]).toLowerCase() === "query" &&
+                String(args[1]).toLowerCase() === "sirkupdater") {
+                return {
+                    status: 0,
+                    stdout: "STATE              : 4  RUNNING\r\n",
+                    stderr: ""
+                };
+            }
+            return originalSpawnSync.call(childProcess, command, args, options);
+        };
+    }
 
     var local = http.createServer(function (req, res) {
         res.setHeader("Content-Type", "application/json");
@@ -102,6 +120,7 @@ async function run() {
         });
         console.log("central-tunnel-client test passed");
     } finally {
+        childProcess.spawnSync = originalSpawnSync;
         tunnel.stop();
         await new Promise(function (resolve) { wss.close(resolve); });
         await new Promise(function (resolve) { central.close(resolve); });
