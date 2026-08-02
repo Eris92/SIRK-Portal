@@ -19,6 +19,7 @@ param(
     [string]$BootstrapFile,
 
     [string]$PortalServiceDisplayName = 'SIRK Portal',
+    [string]$DataRoot = "$env:ProgramData\SIRK\Portal",
     [string]$PublicUrl,
     [switch]$SkipRemoteValidation
 )
@@ -40,6 +41,8 @@ function Normalize-CentralConfiguration {
     if (-not $nameText) { $nameText = [string]$InputValues.portalName }
     $publicUrlText = [string]$InputValues.PublicUrl
     if (-not $publicUrlText) { $publicUrlText = [string]$InputValues.publicUrl }
+    $tunnelText = [string]$InputValues.TunnelUrl
+    if (-not $tunnelText) { $tunnelText = [string]$InputValues.tunnelUrl }
 
     $urlText = $urlText.Trim().TrimEnd('/')
     $idText = $idText.Trim().ToLowerInvariant()
@@ -50,11 +53,15 @@ function Normalize-CentralConfiguration {
     if ($urlText -notmatch '^https://[^/]+(?::\d+)?$') {
         throw 'CentralUrl must be an HTTPS origin without a path.'
     }
+    if (-not $tunnelText) { $tunnelText = ($urlText -replace '^https://', 'wss://') + '/tunnel' }
+    if ($tunnelText -ne (($urlText -replace '^https://', 'wss://') + '/tunnel')) {
+        throw 'TunnelUrl must use the Central origin and /tunnel path.'
+    }
     if ($idText -notmatch '^[a-z0-9][a-z0-9-]{2,62}$') {
         throw 'PortalId must contain 3-63 lowercase letters, digits or hyphens.'
     }
-    if ($tokenText.Length -lt 32) {
-        throw 'PortalToken must contain at least 32 characters.'
+    if ($tokenText -notmatch '^[A-Za-z0-9_-]{32,512}$') {
+        throw 'PortalToken has an invalid format.'
     }
     if (-not $nameText) { $nameText = $idText }
     if ($nameText.Length -gt 100) { throw 'PortalName cannot exceed 100 characters.' }
@@ -63,11 +70,14 @@ function Normalize-CentralConfiguration {
     }
 
     return [ordered]@{
-        CentralUrl = $urlText
-        PortalId = $idText
-        PortalToken = $tokenText
-        PortalName = $nameText
-        PublicUrl = $publicUrlText
+        schemaVersion = 1
+        centralUrl = $urlText
+        tunnelUrl = $tunnelText
+        portalId = $idText
+        portalName = $nameText
+        portalToken = $tokenText
+        publicUrl = $publicUrlText
+        updatedAtUtc = [DateTime]::UtcNow.ToString('o')
     }
 }
 
@@ -98,45 +108,23 @@ $portal = Get-CimInstance Win32_Service |
     Select-Object -First 1
 if (-not $portal) { throw "Portal service was not found: $PortalServiceDisplayName" }
 
-$serviceKey = "HKLM:\SYSTEM\CurrentControlSet\Services\$($portal.Name)"
-if (-not (Test-Path -LiteralPath $serviceKey)) { throw "Service registry key was not found: $serviceKey" }
+New-Item -ItemType Directory -Path $DataRoot -Force | Out-Null
+$configPath = Join-Path $DataRoot 'central-connection.json'
+$tempPath = "$configPath.tmp-$PID-$([guid]::NewGuid().ToString('N'))"
+try {
+    $configuration | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $tempPath -Encoding UTF8
+    Move-Item -LiteralPath $tempPath -Destination $configPath -Force
+}
+finally {
+    Remove-Item -LiteralPath $tempPath -Force -ErrorAction SilentlyContinue
+}
 
-$existing = @((Get-ItemProperty -LiteralPath $serviceKey -Name Environment -ErrorAction SilentlyContinue).Environment)
-$managedNames = @(
-    'SIRK_CENTRAL_URL',
-    'SIRK_CENTRAL_API_URL',
-    'SIRK_CENTRAL_PORTAL_ID',
-    'SIRK_CENTRAL_PORTAL_NAME',
-    'SIRK_CENTRAL_TOKEN',
-    'SIRK_PUBLIC_URL'
-)
-$environment = @($existing | Where-Object {
-    $line = [string]$_
-    if (-not $line) { return $false }
-    foreach ($name in $managedNames) {
-        if ($line.StartsWith($name + '=', [StringComparison]::OrdinalIgnoreCase)) { return $false }
-    }
-    return $true
-})
+& icacls.exe $configPath /inheritance:r /grant:r '*S-1-5-18:F' '*S-1-5-32-544:F' | Out-Null
+if ($LASTEXITCODE -ne 0) { throw 'Unable to secure central-connection.json ACL.' }
 
-$webSocketUrl = $configuration.CentralUrl -replace '^https://', 'wss://'
-$tunnelUrl = "$webSocketUrl/tunnel"
-$environment += @(
-    "SIRK_CENTRAL_URL=$tunnelUrl",
-    "SIRK_CENTRAL_API_URL=$($configuration.CentralUrl)",
-    "SIRK_CENTRAL_PORTAL_ID=$($configuration.PortalId)",
-    "SIRK_CENTRAL_PORTAL_NAME=$($configuration.PortalName)",
-    "SIRK_CENTRAL_TOKEN=$($configuration.PortalToken)"
-)
-if ($configuration.PublicUrl) { $environment += "SIRK_PUBLIC_URL=$($configuration.PublicUrl)" }
-
-New-ItemProperty -LiteralPath $serviceKey -Name Environment -PropertyType MultiString -Value $environment -Force | Out-Null
-
-$persisted = @((Get-ItemProperty -LiteralPath $serviceKey -Name Environment -ErrorAction Stop).Environment)
-foreach ($requiredName in @('SIRK_CENTRAL_URL', 'SIRK_CENTRAL_API_URL', 'SIRK_CENTRAL_PORTAL_ID', 'SIRK_CENTRAL_TOKEN')) {
-    if (-not ($persisted | Where-Object { ([string]$_).StartsWith($requiredName + '=', [StringComparison]::OrdinalIgnoreCase) })) {
-        throw "Portal service environment was not persisted: $requiredName"
-    }
+$persisted = Get-Content -LiteralPath $configPath -Raw | ConvertFrom-Json
+if ($persisted.portalId -ne $configuration.portalId -or $persisted.tunnelUrl -ne $configuration.tunnelUrl) {
+    throw 'Persisted Central configuration validation failed.'
 }
 
 Restart-Service -Name $portal.Name -Force
@@ -144,16 +132,17 @@ Restart-Service -Name $portal.Name -Force
 Start-Sleep -Seconds 5
 
 if (-not $SkipRemoteValidation) {
-    $credential = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes("$($configuration.PortalId):$($configuration.PortalToken)"))
+    $credential = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes("$($configuration.portalId):$($configuration.portalToken)"))
         .TrimEnd('=').Replace('+','-').Replace('/','_')
     $headers = @{ Authorization = "SIRK-Portal $credential" }
-    $response = Invoke-RestMethod -Method Get -Uri "$($configuration.CentralUrl)/api/portal/v1/config" -Headers $headers -TimeoutSec 20
-    if (-not $response.ok -or $response.portalId -ne $configuration.PortalId) {
+    $response = Invoke-RestMethod -Method Get -Uri "$($configuration.centralUrl)/api/portal/v1/config" -Headers $headers -TimeoutSec 20
+    if (-not $response.ok -or $response.portalId -ne $configuration.portalId) {
         throw 'Central configuration validation returned an unexpected response.'
     }
 }
 
 Write-Host 'SIRK_CENTRAL_PORTAL_CONFIGURATION_OK' -ForegroundColor Green
-Write-Host "Portal ID: $($configuration.PortalId)"
-Write-Host "Central: $($configuration.CentralUrl)"
-Write-Host "Tunnel: $tunnelUrl"
+Write-Host "Portal ID: $($configuration.portalId)"
+Write-Host "Central: $($configuration.centralUrl)"
+Write-Host "Tunnel: $($configuration.tunnelUrl)"
+Write-Host "Configuration: $configPath"
