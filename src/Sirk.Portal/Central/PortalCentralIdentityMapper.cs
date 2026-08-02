@@ -7,7 +7,7 @@ namespace Sirk.Portal.Central;
 
 internal sealed class PortalCentralIdentityMapper
 {
-    private readonly object _sync = new();
+    private static readonly object Sync = new();
     private readonly PortalIdentityStore _identities;
 
     public PortalCentralIdentityMapper(PortalIdentityStore identities)
@@ -27,7 +27,7 @@ internal sealed class PortalCentralIdentityMapper
             SHA256.HashData(Encoding.UTF8.GetBytes(normalizedActorId)))[..30]
             .ToLowerInvariant();
 
-        lock (_sync)
+        lock (Sync)
         {
             var snapshot = JsonSerializer.SerializeToElement(_identities.Snapshot());
             var existing = snapshot.GetProperty("users")
