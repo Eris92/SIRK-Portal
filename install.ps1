@@ -1,5 +1,7 @@
 [CmdletBinding()]
-param()
+param(
+    [string]$PortalName
+)
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
@@ -96,11 +98,16 @@ function Register-PortalWithUpdater {
 if (-not (Test-Administrator)) { throw 'Run PowerShell as Administrator.' }
 
 $defaultName = $env:COMPUTERNAME.ToLowerInvariant()
-$portalName = (Read-Host "Portal DNS name [$defaultName]").Trim().ToLowerInvariant()
-if (-not $portalName) { $portalName = $defaultName }
-if ($portalName.Length -gt 253 -or $portalName -notmatch '^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)(?:\.(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?))*$') {
+if (-not $PortalName) {
+    $PortalName = (Read-Host "Portal DNS name [$defaultName]").Trim().ToLowerInvariant()
+    if (-not $PortalName) { $PortalName = $defaultName }
+} else {
+    $PortalName = $PortalName.Trim().ToLowerInvariant()
+}
+if ($PortalName.Length -gt 253 -or $PortalName -notmatch '^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)(?:\.(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?))*$') {
     throw 'Invalid DNS name. Enter only a hostname or FQDN without protocol, port or path.'
 }
+$portalName = $PortalName
 
 $core = Join-Path $env:TEMP ('sirk-portal-core-' + [guid]::NewGuid().ToString('N') + '.ps1')
 try {
