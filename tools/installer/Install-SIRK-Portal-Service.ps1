@@ -71,6 +71,7 @@ $escapedPublicOrigin = [Security.SecurityElement]::Escape($publicOrigin)
   <onfailure action="restart" delay="15 sec"/>
   <stoptimeout>30 sec</stoptimeout>
   <env name="NODE_ENV" value="production"/>
+  <env name="SIRK_SERVICE_NAME" value="$serviceId"/>
   <env name="SIRK_DATA_ROOT" value="$escapedData"/>
   <env name="SIRK_INTERNAL_PORT" value="$InternalPort"/>
   <env name="SIRK_HTTPS_PORT" value="$HttpsPort"/>
