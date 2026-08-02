@@ -142,16 +142,21 @@ def main() -> int:
     server_thread.start()
 
     with tempfile.TemporaryDirectory(prefix="sirk-portal-central-") as temporary_directory:
-        connection_file = write_protected_connection_file(Path(temporary_directory))
+        test_root = Path(temporary_directory)
+        connection_file = write_protected_connection_file(test_root)
+        data_root = test_root / "portal-data"
+        data_root.mkdir(mode=0o700)
         environment = os.environ.copy()
         environment.update(
             {
                 "ASPNETCORE_ENVIRONMENT": "Development",
                 "ASPNETCORE_URLS": PORTAL_URL,
+                "Sirk__DataRoot": str(data_root),
                 "Sirk__Central__ConnectionFile": str(connection_file),
                 "Sirk__Central__UpdateChannel": "dev",
                 "Sirk__Central__HeartbeatIntervalSeconds": "30",
                 "Sirk__Central__RequestTimeoutSeconds": "5",
+                "Sirk__CentralTunnel__Enabled": "false",
             }
         )
 
