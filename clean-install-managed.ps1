@@ -38,9 +38,21 @@ function Invoke-RemotePowerShellProcess {
     $path = Join-Path $env:TEMP ('sirk-installer-' + [guid]::NewGuid().ToString('N') + '.ps1')
     try {
         Invoke-WebRequest -UseBasicParsing -Uri ($Uri + '?nocache=' + [guid]::NewGuid()) -OutFile $path
+
+        # Force cache-busting for every nested raw GitHub installer fetched by install-v3.
+        $content = Get-Content -LiteralPath $path -Raw
+        $updaterNonce = [guid]::NewGuid().ToString('N')
+        $content = $content.Replace(
+            'https://raw.githubusercontent.com/Eris92/SIRK-Updater/main/install-release.ps1',
+            "https://raw.githubusercontent.com/Eris92/SIRK-Updater/main/install-release.ps1?nocache=$updaterNonce"
+        )
+        Set-Content -LiteralPath $path -Value $content -Encoding UTF8
+
+        Write-Host '[BOOTSTRAP] Starting SIRK Portal installer v3 with cache-busted nested installers.' -ForegroundColor DarkCyan
         & powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File $path @ArgumentList
-        if ($LASTEXITCODE -ne 0) {
-            throw "SIRK Portal installer failed. ExitCode=$LASTEXITCODE"
+        $exitCode = $LASTEXITCODE
+        if ($exitCode -ne 0) {
+            throw "SIRK Portal installer failed. ExitCode=$exitCode"
         }
     }
     finally {
