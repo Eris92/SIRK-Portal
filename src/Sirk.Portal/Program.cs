@@ -15,6 +15,7 @@ builder.WebHost.ConfigureKestrel(options => options.AddServerHeader = false);
 builder.Services.AddProblemDetails();
 builder.Services.AddSingleton<PortalRuntimeState>();
 builder.Services.AddSingleton<CentralConnectionState>();
+builder.Services.AddSingleton<CentralConnectionResolver>();
 builder.Services.Configure<CentralConnectionOptions>(
     builder.Configuration.GetSection(CentralConnectionOptions.SectionName));
 builder.Services.AddHttpClient("SirkCentral")
