@@ -1,6 +1,7 @@
 "use strict";
 
 var fs = require("fs");
+var http = require("http");
 var https = require("https");
 var path = require("path");
 var enrollmentFactory = require("./central-enrollment-client.js");
@@ -14,8 +15,9 @@ function jsonRequest(method, target, headers, body, options) {
         return Promise.reject(new Error("HTTPS is required."));
     }
     var raw = body == null ? "" : JSON.stringify(body);
+    var transport = url.protocol === "https:" ? https : http;
     return new Promise(function (resolve, reject) {
-        var request = https.request(url, {
+        var request = transport.request(url, {
             method: method,
             timeout: Number(options.timeoutMilliseconds || 20000),
             rejectUnauthorized: options.rejectUnauthorized !== false,
