@@ -45,6 +45,8 @@ jobs:
           & robocopy.exe $env:GITHUB_WORKSPACE $stage /E /XD .git .agents .github .release node_modules artifacts docs test assets /XF AGENTS.md README.md changelog.md
           if ($LASTEXITCODE -gt 7) { throw "Portal staging failed with robocopy code $LASTEXITCODE" }
           $global:LASTEXITCODE = 0
+          npm ci --omit=dev --prefix $stage
+          if ($LASTEXITCODE -ne 0) { throw "Production dependency installation failed." }
           New-Item -ItemType Directory -Path (Join-Path $stage "runtime") -Force | Out-Null
           New-Item -ItemType Directory -Path (Join-Path $stage "server\daemon") -Force | Out-Null
           Copy-Item -LiteralPath (Get-Command node.exe).Source -Destination (Join-Path $stage "runtime\node.exe")
@@ -58,7 +60,7 @@ jobs:
           $env:SIRK_PORTAL_STAGE = $stage
           "SIRK_PORTAL_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append
           "SIRK_PORTAL_STAGE=$stage" | Out-File -FilePath $env:GITHUB_ENV -Append
-      - name: Build Windows EXE installer
+      - name: Build Windows EXE installer and transactional package
         shell: pwsh
         run: |
           $output = Join-Path $env:GITHUB_WORKSPACE "artifacts"
@@ -71,9 +73,29 @@ jobs:
           if (-not (Test-Path -LiteralPath $iscc)) { throw "Inno Setup compiler is unavailable." }
           & $iscc "/O$output" (Join-Path $env:GITHUB_WORKSPACE "tools\installer\SIRK-Portal.iss")
           if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed." }
-          Get-FileHash (Join-Path $output "*.exe") -Algorithm SHA256 |
-            ForEach-Object { "$($_.Hash)  $([IO.Path]::GetFileName($_.Path))" } |
-            Set-Content (Join-Path $output "SHA256SUMS.txt") -Encoding ASCII
+
+          $zipName = "SIRK-Portal-$env:SIRK_PORTAL_VERSION-win-x64.zip"
+          $zipPath = Join-Path $output $zipName
+          Compress-Archive -Path (Join-Path $env:SIRK_PORTAL_STAGE '*') -DestinationPath $zipPath -CompressionLevel Optimal -Force
+          $zipHash = (Get-FileHash -LiteralPath $zipPath -Algorithm SHA256).Hash.ToUpperInvariant()
+          $tag = "v$env:SIRK_PORTAL_VERSION"
+          $downloadUrl = "https://github.com/Eris92/SIRK-Portal/releases/download/$tag/$zipName"
+          $metadata = [ordered]@{
+            schemaVersion = 1
+            applicationId = 'sirk-portal'
+            version = $env:SIRK_PORTAL_VERSION
+            channel = if ($env:SIRK_PORTAL_VERSION -match '(?i)(dev|alpha|beta|rc)') { 'dev' } else { 'stable' }
+            packageUrl = $downloadUrl
+            sha256 = $zipHash
+            architecture = 'win-x64'
+            minimumUpdaterVersion = '1.0.0'
+            publishedAtUtc = [DateTime]::UtcNow.ToString('o')
+            commit = $env:GITHUB_SHA
+          }
+          $metadata | ConvertTo-Json -Depth 8 | Set-Content (Join-Path $output "SIRK-Portal-$env:SIRK_PORTAL_VERSION-release.json") -Encoding UTF8
+          Get-ChildItem $output -File | Where-Object Name -ne 'SHA256SUMS.txt' | ForEach-Object {
+            "$(Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256 | Select-Object -ExpandProperty Hash)  $($_.Name)"
+          } | Set-Content (Join-Path $output "SHA256SUMS.txt") -Encoding ASCII
       - uses: actions/upload-artifact@v4
         with:
           name: SIRK-Portal-${{ env.SIRK_PORTAL_VERSION }}-Windows-x64
