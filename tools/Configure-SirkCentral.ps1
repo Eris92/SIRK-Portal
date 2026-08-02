@@ -76,6 +76,9 @@ if ($PSCmdlet.ParameterSetName -eq 'Bootstrap') {
         throw "Bootstrap file was not found: $BootstrapFile"
     }
     $raw = Get-Content -LiteralPath $BootstrapFile -Raw | ConvertFrom-Json
+    if ($raw.PSObject.Properties.Name -contains 'bootstrap' -and $raw.bootstrap) {
+        $raw = $raw.bootstrap
+    }
     $values = @{}
     foreach ($property in $raw.PSObject.Properties) { $values[$property.Name] = $property.Value }
     $configuration = Normalize-CentralConfiguration -InputValues $values
@@ -109,12 +112,17 @@ $managedNames = @(
 )
 $environment = @($existing | Where-Object {
     $line = [string]$_
-    $line -and -not ($managedNames | Where-Object { $line.StartsWith($_ + '=', [StringComparison]::OrdinalIgnoreCase) })
+    if (-not $line) { return $false }
+    foreach ($name in $managedNames) {
+        if ($line.StartsWith($name + '=', [StringComparison]::OrdinalIgnoreCase)) { return $false }
+    }
+    return $true
 })
 
 $webSocketUrl = $configuration.CentralUrl -replace '^https://', 'wss://'
+$tunnelUrl = "$webSocketUrl/tunnel"
 $environment += @(
-    "SIRK_CENTRAL_URL=$webSocketUrl/api/portal/v1/tunnel",
+    "SIRK_CENTRAL_URL=$tunnelUrl",
     "SIRK_CENTRAL_API_URL=$($configuration.CentralUrl)",
     "SIRK_CENTRAL_PORTAL_ID=$($configuration.PortalId)",
     "SIRK_CENTRAL_PORTAL_NAME=$($configuration.PortalName)",
@@ -124,10 +132,12 @@ if ($configuration.PublicUrl) { $environment += "SIRK_PUBLIC_URL=$($configuratio
 
 New-ItemProperty -LiteralPath $serviceKey -Name Environment -PropertyType MultiString -Value $environment -Force | Out-Null
 
-# The Services branch is protected by Windows by default. Explicitly retain only
-# SYSTEM and Administrators on the concrete service key because it now contains
-# the Portal credential used for HMAC authentication to Central.
-& icacls.exe ("$env:SystemRoot\System32\config\SYSTEM") /verify *> $null
+$persisted = @((Get-ItemProperty -LiteralPath $serviceKey -Name Environment -ErrorAction Stop).Environment)
+foreach ($requiredName in @('SIRK_CENTRAL_URL', 'SIRK_CENTRAL_API_URL', 'SIRK_CENTRAL_PORTAL_ID', 'SIRK_CENTRAL_TOKEN')) {
+    if (-not ($persisted | Where-Object { ([string]$_).StartsWith($requiredName + '=', [StringComparison]::OrdinalIgnoreCase) })) {
+        throw "Portal service environment was not persisted: $requiredName"
+    }
+}
 
 Restart-Service -Name $portal.Name -Force
 (Get-Service -Name $portal.Name).WaitForStatus('Running', [TimeSpan]::FromSeconds(60))
@@ -146,4 +156,4 @@ if (-not $SkipRemoteValidation) {
 Write-Host 'SIRK_CENTRAL_PORTAL_CONFIGURATION_OK' -ForegroundColor Green
 Write-Host "Portal ID: $($configuration.PortalId)"
 Write-Host "Central: $($configuration.CentralUrl)"
-Write-Host "Tunnel: $webSocketUrl/api/portal/v1/tunnel"
+Write-Host "Tunnel: $tunnelUrl"
