@@ -36,7 +36,6 @@ internal sealed class CentralConnectionResolver
         UnixFileMode.OtherExecute;
 
     private readonly CentralConnectionOptions _configuredOptions;
-    private readonly IHostEnvironment _environment;
     private readonly ILogger<CentralConnectionResolver> _logger;
 
     public CentralConnectionResolver(
@@ -44,8 +43,8 @@ internal sealed class CentralConnectionResolver
         IHostEnvironment environment,
         ILogger<CentralConnectionResolver> logger)
     {
+        ArgumentNullException.ThrowIfNull(environment);
         _configuredOptions = options.Value;
-        _environment = environment;
         _logger = logger;
     }
 
@@ -59,6 +58,9 @@ internal sealed class CentralConnectionResolver
 
         ValidateFileSecurity(path);
         var document = ReadDocument(path);
+        ValidateDocument(document);
+        ValidateTunnelOrigin(document.CentralUrl, document.TunnelUrl);
+
         var resolved = new CentralConnectionOptions
         {
             Enabled = true,
@@ -73,7 +75,6 @@ internal sealed class CentralConnectionResolver
             ConnectionFile = path
         };
 
-        ValidateTunnelOrigin(document.CentralUrl, document.TunnelUrl);
         _logger.LogInformation(
             "Loaded SIRK Central connection for Portal {PortalId} from protected configuration file {ConfigurationPath}.",
             resolved.PortalId,
@@ -82,7 +83,7 @@ internal sealed class CentralConnectionResolver
         return new ResolvedCentralConnection(resolved, "protected-file", path);
     }
 
-    private CentralConnectionFileDocument ReadDocument(string path)
+    private static CentralConnectionFileDocument ReadDocument(string path)
     {
         var file = new FileInfo(path);
         if (file.Length is <= 0 or > MaximumFileBytes)
@@ -123,7 +124,53 @@ internal sealed class CentralConnectionResolver
         }
     }
 
-    private void ValidateFileSecurity(string path)
+    private static void ValidateDocument(CentralConnectionFileDocument document)
+    {
+        if (string.IsNullOrWhiteSpace(document.CentralUrl) ||
+            string.IsNullOrWhiteSpace(document.TunnelUrl))
+        {
+            throw new InvalidDataException(
+                "Central connection file must contain Central and tunnel URLs.");
+        }
+
+        if (!IsValidPortalId(document.PortalId))
+        {
+            throw new InvalidDataException(
+                "Central connection file contains an invalid Portal ID.");
+        }
+
+        if (string.IsNullOrWhiteSpace(document.PortalName) ||
+            document.PortalName.Length is < 2 or > 100 ||
+            !string.Equals(document.PortalName, document.PortalName.Trim(), StringComparison.Ordinal))
+        {
+            throw new InvalidDataException(
+                "Central connection file contains an invalid Portal name.");
+        }
+
+        if (!IsValidBase64UrlSecret(document.PortalToken, 32, 512))
+        {
+            throw new InvalidDataException(
+                "Central connection file contains an invalid Portal token.");
+        }
+
+        if (document.PublicUrl is null)
+        {
+            throw new InvalidDataException(
+                "Central connection file must contain the publicUrl field.");
+        }
+
+        if (document.PublicUrl.Length > 0 &&
+            (!Uri.TryCreate(document.PublicUrl, UriKind.Absolute, out var publicUrl) ||
+             publicUrl is null ||
+             publicUrl.Scheme != Uri.UriSchemeHttps ||
+             !IsOriginOnly(publicUrl)))
+        {
+            throw new InvalidDataException(
+                "Central connection file contains an invalid Portal public URL.");
+        }
+    }
+
+    private static void ValidateFileSecurity(string path)
     {
         var attributes = File.GetAttributes(path);
         if ((attributes & FileAttributes.ReparsePoint) != 0)
@@ -165,9 +212,12 @@ internal sealed class CentralConnectionResolver
 
     private static void ValidateTunnelOrigin(string centralUrl, string tunnelUrl)
     {
-        if (!Uri.TryCreate(centralUrl, UriKind.Absolute, out var central) || central is null)
+        if (!Uri.TryCreate(centralUrl, UriKind.Absolute, out var central) ||
+            central is null ||
+            !IsOriginOnly(central))
         {
-            throw new InvalidDataException("Central connection file contains an invalid Central URL.");
+            throw new InvalidDataException(
+                "Central connection file contains an invalid Central origin URL.");
         }
 
         if (!Uri.TryCreate(tunnelUrl, UriKind.Absolute, out var tunnel) || tunnel is null)
@@ -188,6 +238,57 @@ internal sealed class CentralConnectionResolver
                 "Central tunnel URL must use the Central origin and the /tunnel path.");
         }
     }
+
+    private static bool IsOriginOnly(Uri uri) =>
+        string.IsNullOrEmpty(uri.UserInfo) &&
+        string.IsNullOrEmpty(uri.Query) &&
+        string.IsNullOrEmpty(uri.Fragment) &&
+        (uri.AbsolutePath.Length == 0 || uri.AbsolutePath == "/");
+
+    private static bool IsValidPortalId(string? value)
+    {
+        if (value is null ||
+            value.Length is < 3 or > 63 ||
+            !IsLowercaseLetterOrDigit(value[0]))
+        {
+            return false;
+        }
+
+        foreach (var character in value)
+        {
+            if (!IsLowercaseLetterOrDigit(character) && character != '-')
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static bool IsValidBase64UrlSecret(string? value, int minimum, int maximum)
+    {
+        if (value is null || value.Length < minimum || value.Length > maximum)
+        {
+            return false;
+        }
+
+        foreach (var character in value)
+        {
+            if (character is not (>= 'a' and <= 'z') and
+                not (>= 'A' and <= 'Z') and
+                not (>= '0' and <= '9') and
+                not '-' and
+                not '_')
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static bool IsLowercaseLetterOrDigit(char value) =>
+        value is >= 'a' and <= 'z' or >= '0' and <= '9';
 
     private static CentralConnectionOptions Clone(CentralConnectionOptions source) =>
         new()
