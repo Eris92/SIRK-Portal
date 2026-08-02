@@ -6,6 +6,7 @@ var http = require("http");
 var https = require("https");
 var net = require("net");
 var path = require("path");
+var connectionConfigFactory = require("./core/central-connection-config.js");
 var standalone = require("./standalone.js");
 
 var ROOT = path.resolve(__dirname, "..");
@@ -49,8 +50,23 @@ function proxyRequest(targetPort, req, res, activeRequests) {
     req.pipe(upstream);
 }
 
+function applyCentralConnection(dataRoot) {
+    var store = connectionConfigFactory.create({ dataRoot: dataRoot });
+    var value = store.read();
+    if (!value) return null;
+    process.env.SIRK_CENTRAL_URL = value.tunnelUrl;
+    process.env.SIRK_CENTRAL_API_URL = value.centralUrl;
+    process.env.SIRK_CENTRAL_PORTAL_ID = value.portalId;
+    process.env.SIRK_CENTRAL_PORTAL_NAME = value.portalName;
+    process.env.SIRK_CENTRAL_TOKEN = value.portalToken;
+    if (value.publicUrl) process.env.SIRK_PUBLIC_URL = value.publicUrl;
+    return store.status();
+}
+
 async function start(options) {
     options = options || {};
+    var dataRoot = path.resolve(options.dataRoot || process.env.SIRK_DATA_ROOT || "C:\\ProgramData\\SIRK\\Portal");
+    applyCentralConnection(dataRoot);
     var internalPort = Number(options.internalPort || process.env.SIRK_INTERNAL_PORT || 9080);
     var httpsPort = Number(options.httpsPort || process.env.SIRK_HTTPS_PORT || 443);
     var certificatePath = options.certificatePath || process.env.SIRK_TLS_CERT;
@@ -63,7 +79,8 @@ async function start(options) {
     if (!pfxPath && (!certificatePath || !privateKeyPath)) throw new Error("SIRK_TLS_PFX or certificate/key is required.");
     if (accessHash && !/^[a-f0-9]{64}$/.test(accessHash)) throw new Error("Invalid SIRK_ACCESS_KEY_HASH.");
 
-    var application = await standalone.start({ host: "127.0.0.1", port: internalPort, agentToken: options.agentToken,
+    var application = await standalone.start({ host: "127.0.0.1", port: internalPort, dataRoot: dataRoot,
+        agentToken: options.agentToken,
         agentEnrollmentToken: options.agentEnrollmentToken || (enrollmentTokenFile ? fs.readFileSync(enrollmentTokenFile, "utf8").trim() : undefined) });
     var tlsOptions = pfxPath ? { pfx: fs.readFileSync(pfxPath),
         passphrase: pfxPasswordFile ? fs.readFileSync(pfxPasswordFile, "utf8").trim() : undefined } :
@@ -124,4 +141,4 @@ async function start(options) {
 }
 if (require.main === module) start().then(function (servers) { console.log("SIRK Portal standalone HTTPS listening on", servers.gateway.address()); })
     .catch(function (error) { console.error(error); process.exitCode = 1; });
-module.exports = { start: start, sha256: sha256 };
+module.exports = { start: start, sha256: sha256, applyCentralConnection: applyCentralConnection };
