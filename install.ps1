@@ -33,10 +33,10 @@ function Ensure-SirkUpdater {
         $installer = Join-Path $env:TEMP ('sirk-updater-install-' + [guid]::NewGuid().ToString('N') + '.ps1')
         try {
             Invoke-WebRequest `
-                -Uri ('https://raw.githubusercontent.com/Eris92/SIRK-Updater/main/install.ps1?nocache=' + [guid]::NewGuid()) `
+                -Uri ('https://raw.githubusercontent.com/Eris92/SIRK-Updater/main/install-release.ps1?nocache=' + [guid]::NewGuid()) `
                 -OutFile $installer `
                 -UseBasicParsing
-            & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $installer
+            & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $installer -AllowSourceFallback
             if ($LASTEXITCODE -ne 0) { throw "SIRK Updater installation failed. ExitCode=$LASTEXITCODE" }
         }
         finally {
@@ -61,7 +61,7 @@ function Register-PortalWithUpdater {
     param(
         [Parameter(Mandatory)][string]$UpdaterCli,
         [Parameter(Mandatory)]$PortalService,
-        [Parameter(Mandatory)]$WatchdogService
+        $WatchdogService
     )
 
     Write-Host '=== Register Portal in shared SIRK Updater ==='
@@ -72,11 +72,11 @@ function Register-PortalWithUpdater {
             applicationId       = 'sirk-portal'
             displayName         = 'SIRK Portal'
             serviceName         = $PortalService.Name
-            watchdogServiceName = $WatchdogService.Name
+            watchdogServiceName = if ($WatchdogService) { $WatchdogService.Name } else { $null }
             installRoot         = 'C:\Program Files\SIRK\Portal'
             dataRoot            = 'C:\ProgramData\SIRK\Portal'
             healthUrl           = 'https://127.0.0.1/login'
-            channel             = 'develop'
+            channel             = 'dev'
             updateSource        = 'https://github.com/Eris92/SIRK-Portal'
             packageSha256Url    = $null
             signatureRequired   = $false
@@ -110,12 +110,12 @@ try {
     & $core
 
     $portal = Get-CimInstance Win32_Service | Where-Object {
-        $_.DisplayName -eq 'SIRK Portal' -or $_.Name -in @('SirkPortal','sirkportal.exe')
+        $_.DisplayName -eq 'SIRK Portal' -or $_.Name -in @('SirkPortal','SirkPortalStandalone','sirkportal.exe')
     } | Select-Object -First 1
     $watchdog = Get-CimInstance Win32_Service | Where-Object {
         $_.DisplayName -eq 'SIRK Portal Watchdog' -or $_.Name -in @('SirkPortalWatchdog','sirkportalwatchdog.exe')
     } | Select-Object -First 1
-    if (-not $portal -or -not $watchdog) { throw 'Portal services were not found after the core installation.' }
+    if (-not $portal) { throw 'Portal service was not found after the core installation.' }
 
     $dataRoot = 'C:\ProgramData\SIRK\Portal'
     $tlsRoot = Join-Path $dataRoot 'TLS'
@@ -124,7 +124,7 @@ try {
     $pfxPassword = (Get-Content $pfxPasswordPath -Raw).Trim()
     if (-not $pfxPassword) { throw 'TLS PFX password is missing.' }
 
-    Stop-Service -Name $watchdog.Name -Force -ErrorAction SilentlyContinue
+    if ($watchdog) { Stop-Service -Name $watchdog.Name -Force -ErrorAction SilentlyContinue }
     Stop-Service -Name $portal.Name -Force
 
     $dnsNames = @($portalName, $env:COMPUTERNAME, "$($env:COMPUTERNAME).local", 'localhost') | Select-Object -Unique
@@ -139,9 +139,13 @@ try {
     $portalKey = "HKLM:\SYSTEM\CurrentControlSet\Services\$($portal.Name)"
     $environment = @((Get-ItemProperty -Path $portalKey -Name Environment -ErrorAction SilentlyContinue).Environment)
     $environment = @($environment | Where-Object {
-        $_ -and $_ -notmatch '^SIRK_ACCESS_KEY_HASH=' -and $_ -notmatch '^SIRK_PORTAL_FQDN='
+        $_ -and $_ -notmatch '^SIRK_ACCESS_KEY_HASH=' -and $_ -notmatch '^SIRK_PORTAL_FQDN=' -and $_ -notmatch '^SIRK_PUBLIC_URL='
     })
-    $environment += @("SIRK_ACCESS_KEY_HASH=$accessHash", "SIRK_PORTAL_FQDN=$portalName")
+    $environment += @(
+        "SIRK_ACCESS_KEY_HASH=$accessHash",
+        "SIRK_PORTAL_FQDN=$portalName",
+        "SIRK_PUBLIC_URL=https://$portalName"
+    )
     New-ItemProperty -Path $portalKey -Name Environment -PropertyType MultiString -Value $environment -Force | Out-Null
 
     Start-Service -Name $portal.Name
@@ -149,7 +153,7 @@ try {
     Start-Sleep -Seconds 8
     $status = & curl.exe -k -s -o NUL -w '%{http_code}' --resolve "$portalName`:443`:127.0.0.1" "https://$portalName/login"
     if ($status -ne '200') { throw "Portal readiness failed. HTTP=$status" }
-    Start-Service -Name $watchdog.Name
+    if ($watchdog) { Start-Service -Name $watchdog.Name }
 
     $updaterCli = Ensure-SirkUpdater
     Register-PortalWithUpdater -UpdaterCli $updaterCli -PortalService $portal -WatchdogService $watchdog
