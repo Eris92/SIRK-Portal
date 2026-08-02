@@ -5,15 +5,10 @@ on:
   push:
     branches:
       - rewrite/dotnet10-clean
-    paths:
-      - global.json
-      - Directory.Build.props
-      - Dockerfile.dotnet10
-      - src/Sirk.Portal/**
-      - tests/Sirk.Portal.ProtocolTests/**
-      - .github/scripts/**
-      - public/**
-      - .github/workflows/dotnet10-clean.yml
+  pull_request:
+    branches:
+      - develop
+      - main
 
 permissions:
   contents: read
