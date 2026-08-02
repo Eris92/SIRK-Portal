@@ -411,16 +411,17 @@ internal sealed class PortalIdentityStore
                 "SIRK Portal identity is not initialized. Provide SIRK_BOOTSTRAP_PASSWORD_FILE during installation.");
             return;
         }
+        var bootstrapPassword = password;
+        ValidatePassword(bootstrapPassword);
 
-        ValidatePassword(password);
-        var accessCode = ReadSecret(
+        var configuredAccessCode = ReadSecret(
             _options.BootstrapAccessCodeFile,
             "SIRK_BOOTSTRAP_ACCESS_CODE_FILE",
             "SIRK_BOOTSTRAP_ACCESS_CODE");
-        var generatedAccessCode = string.IsNullOrWhiteSpace(accessCode);
-        accessCode = generatedAccessCode
+        var generatedAccessCode = string.IsNullOrWhiteSpace(configuredAccessCode);
+        var accessCode = generatedAccessCode
             ? Base64Url(RandomNumberGenerator.GetBytes(32))
-            : accessCode.Trim();
+            : configuredAccessCode!.Trim();
 
         var now = DateTimeOffset.UtcNow;
         var user = new PortalUserRecord(
@@ -430,7 +431,7 @@ internal sealed class PortalIdentityStore
             PortalRoles.BreakGlass,
             true,
             1,
-            HashPassword(password),
+            HashPassword(bootstrapPassword),
             now,
             now);
         Save(new PortalIdentityDocument(
