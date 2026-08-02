@@ -1,0 +1,96 @@
+name: SIRK Portal .NET 10 Rewrite
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ rewrite/dotnet10 ]
+    paths:
+      - 'global.json'
+      - 'Directory.Build.props'
+      - 'Dockerfile.dotnet10'
+      - 'src/Sirk.Portal/**'
+      - 'tests/Sirk.Portal.ProtocolTests/**'
+      - '.github/scripts/test-dotnet10-central-heartbeat.py'
+      - 'public/**'
+      - '.github/workflows/dotnet10-rewrite.yml'
+  pull_request:
+    branches: [ develop ]
+    paths:
+      - 'global.json'
+      - 'Directory.Build.props'
+      - 'Dockerfile.dotnet10'
+      - 'src/Sirk.Portal/**'
+      - 'tests/Sirk.Portal.ProtocolTests/**'
+      - '.github/scripts/test-dotnet10-central-heartbeat.py'
+      - 'public/**'
+      - '.github/workflows/dotnet10-rewrite.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: SDK contract
+        run: |
+          dotnet --info
+          grep -R --line-number --include='*.csproj' --include='*.props' --include='global.json' -E 'net8\.0|net9\.0' src/Sirk.Portal tests/Sirk.Portal.ProtocolTests Directory.Build.props global.json && exit 1 || true
+
+      - name: Restore
+        run: dotnet restore tests/Sirk.Portal.ProtocolTests/Sirk.Portal.ProtocolTests.csproj
+
+      - name: Build
+        run: dotnet build tests/Sirk.Portal.ProtocolTests/Sirk.Portal.ProtocolTests.csproj --configuration Release --no-restore
+
+      - name: Signed heartbeat contracts
+        run: dotnet run --project tests/Sirk.Portal.ProtocolTests/Sirk.Portal.ProtocolTests.csproj --configuration Release --no-build
+
+      - name: Publish Windows x64
+        run: dotnet publish src/Sirk.Portal/Sirk.Portal.csproj --configuration Release --runtime win-x64 --self-contained false --output artifacts/win-x64
+
+      - name: Publish Linux x64
+        run: dotnet publish src/Sirk.Portal/Sirk.Portal.csproj --configuration Release --runtime linux-x64 --self-contained false --output artifacts/linux-x64
+
+      - name: Live Central heartbeat smoke
+        run: python3 .github/scripts/test-dotnet10-central-heartbeat.py artifacts/linux-x64/Sirk.Portal.dll
+
+      - name: Container build
+        run: docker build --file Dockerfile.dotnet10 --tag sirk-portal:dotnet10 .
+
+      - name: Container runtime health smoke
+        run: |
+          docker run --detach \
+            --name sirk-portal-dotnet10-smoke \
+            --health-interval 1s \
+            --health-timeout 5s \
+            --health-start-period 1s \
+            --health-retries 20 \
+            sirk-portal:dotnet10
+          cleanup() {
+            docker logs sirk-portal-dotnet10-smoke || true
+            docker rm --force --volumes sirk-portal-dotnet10-smoke >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+          for attempt in $(seq 1 45); do
+            status=$(docker inspect --format '{{.State.Health.Status}}' sirk-portal-dotnet10-smoke)
+            if [ "$status" = healthy ]; then
+              echo 'SIRK Portal container runtime health: OK'
+              cleanup
+              trap - EXIT
+              exit 0
+            fi
+            if [ "$status" = unhealthy ]; then
+              echo 'SIRK Portal container became unhealthy.' >&2
+              exit 1
+            fi
+            sleep 1
+          done
+          echo 'SIRK Portal container did not become healthy.' >&2
+          exit 1

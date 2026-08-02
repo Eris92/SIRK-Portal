@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>Sirk.Portal.ProtocolTests</AssemblyName>
+    <RootNamespace>Sirk.Portal.ProtocolTests</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <ProjectReference Include="../../src/Sirk.Portal/Sirk.Portal.csproj" />
+  </ItemGroup>
+</Project>

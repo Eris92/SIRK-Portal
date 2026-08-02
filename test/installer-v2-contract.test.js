@@ -17,6 +17,8 @@ assert.ok(installer.indexOf("SIRK_PORTAL_INSTALL_V2_OK") >= 0, "Installer v2 mus
 assert.strictEqual(installer.indexOf("node-windows"), -1, "Installer v2 must not use node-windows.");
 assert.strictEqual(installer.indexOf("wrapper.js"), -1, "Installer v2 must not use the node-windows wrapper.");
 assert.strictEqual(managed.indexOf("clean-install.ps1"), -1, "Managed installer must not invoke the legacy clean installer.");
-assert.ok(managed.indexOf("install-v2.ps1") >= 0, "Managed installer must invoke installer v2.");
+assert.strictEqual(managed.indexOf("install-v2.ps1"), -1, "Managed installer must not invoke the superseded installer v2.");
+assert.ok(managed.indexOf("install-v3.ps1") >= 0, "Managed installer must invoke the current installer v3.");
+assert.ok(managed.indexOf("install-release-v2.ps1") >= 0, "Managed installer must enforce transactional Updater release v2.");
 
 console.log("installer-v2-contract: OK");
