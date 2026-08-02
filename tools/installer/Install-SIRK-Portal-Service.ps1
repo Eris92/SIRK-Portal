@@ -20,10 +20,11 @@ foreach ($required in @($wrapper, $node, $server, $ensureUpdater)) {
     if (-not (Test-Path -LiteralPath $required)) { throw "Brak wymaganego pliku: $required" }
 }
 
-$PortalDnsName = String($PortalDnsName).Trim().ToLowerInvariant()
+$PortalDnsName = ([string]$PortalDnsName).Trim().ToLowerInvariant()
 if ($PortalDnsName -notmatch '^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)(?:\.(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?))*$') {
     throw 'PortalDnsName must be a valid hostname or FQDN without protocol, port or path.'
 }
+$publicOrigin = if ($HttpsPort -eq 443) { "https://$PortalDnsName" } else { "https://$PortalDnsName`:$HttpsPort" }
 
 New-Item -ItemType Directory -Path $DataPath -Force | Out-Null
 $tls = Join-Path $DataPath 'TLS'
@@ -55,6 +56,7 @@ if ($LASTEXITCODE -ne 0) { throw 'Nie ustawiono bezpiecznych ACL katalogu danych
 $escapedInstall = [Security.SecurityElement]::Escape($InstallPath)
 $escapedData = [Security.SecurityElement]::Escape($DataPath)
 $escapedDnsName = [Security.SecurityElement]::Escape($PortalDnsName)
+$escapedPublicOrigin = [Security.SecurityElement]::Escape($publicOrigin)
 @"
 <service>
   <id>$serviceId</id>
@@ -73,7 +75,7 @@ $escapedDnsName = [Security.SecurityElement]::Escape($PortalDnsName)
   <env name="SIRK_INTERNAL_PORT" value="$InternalPort"/>
   <env name="SIRK_HTTPS_PORT" value="$HttpsPort"/>
   <env name="SIRK_PORTAL_FQDN" value="$escapedDnsName"/>
-  <env name="SIRK_PUBLIC_URL" value="https://$escapedDnsName"/>
+  <env name="SIRK_PUBLIC_URL" value="$escapedPublicOrigin"/>
   <env name="SIRK_TLS_PFX" value="$escapedData\TLS\portal.pfx"/>
   <env name="SIRK_TLS_PFX_PASSWORD_FILE" value="$escapedData\TLS\portal-pfx-password.txt"/>
   <env name="SIRK_ENROLLMENT_TOKEN_FILE" value="$escapedData\agent-enrollment-token.txt"/>
@@ -114,4 +116,4 @@ if ($LASTEXITCODE -ne 0) { throw 'Nie skonfigurowano reguły Zapory Windows dla 
     -DataPath $DataPath `
     -Channel dev
 
-Write-Host "SIRK Portal działa pod adresem https://$PortalDnsName`:$HttpsPort/login" -ForegroundColor Green
+Write-Host "SIRK Portal działa pod adresem $publicOrigin/login" -ForegroundColor Green
