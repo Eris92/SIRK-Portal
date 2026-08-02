@@ -6,13 +6,18 @@ var http = require("http");
 var https = require("https");
 var path = require("path");
 var connectionConfigFactory = require("./central-connection-config.js");
+var fileSecurity = require("./windows-file-security.js");
 
 function atomicWrite(filePath, value, mode) {
-    fs.mkdirSync(path.dirname(filePath), { recursive: true, mode: 0o700 });
+    var directory = path.dirname(filePath);
+    fs.mkdirSync(directory, { recursive: true, mode: 0o700 });
+    fileSecurity.hardenDirectory(directory);
     var temporary = filePath + ".tmp-" + process.pid + "-" + crypto.randomBytes(6).toString("hex");
     fs.writeFileSync(temporary, value, { encoding: "utf8", mode: mode || 0o600, flag: "wx" });
+    fileSecurity.hardenFile(temporary);
     fs.renameSync(temporary, filePath);
     try { fs.chmodSync(filePath, mode || 0o600); } catch (_) {}
+    fileSecurity.hardenFile(filePath);
 }
 
 function normalizeCentralUrl(value) {
