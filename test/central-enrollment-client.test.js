@@ -20,6 +20,29 @@ function readBody(req) {
     });
 }
 
+function encryptEnvelope(publicKeyPem, value) {
+    var contentKey = crypto.randomBytes(32);
+    var iv = crypto.randomBytes(12);
+    var cipher = crypto.createCipheriv("aes-256-gcm", contentKey, iv);
+    cipher.setAAD(Buffer.from("SIRK-Portal-Enrollment-v1", "utf8"));
+    var ciphertext = Buffer.concat([cipher.update(Buffer.from(JSON.stringify(value), "utf8")), cipher.final()]);
+    var tag = cipher.getAuthTag();
+    var encryptedKey = crypto.publicEncrypt({
+        key: publicKeyPem,
+        padding: crypto.constants.RSA_PKCS1_OAEP_PADDING,
+        oaepHash: "sha256"
+    }, contentKey);
+    contentKey.fill(0);
+    return Buffer.from(JSON.stringify({
+        schemaVersion: 1,
+        algorithm: "RSA-OAEP-256+A256GCM",
+        encryptedKey: encryptedKey.toString("base64"),
+        iv: iv.toString("base64"),
+        tag: tag.toString("base64"),
+        ciphertext: ciphertext.toString("base64")
+    }), "utf8").toString("base64");
+}
+
 async function run() {
     var dataRoot = fs.mkdtempSync(path.join(os.tmpdir(), "sirk-central-enrollment-client-"));
     var publicKeyPem = "";
@@ -61,12 +84,10 @@ async function run() {
                     portalToken: "12345678901234567890123456789012",
                     createdAtUtc: "2026-08-02T00:00:00.000Z"
                 };
-                var encrypted = crypto.publicEncrypt({
-                    key: publicKeyPem,
-                    padding: crypto.constants.RSA_PKCS1_OAEP_PADDING,
-                    oaepHash: "sha256"
-                }, Buffer.from(JSON.stringify(bundle), "utf8")).toString("base64");
-                return res.end(JSON.stringify({ ok: true, enrollment: { status: "approved", encryptedBootstrap: encrypted } }));
+                return res.end(JSON.stringify({
+                    ok: true,
+                    enrollment: { status: "approved", encryptedBootstrap: encryptEnvelope(publicKeyPem, bundle) }
+                }));
             }
             res.statusCode = 404;
             res.end(JSON.stringify({ ok: false, error: "Not found" }));
