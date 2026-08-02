@@ -1,6 +1,10 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using Microsoft.Extensions.FileProviders;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using Sirk.Portal.Central;
 
 const string portalId = "portal-test";
@@ -77,7 +81,71 @@ Assert(
     !stateProperties.Contains("PortalToken", StringComparer.Ordinal),
     "Portal connection status must never expose the Portal token.");
 
-Console.WriteLine("SIRK Portal signed heartbeat contracts: OK");
+var configurationRoot = Path.Combine(
+    Path.GetTempPath(),
+    $"sirk-portal-central-config-{Guid.NewGuid():N}");
+Directory.CreateDirectory(configurationRoot);
+try
+{
+    var configurationPath = Path.Combine(configurationRoot, "central-connection.json");
+    var document = new CentralConnectionFileDocument(
+        1,
+        "https://central.example",
+        "wss://central.example/tunnel",
+        portalId,
+        "Portal Test",
+        portalToken,
+        "https://portal.example",
+        timestamp);
+    File.WriteAllText(
+        configurationPath,
+        JsonSerializer.Serialize(
+            document,
+            CentralConnectionFileJsonContext.Default.CentralConnectionFileDocument),
+        Encoding.UTF8);
+    if (!OperatingSystem.IsWindows())
+    {
+        File.SetUnixFileMode(
+            configurationPath,
+            UnixFileMode.UserRead | UnixFileMode.UserWrite);
+    }
+
+    var resolver = new CentralConnectionResolver(
+        Options.Create(new CentralConnectionOptions
+        {
+            ConnectionFile = configurationPath,
+            UpdateChannel = "dev",
+            HeartbeatIntervalSeconds = 60,
+            RequestTimeoutSeconds = 15
+        }),
+        new TestHostEnvironment(),
+        NullLogger<CentralConnectionResolver>.Instance);
+    var resolved = resolver.Resolve();
+    Assert(resolved.Source == "protected-file", "Protected Central configuration source is invalid.");
+    Assert(resolved.SourcePath == configurationPath, "Protected Central configuration path is invalid.");
+    Assert(resolved.Options.Enabled, "Protected Central configuration must enable the connection.");
+    Assert(resolved.Options.PortalId == portalId, "Protected Portal ID is invalid.");
+    Assert(resolved.Options.PortalToken == portalToken, "Protected Portal token was not loaded.");
+    Assert(resolved.Options.BaseUrl == "https://central.example", "Protected Central URL is invalid.");
+
+    if (!OperatingSystem.IsWindows())
+    {
+        File.SetUnixFileMode(
+            configurationPath,
+            UnixFileMode.UserRead |
+            UnixFileMode.UserWrite |
+            UnixFileMode.GroupRead);
+        AssertThrows<InvalidDataException>(
+            () => resolver.Resolve(),
+            "Protected Central configuration with group permissions must be rejected.");
+    }
+}
+finally
+{
+    Directory.Delete(configurationRoot, recursive: true);
+}
+
+Console.WriteLine("SIRK Portal signed heartbeat and protected config contracts: OK");
 
 static byte[] Base64UrlDecode(string value)
 {
@@ -92,10 +160,36 @@ static byte[] Base64UrlDecode(string value)
     return Convert.FromBase64String(normalized);
 }
 
+static void AssertThrows<TException>(Action action, string message)
+    where TException : Exception
+{
+    try
+    {
+        action();
+    }
+    catch (TException)
+    {
+        return;
+    }
+
+    throw new InvalidOperationException(message);
+}
+
 static void Assert(bool condition, string message)
 {
     if (!condition)
     {
         throw new InvalidOperationException(message);
     }
+}
+
+internal sealed class TestHostEnvironment : IHostEnvironment
+{
+    public string EnvironmentName { get; set; } = Environments.Development;
+
+    public string ApplicationName { get; set; } = "Sirk.Portal.ProtocolTests";
+
+    public string ContentRootPath { get; set; } = AppContext.BaseDirectory;
+
+    public IFileProvider ContentRootFileProvider { get; set; } = new NullFileProvider();
 }
