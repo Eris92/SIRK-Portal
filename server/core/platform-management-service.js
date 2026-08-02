@@ -80,9 +80,13 @@ function completeAgentRelease(releases) {
         var assets = Array.isArray(release.assets) ? release.assets : [];
         var exe = assets.find(function (item) { return item.name === "SIRK-Agent-Setup.exe"; });
         var msi = assets.find(function (item) { return /^SIRK-Agent-.+-win-x64\.msi$/i.test(String(item.name || "")); });
-        var zip = assets.find(function (item) { return /win-x64-framework-dependent.*\.zip$/i.test(String(item.name || "")); });
-        var manifest = assets.find(function (item) { return item.name === "installer-manifest.json"; });
-        if (!exe || !msi || !zip || !manifest) continue;
+        var zip = assets.find(function (item) {
+            var name = String(item.name || "");
+            return /net10.*win-x64-framework-dependent.*\.zip$/i.test(name);
+        });
+        var installerManifest = assets.find(function (item) { return item.name === "installer-manifest.json"; });
+        var runtimeManifest = assets.find(function (item) { return item.name === "runtime-manifest.json"; });
+        if (!exe || !msi || !zip || !installerManifest || !runtimeManifest) continue;
         var exeHash = assets.find(function (item) { return item.name === exe.name + ".sha256"; });
         var msiHash = assets.find(function (item) { return item.name === msi.name + ".sha256"; });
         var zipHash = assets.find(function (item) { return item.name === zip.name + ".sha256"; });
@@ -91,11 +95,14 @@ function completeAgentRelease(releases) {
             version: String(release.tag_name || release.name || ""),
             prerelease: release.prerelease === true,
             publishedAtUtc: release.published_at || null,
+            targetFramework: "net10.0-windows",
+            requiredRuntime: "Microsoft.NETCore.App 10.0",
             installers: {
                 exe: publicAsset(exe, exeHash),
                 msi: publicAsset(msi, msiHash),
                 zip: publicAsset(zip, zipHash),
-                manifest: publicAsset(manifest, null)
+                installerManifest: publicAsset(installerManifest, null),
+                runtimeManifest: publicAsset(runtimeManifest, null)
             }
         };
     }
