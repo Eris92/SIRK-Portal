@@ -55,7 +55,7 @@ internal sealed class InternalTunnelAuthenticationMiddleware
     public async Task InvokeAsync(
         HttpContext context,
         InternalTunnelCredential credential,
-        PortalCentralIdentityMapper mapper)
+        PortalIdentityStore identities)
     {
         var supplied = context.Request.Headers[CredentialHeader].ToString();
         if (string.IsNullOrEmpty(supplied))
@@ -84,7 +84,8 @@ internal sealed class InternalTunnelAuthenticationMiddleware
         PortalAuthenticatedIdentity mapped;
         try
         {
-            mapped = mapper.Resolve(centralActorId, actorName, centralRole);
+            mapped = new PortalCentralIdentityMapper(identities)
+                .Resolve(centralActorId, actorName, centralRole);
         }
         catch (Exception exception) when (
             exception is InvalidDataException or InvalidOperationException or UnauthorizedAccessException)
