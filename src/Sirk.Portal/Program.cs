@@ -23,7 +23,7 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
 
     if (builder.Configuration.GetValue<bool>("Sirk:ReverseProxy:TrustAll"))
     {
-        options.KnownNetworks.Clear();
+        options.KnownIPNetworks.Clear();
         options.KnownProxies.Clear();
     }
 });
