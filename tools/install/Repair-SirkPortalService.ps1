@@ -26,7 +26,6 @@ $dataRoot = 'C:\ProgramData\SIRK\Portal'
 $tlsRoot = Join-Path $dataRoot 'TLS'
 $pfxPath = Join-Path $tlsRoot 'portal.pfx'
 $pfxPasswordPath = Join-Path $tlsRoot 'portal-pfx-password.txt'
-$enrollmentTokenPath = Join-Path $dataRoot 'agent-enrollment-token.txt'
 $nodePath = (Get-Command node.exe -ErrorAction Stop).Source
 $entrypoint = Join-Path $portalRoot 'server\standalone-https.js'
 $daemonRoot = Join-Path $portalRoot 'server\daemon'
@@ -34,7 +33,7 @@ $serviceExe = Join-Path $daemonRoot 'SirkPortal.exe'
 $serviceXml = Join-Path $daemonRoot 'SirkPortal.xml'
 $serviceName = 'SirkPortal'
 
-foreach ($required in @($entrypoint, $pfxPath, $pfxPasswordPath, $enrollmentTokenPath)) {
+foreach ($required in @($entrypoint, $pfxPath, $pfxPasswordPath)) {
     if (-not (Test-Path -LiteralPath $required -PathType Leaf)) { throw "Required Portal file is missing: $required" }
 }
 
@@ -52,7 +51,7 @@ $passwordAgain = ConvertFrom-SecureStringPlain $passwordRepeat
 if ([string]::IsNullOrWhiteSpace($password) -or $password.Length -lt 12) { throw 'Password must contain at least 12 characters.' }
 if ($password -cne $passwordAgain) { throw 'Passwords do not match.' }
 
-Write-Step 'Remove incomplete or legacy Portal services'
+Write-Step 'Remove incomplete Portal services'
 foreach ($name in @('SirkPortal','SirkPortalStandalone','sirkportal.exe')) {
     $service = Get-Service -Name $name -ErrorAction SilentlyContinue
     if ($service) {
@@ -97,7 +96,6 @@ $xml = @"
   <env name="SIRK_SERVICE_NAME" value="$serviceName" />
   <env name="SIRK_TLS_PFX" value="$(Escape-Xml $pfxPath)" />
   <env name="SIRK_TLS_PFX_PASSWORD_FILE" value="$(Escape-Xml $pfxPasswordPath)" />
-  <env name="SIRK_ENROLLMENT_TOKEN_FILE" value="$(Escape-Xml $enrollmentTokenPath)" />
   <env name="SIRK_HTTPS_PORT" value="443" />
   <env name="SIRK_INTERNAL_PORT" value="9080" />
   <env name="SIRK_PORTAL_FQDN" value="$(Escape-Xml $PortalName)" />
@@ -118,6 +116,7 @@ if ($LASTEXITCODE -ne 0) { throw "WinSW service start failed. ExitCode=$LASTEXIT
 
 Write-Step 'Initialize identity store and verify HTTPS'
 $deadline = (Get-Date).AddSeconds(120)
+$httpCode = '000'
 do {
     $httpCode = & curl.exe -k -sS -o NUL -w '%{http_code}' --resolve "$PortalName`:443`:127.0.0.1" "https://$PortalName/login" 2>$null
     if ($httpCode -eq '200') { break }
@@ -145,6 +144,8 @@ Write-Host 'Portal URL (copied to clipboard):' -ForegroundColor White
 Write-Host $portalUrl -ForegroundColor Cyan
 Write-Host 'System status:' -ForegroundColor White
 Write-Host $statusUrl -ForegroundColor Cyan
+Write-Host 'Agent enrollment:' -ForegroundColor White
+Write-Host 'Use Portal Settings -> Platform -> SIRK Agent downloads to generate a group token.' -ForegroundColor Cyan
 Write-Host 'Service:' -ForegroundColor White
 Get-Service -Name $serviceName | Format-Table Name, Status, StartType -AutoSize
 Write-Host 'IMPORTANT: keep the Break-Glass password in a secure password manager.' -ForegroundColor Yellow
