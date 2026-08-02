@@ -50,41 +50,11 @@ function Invoke-RemotePowerShellProcess {
     $path = Join-Path $env:TEMP ('sirk-installer-' + [guid]::NewGuid().ToString('N') + '.ps1')
     try {
         Invoke-WebRequest -UseBasicParsing -Uri ($Uri + '?nocache=' + [guid]::NewGuid()) -OutFile $path
-
-        $content = Get-Content -LiteralPath $path -Raw
-        $updaterNonce = [guid]::NewGuid().ToString('N')
-        $content = $content.Replace(
-            'https://raw.githubusercontent.com/Eris92/SIRK-Updater/main/install-release.ps1',
-            "https://raw.githubusercontent.com/Eris92/SIRK-Updater/main/install-release-v2.ps1?nocache=$updaterNonce"
-        )
-
-        $oldUpdaterInvocation = @'
-        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $installer -AllowSourceFallback
-        if ($LASTEXITCODE -ne 0) { throw "SIRK Updater installation failed. ExitCode=$LASTEXITCODE" }
-'@
-        $newUpdaterInvocation = @'
-        Write-Host '[UPDATER] Installing transactional verified release package v2.' -ForegroundColor DarkCyan
-        & powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File $installer | Out-Host
-        $updaterInstallerExitCode = $LASTEXITCODE
-        if ($updaterInstallerExitCode -ne 0) {
-            throw "SIRK Updater release v2 installation failed. ExitCode=$updaterInstallerExitCode. Local source build is disabled."
-        }
-'@
-        if (-not $content.Contains($oldUpdaterInvocation.Trim())) {
-            throw 'Unable to apply Updater v2 integration patch to install-v3.ps1.'
-        }
-        $content = $content.Replace($oldUpdaterInvocation.Trim(), $newUpdaterInvocation.Trim())
-        Set-Content -LiteralPath $path -Value $content -Encoding UTF8
-
-        Write-Host '[BOOTSTRAP] Starting SIRK Portal installer v3.' -ForegroundColor DarkCyan
-        Write-Host '[BOOTSTRAP] Nested installers use cache-busting.' -ForegroundColor DarkCyan
-        Write-Host '[BOOTSTRAP] SIRK Updater policy: transactional verified release v2 only.' -ForegroundColor DarkCyan
-
+        Write-Host '[BOOTSTRAP] Starting canonical SIRK Portal clean installer.' -ForegroundColor DarkCyan
+        Write-Host '[BOOTSTRAP] Updater policy: transactional verified release v2 only.' -ForegroundColor DarkCyan
         & powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File $path @ArgumentList
         $exitCode = $LASTEXITCODE
-        if ($exitCode -ne 0) {
-            throw "SIRK Portal installer failed. ExitCode=$exitCode"
-        }
+        if ($exitCode -ne 0) { throw "SIRK Portal installer failed. ExitCode=$exitCode" }
     }
     finally {
         Remove-Item -LiteralPath $path -Force -ErrorAction SilentlyContinue
@@ -102,9 +72,7 @@ function Invoke-CentralEnrollment {
 
     $node = (Get-Command node.exe -ErrorAction Stop).Source
     $cli = 'C:\Program Files\SIRK\Portal\tools\enrollment\sirk-central-enroll.js'
-    if (-not (Test-Path -LiteralPath $cli)) {
-        throw "Central enrollment CLI is missing: $cli"
-    }
+    if (-not (Test-Path -LiteralPath $cli)) { throw "Central enrollment CLI is missing: $cli" }
 
     if (-not $PortalId) {
         $PortalId = $env:COMPUTERNAME.ToLowerInvariant() -replace '[^a-z0-9-]', '-'
@@ -160,10 +128,9 @@ function Invoke-CentralEnrollment {
 }
 
 Write-Host "`n============================================================" -ForegroundColor Cyan
-Write-Host ' SIRK PORTAL MANAGED INSTALLATION' -ForegroundColor Cyan
-Write-Host ' WinGet + Node.js LTS + npm latest + .NET LTS + WinSW' -ForegroundColor Cyan
-Write-Host ' Shared SIRK Installer Framework v3' -ForegroundColor Cyan
-Write-Host ' Updater: verified release v2 with transactional rollback' -ForegroundColor Cyan
+Write-Host ' SIRK PORTAL MANAGED CLEAN INSTALLATION' -ForegroundColor Cyan
+Write-Host ' WinGet + Node.js 24 LTS + npm latest + .NET 10 LTS + WinSW' -ForegroundColor Cyan
+Write-Host ' No migration | No legacy compatibility | Updater v2 release only' -ForegroundColor Cyan
 Write-Host "============================================================" -ForegroundColor Cyan
 
 Invoke-RemotePowerShellScript `
