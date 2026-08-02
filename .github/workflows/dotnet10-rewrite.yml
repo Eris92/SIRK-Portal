@@ -46,10 +46,10 @@ jobs:
         run: dotnet build src/Sirk.Portal/Sirk.Portal.csproj --configuration Release --no-restore
 
       - name: Publish Windows x64
-        run: dotnet publish src/Sirk.Portal/Sirk.Portal.csproj --configuration Release --no-build --runtime win-x64 --self-contained false --output artifacts/win-x64
+        run: dotnet publish src/Sirk.Portal/Sirk.Portal.csproj --configuration Release --runtime win-x64 --self-contained false --output artifacts/win-x64
 
       - name: Publish Linux x64
-        run: dotnet publish src/Sirk.Portal/Sirk.Portal.csproj --configuration Release --no-build --runtime linux-x64 --self-contained false --output artifacts/linux-x64
+        run: dotnet publish src/Sirk.Portal/Sirk.Portal.csproj --configuration Release --runtime linux-x64 --self-contained false --output artifacts/linux-x64
 
       - name: Container build
         run: docker build --file Dockerfile.dotnet10 --tag sirk-portal:dotnet10 .
