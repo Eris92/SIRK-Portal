@@ -1,0 +1,32 @@
+name: SIRK Portal Native Modules
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - rewrite/dotnet10-clean
+  pull_request:
+    branches:
+      - rewrite/dotnet10
+      - develop
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  native-modules:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Publish native Portal
+        run: dotnet publish src/Sirk.Portal/Sirk.Portal.csproj --configuration Release --runtime linux-x64 --self-contained false --output artifacts/linux-x64
+
+      - name: Native module workflows E2E
+        run: python3 .github/scripts/test-dotnet10-modules.py artifacts/linux-x64/Sirk.Portal.dll
