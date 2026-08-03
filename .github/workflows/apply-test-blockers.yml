@@ -1,0 +1,32 @@
+name: Apply Portal Test Blocker Repair
+
+on:
+  push:
+    branches:
+      - fix/test-blockers-management-settings-agent
+    paths:
+      - '.github/scripts/apply-test-blockers.py'
+      - '.github/workflows/apply-test-blockers.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/test-blockers-management-settings-agent
+          fetch-depth: 0
+      - name: Apply verified repair
+        run: python3 .github/scripts/apply-test-blockers.py
+      - name: Commit product changes
+        run: |
+          rm -f .github/scripts/apply-test-blockers.py .github/workflows/apply-test-blockers.yml
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A
+          git diff --cached --check
+          git commit -m "Repair Management files, Settings and Break-Glass"
+          git push origin HEAD:fix/test-blockers-management-settings-agent
