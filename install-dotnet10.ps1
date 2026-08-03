@@ -407,7 +407,7 @@ try {
                 ConnectionFile = ''
             }
             CentralTunnel = @{
-                Enabled = $false
+                Enabled = $true
                 LocalOrigin = $localOrigin
                 PollIntervalMilliseconds = 750
                 MaximumConcurrency = 8
