@@ -52,8 +52,14 @@ if ($updaterService.Status -ne 'Running') {
 }
 if (-not (Test-Path -LiteralPath $updaterCli)) { throw "Brak CLI Updatera: $updaterCli" }
 
-$portalService = Get-CimInstance Win32_Service -Filter "Name='$PortalServiceName'" -ErrorAction SilentlyContinue
+# Do not use Win32_Service/CIM here. Windows Sandbox may expose Get-CimInstance
+# while the Win32_Service provider itself returns Invalid class.
+$portalService = Get-Service -Name $PortalServiceName -ErrorAction SilentlyContinue
 if (-not $portalService) { throw "Usługa Portalu nie istnieje: $PortalServiceName" }
+if ($portalService.Status -ne 'Running') {
+    Start-Service -Name $PortalServiceName
+    $portalService.WaitForStatus('Running', [TimeSpan]::FromSeconds(30))
+}
 
 $manifestPath = Join-Path $env:TEMP ('sirk-portal-updater-' + [guid]::NewGuid().ToString('N') + '.json')
 try {
