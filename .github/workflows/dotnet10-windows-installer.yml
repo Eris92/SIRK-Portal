@@ -14,10 +14,14 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: sirk-portal-windows-installer-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   windows-installer:
     runs-on: windows-latest
-    timeout-minutes: 40
+    timeout-minutes: 45
     env:
       SIRK_TEST_FQDN: portal-ci.sirk.local
       SIRK_TEST_PORT: 9443
@@ -45,6 +49,7 @@ jobs:
       - name: Install SIRK Portal from zero
         shell: powershell
         run: |
+          $ErrorActionPreference = 'Stop'
           $env:SIRK_INSTALL_FQDN = $env:SIRK_TEST_FQDN
           $env:SIRK_INSTALL_BREAKGLASS_PASSWORD = $env:SIRK_TEST_PASSWORD
           $env:SIRK_INSTALL_TRUST_CERTIFICATE = 'true'
@@ -57,10 +62,74 @@ jobs:
             -HttpsPort ([int]$env:SIRK_TEST_PORT) `
             -TrustCertificate
 
-      - name: Verify service certificate HTTPS UI and login
+      - name: Verify service certificate HTTPS UI maintenance and restore
         shell: powershell
         run: |
           $ErrorActionPreference = 'Stop'
+          $baseUrl = "https://$($env:SIRK_TEST_FQDN):$($env:SIRK_TEST_PORT)"
+          $dataRoot = 'C:\ProgramData\SIRK\Portal'
+          $backupRoot = 'C:\ProgramData\SIRK\Portal Backups'
+          $accessFile = Join-Path $dataRoot 'security\break-glass-access-code.txt'
+
+          function Wait-PortalReady {
+            param([int]$TimeoutSeconds = 120)
+            $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+            $lastError = $null
+            do {
+              try {
+                $ready = Invoke-RestMethod "$baseUrl/readyz" -TimeoutSec 5
+                if ($ready.status -eq 'ready') { return }
+              }
+              catch { $lastError = $_ }
+              Start-Sleep -Seconds 2
+            } while ((Get-Date) -lt $deadline)
+            throw "Portal did not become ready: $lastError"
+          }
+
+          function New-PortalSession {
+            if (-not (Test-Path -LiteralPath $accessFile)) { throw 'Break-Glass access code file is missing.' }
+            $accessCode = (Get-Content -LiteralPath $accessFile -Raw).Trim()
+            if ($accessCode.Length -lt 40) { throw 'Access Code is missing or too short.' }
+            $session = New-Object Microsoft.PowerShell.Commands.WebRequestSession
+            $payload = @{
+              userName = 'admin'
+              password = $env:SIRK_TEST_PASSWORD
+              accessCode = $accessCode
+            } | ConvertTo-Json -Compress
+            $login = Invoke-RestMethod "$baseUrl/api/v1/auth/login" `
+              -Method Post `
+              -ContentType 'application/json; charset=utf-8' `
+              -Body $payload `
+              -WebSession $session `
+              -TimeoutSec 15
+            if ($login.user.role -ne 'Break-Glass') { throw 'Break-Glass login failed.' }
+            return $session
+          }
+
+          function Get-CsrfHeaders {
+            param([Parameter(Mandatory)][Microsoft.PowerShell.Commands.WebRequestSession]$Session)
+            $csrf = Invoke-RestMethod "$baseUrl/api/v1/auth/csrf" -WebSession $Session -TimeoutSec 10
+            if (-not $csrf.requestToken) { throw 'CSRF token was not issued.' }
+            return @{ 'X-SIRK-CSRF' = [string]$csrf.requestToken }
+          }
+
+          function Invoke-PortalPost {
+            param(
+              [Parameter(Mandatory)][string]$Path,
+              [Parameter(Mandatory)][object]$Body,
+              [Parameter(Mandatory)][Microsoft.PowerShell.Commands.WebRequestSession]$Session,
+              [Parameter(Mandatory)][hashtable]$Headers
+            )
+            Invoke-RestMethod ($baseUrl + $Path) `
+              -Method Post `
+              -ContentType 'application/json; charset=utf-8' `
+              -Body ($Body | ConvertTo-Json -Depth 12 -Compress) `
+              -WebSession $Session `
+              -Headers $Headers `
+              -TimeoutSec 30
+          }
+
+          Wait-PortalReady
           $service = Get-Service SirkPortal
           if ($service.Status -ne 'Running' -or $service.StartType -ne 'Automatic') {
             throw "Invalid service state: $($service.Status) / $($service.StartType)"
@@ -68,6 +137,9 @@ jobs:
           $wmi = Get-CimInstance Win32_Service -Filter "Name='SirkPortal'"
           if ($wmi.PathName -notmatch 'Sirk\.Portal\.exe') {
             throw "Invalid service command line: $($wmi.PathName)"
+          }
+          if (Get-ChildItem 'C:\Program Files\SIRK\Portal' -Recurse -Filter node.exe -ErrorAction SilentlyContinue) {
+            throw 'Legacy Node.js runtime is present in the native installation.'
           }
 
           $personal = Get-ChildItem Cert:\LocalMachine\My |
@@ -88,15 +160,14 @@ jobs:
             Select-Object -First 1
           if (-not $trusted) { throw 'Portal certificate is not trusted in LocalMachine\Root.' }
 
-          $baseUrl = "https://$($env:SIRK_TEST_FQDN):$($env:SIRK_TEST_PORT)"
           $health = Invoke-RestMethod "$baseUrl/healthz"
           $ready = Invoke-RestMethod "$baseUrl/readyz"
           if ($health.status -ne 'healthy' -or $ready.status -ne 'ready') {
             throw 'Portal health/readiness check failed.'
           }
-          $login = (Invoke-WebRequest "$baseUrl/login" -UseBasicParsing).Content
+          $loginPage = (Invoke-WebRequest "$baseUrl/login" -UseBasicParsing).Content
           foreach ($marker in @('sirk-login-page', '/assets/portal-login.css', 'name="accessCode"')) {
-            if ($login -notmatch [regex]::Escape($marker)) { throw "Login UI marker is missing: $marker" }
+            if ($loginPage -notmatch [regex]::Escape($marker)) { throw "Login UI marker is missing: $marker" }
           }
           foreach ($asset in @(
             '/assets/portal-login.css',
@@ -111,37 +182,80 @@ jobs:
               throw "Frontend asset failed: $asset"
             }
           }
+          $settingsAsset = (Invoke-WebRequest "$baseUrl/assets/settings.js" -UseBasicParsing).Content
+          foreach ($marker in @('data-portal-settings-native','/api/v1/admin/maintenance/status','"Break-Glass"')) {
+            if ($settingsAsset -notmatch [regex]::Escape($marker)) { throw "Native settings marker is missing: $marker" }
+          }
+          if ($settingsAsset -match '/api/admin/settings' -or $settingsAsset -match 'plugin-operation') {
+            throw 'Legacy settings API is active.'
+          }
 
-          $accessCode = Get-Content 'C:\ProgramData\SIRK\Portal\security\break-glass-access-code.txt' -Raw
-          if ($accessCode.Trim().Length -lt 40) { throw 'Access Code is missing or too short.' }
-          $session = New-Object Microsoft.PowerShell.Commands.WebRequestSession
-          $payload = @{
-            userName = 'admin'
-            password = $env:SIRK_TEST_PASSWORD
-            accessCode = $accessCode.Trim()
-          } | ConvertTo-Json -Compress
-          $loginResult = Invoke-RestMethod "$baseUrl/api/v1/auth/login" `
-            -Method Post `
-            -ContentType 'application/json' `
-            -Body $payload `
-            -WebSession $session
-          if ($loginResult.user.role -ne 'Break-Glass') { throw 'Break-Glass login failed.' }
+          $session = New-PortalSession
           $portal = (Invoke-WebRequest "$baseUrl/" -WebSession $session -UseBasicParsing).Content
           foreach ($marker in @('sirkStandaloneRoot', 'data-view="devices"', 'data-view="settings"')) {
             if ($portal -notmatch [regex]::Escape($marker)) { throw "Portal UI marker is missing: $marker" }
           }
+          $settings = Invoke-RestMethod "$baseUrl/api/v1/admin/settings" -WebSession $session -TimeoutSec 10
+          if (-not $settings.value.modules -or -not $settings.value.identity) { throw 'Native settings API is incomplete.' }
+          $maintenance = Invoke-RestMethod "$baseUrl/api/v1/admin/maintenance/status" -WebSession $session -TimeoutSec 10
+          if (-not $maintenance.value.capabilities.backup -or -not $maintenance.value.capabilities.restore) {
+            throw 'Native Windows maintenance capabilities are incomplete.'
+          }
+          $headers = Get-CsrfHeaders -Session $session
 
-          Restart-Service SirkPortal -Force
-          (Get-Service SirkPortal).WaitForStatus('Running', [TimeSpan]::FromSeconds(60))
-          $deadline = (Get-Date).AddMinutes(2)
-          do {
-            try {
-              $ready = Invoke-RestMethod "$baseUrl/readyz" -TimeoutSec 5
-              if ($ready.status -eq 'ready') { break }
-            } catch {}
-            Start-Sleep -Seconds 2
-          } while ((Get-Date) -lt $deadline)
-          if ($ready.status -ne 'ready') { throw 'Portal did not recover after service restart.' }
+          $backup = Invoke-PortalPost `
+            -Path '/api/v1/admin/maintenance/backup' `
+            -Body @{ reason = 'windows-installer-e2e' } `
+            -Session $session `
+            -Headers $headers
+          $backupRecord = @($backup.value.backups)[0]
+          if (-not $backupRecord.id) { throw 'Backup operation did not return a record.' }
+          $backupPath = Join-Path $backupRoot ($backupRecord.id + '.zip')
+          if (-not (Test-Path -LiteralPath $backupPath) -or (Get-Item $backupPath).Length -le 0) {
+            throw "Backup archive was not created: $backupPath"
+          }
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $archive = [IO.Compression.ZipFile]::OpenRead($backupPath)
+          try {
+            $entries = @($archive.Entries | ForEach-Object FullName)
+            if ($entries -notcontains 'identity.json' -or $entries -notcontains 'settings.json') {
+              throw 'Backup archive is missing critical Portal data.'
+            }
+            if ($entries | Where-Object { $_ -like 'backups/*' -or $_ -like '*.zip' }) {
+              throw 'Backup archive recursively contains backup files.'
+            }
+          }
+          finally { $archive.Dispose() }
+
+          $markerPath = Join-Path $dataRoot 'restore-marker.txt'
+          Set-Content -LiteralPath $markerPath -Value 'must-disappear-after-restore' -Encoding ASCII
+
+          $null = Invoke-PortalPost `
+            -Path '/api/v1/admin/maintenance/restart' `
+            -Body @{} `
+            -Session $session `
+            -Headers $headers
+          Start-Sleep -Seconds 4
+          Wait-PortalReady
+          if ((Get-Service SirkPortal).Status -ne 'Running') { throw 'Portal did not recover after native restart.' }
+
+          $session = New-PortalSession
+          $headers = Get-CsrfHeaders -Session $session
+          $null = Invoke-PortalPost `
+            -Path '/api/v1/admin/maintenance/restore' `
+            -Body @{ id = $backupRecord.id } `
+            -Session $session `
+            -Headers $headers
+          Start-Sleep -Seconds 5
+          Wait-PortalReady
+          if (Test-Path -LiteralPath $markerPath) {
+            throw 'Restore did not replace DataRoot with the selected backup.'
+          }
+          if ((Get-Service SirkPortal).Status -ne 'Running') { throw 'Portal did not recover after restore.' }
+          $restoredHealth = Invoke-RestMethod "$baseUrl/healthz" -TimeoutSec 10
+          if ($restoredHealth.status -ne 'healthy') { throw 'Portal is unhealthy after restore.' }
+
+          Write-Host 'SIRK Portal Windows installer HTTPS/UI/backup/restart/restore E2E: OK' -ForegroundColor Green
 
       - name: Show installation diagnostics on failure
         if: failure()
@@ -149,10 +263,10 @@ jobs:
         run: |
           Get-Service SirkPortal -ErrorAction SilentlyContinue | Format-List *
           Get-CimInstance Win32_Service -Filter "Name='SirkPortal'" -ErrorAction SilentlyContinue | Format-List *
-          Get-Content 'C:\ProgramData\SIRK\Logs\Portal-DotNet10-Install.log' -Tail 300 -ErrorAction SilentlyContinue
-          Get-WinEvent -FilterHashtable @{ LogName='Application'; StartTime=(Get-Date).AddMinutes(-20) } -ErrorAction SilentlyContinue |
+          Get-Content 'C:\ProgramData\SIRK\Logs\Portal-DotNet10-Install.log' -Tail 400 -ErrorAction SilentlyContinue
+          Get-WinEvent -FilterHashtable @{ LogName='Application'; StartTime=(Get-Date).AddMinutes(-30) } -ErrorAction SilentlyContinue |
             Where-Object { $_.ProviderName -match 'Sirk|\.NET Runtime|Application Error' -or $_.Message -match 'Sirk\.Portal' } |
-            Select-Object -First 50 TimeCreated,ProviderName,Id,LevelDisplayName,Message |
+            Select-Object -First 100 TimeCreated,ProviderName,Id,LevelDisplayName,Message |
             Format-List
 
       - name: Clean Windows runner
@@ -173,7 +287,12 @@ jobs:
           Get-ChildItem Cert:\LocalMachine\My,Cert:\LocalMachine\Root -ErrorAction SilentlyContinue |
             Where-Object FriendlyName -eq 'SIRK Portal HTTPS' |
             Remove-Item -Force -ErrorAction SilentlyContinue
-          Remove-Item 'C:\Program Files\SIRK\Portal','C:\ProgramData\SIRK\Portal' -Recurse -Force -ErrorAction SilentlyContinue
+          Remove-Item `
+            'C:\Program Files\SIRK\Portal',
+            'C:\ProgramData\SIRK\Portal',
+            'C:\ProgramData\SIRK\Portal Backups',
+            'C:\ProgramData\SIRK\Install Backups' `
+            -Recurse -Force -ErrorAction SilentlyContinue
           $hosts = Join-Path $env:SystemRoot 'System32\drivers\etc\hosts'
           if (Test-Path $hosts) {
             $lines = Get-Content $hosts | Where-Object { $_ -notmatch [regex]::Escape($env:SIRK_TEST_FQDN) }
