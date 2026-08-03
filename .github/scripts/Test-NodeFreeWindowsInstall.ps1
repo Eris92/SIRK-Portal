@@ -32,7 +32,7 @@ try {
     foreach ($name in @('SirkPortal','SirkUpdater')) {
         $service = Get-Service $name
         if ($service.Status -ne 'Running' -or $service.StartType -ne 'Automatic') {
-            throw "Invalid service state for $name: $($service.Status) / $($service.StartType)"
+            throw "Invalid service state for ${name}: $($service.Status) / $($service.StartType)"
         }
     }
 
