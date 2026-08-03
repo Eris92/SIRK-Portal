@@ -25,9 +25,19 @@ function Remove-TestService([string]$Name) {
 }
 
 try {
+    $baseUrl = "https://$Fqdn`:$Port"
     $source = Get-Content '.\install.ps1' -Raw -Encoding UTF8
     $installer = [scriptblock]::Create($source)
-    & $installer -Branch $Branch -NonInteractive -RemoveData -PortalFqdn $Fqdn -HttpsPort $Port -TrustCertificate
+    $installOutput = @(& $installer -Branch $Branch -NonInteractive -RemoveData -PortalFqdn $Fqdn -HttpsPort $Port -TrustCertificate 6>&1)
+    $installOutput | Out-Host
+    $installText = $installOutput | Out-String
+    $expectedAccessPrefix = "Access URL: $baseUrl/login#access="
+    if ($installText -notmatch [regex]::Escape($expectedAccessPrefix)) {
+        throw "Final installer output does not contain the complete Access URL: $expectedAccessPrefix"
+    }
+    if ($installText -notmatch 'SIRK_PORTAL_DOTNET10_INSTALL_OK') {
+        throw 'Final one-line installer success marker is missing.'
+    }
 
     $systemDotNet = Join-Path $env:ProgramFiles 'dotnet\dotnet.exe'
     if (-not (Test-Path -LiteralPath $systemDotNet -PathType Leaf)) {
@@ -47,12 +57,13 @@ try {
         }
     }
 
-    $portalService = Get-CimInstance Win32_Service -Filter "Name='SirkPortal'"
-    if ($portalService.PathName -notmatch 'Sirk\.Portal\.exe') {
-        throw "Invalid SirkPortal command: $($portalService.PathName)"
+    $portalServiceRegistry = Get-ItemProperty -LiteralPath 'HKLM:\SYSTEM\CurrentControlSet\Services\SirkPortal'
+    $portalServicePath = [string]$portalServiceRegistry.ImagePath
+    if ($portalServicePath -notmatch 'Sirk\.Portal\.exe') {
+        throw "Invalid SirkPortal command: $portalServicePath"
     }
-    if ($portalService.PathName -match 'node|npm|winsw') {
-        throw "Legacy runtime detected in service command: $($portalService.PathName)"
+    if ($portalServicePath -match 'node|npm|winsw') {
+        throw "Legacy runtime detected in service command: $portalServicePath"
     }
 
     $portalRoot = 'C:\Program Files\SIRK\Portal'
@@ -76,7 +87,6 @@ try {
         throw 'Portal certificate is not trusted.'
     }
 
-    $baseUrl = "https://$Fqdn`:$Port"
     if ((Invoke-RestMethod "$baseUrl/healthz").status -ne 'healthy') { throw 'Health failed.' }
     if ((Invoke-RestMethod "$baseUrl/readyz").status -ne 'ready') { throw 'Readiness failed.' }
 
@@ -85,7 +95,7 @@ try {
         '/assets/portal-login.css',
         '/assets/portal-login.js',
         '/assets/portal-standalone.css',
-        '/assets/portal-management-frame.css',
+        '/assets/portal-module-shell.css',
         '/assets/standalone-core.js',
         '/assets/portal-standalone.js',
         '/assets/settings.js',
@@ -97,15 +107,16 @@ try {
         }
     }
 
-    $shellIconCss = (Invoke-WebRequest "$baseUrl/assets/portal-management-frame.css" -UseBasicParsing).Content
+    $shellIconCss = (Invoke-WebRequest "$baseUrl/assets/portal-module-shell.css" -UseBasicParsing).Content
     foreach ($marker in @(
         '[data-action="sidebar"] svg',
         '.sirk-standalone-nav button > span > svg',
         'stroke: currentColor !important',
-        'visibility: visible !important'
+        'visibility: visible !important',
+        'svg :is(path,rect,circle,line,polyline,polygon,ellipse)'
     )) {
         if ($shellIconCss -notmatch [regex]::Escape($marker)) {
-            throw "Sidebar icon CSS marker missing: $marker"
+            throw "Loaded sidebar icon CSS marker missing: $marker"
         }
     }
 
@@ -137,7 +148,7 @@ try {
     if ($login.user.role -ne 'Break-Glass') { throw 'Break-Glass access URL login failed.' }
 
     $portal = (Invoke-WebRequest "$baseUrl/" -WebSession $session -UseBasicParsing).Content
-    foreach ($marker in @('sirkStandaloneRoot','data-view="devices"','data-view="settings"')) {
+    foreach ($marker in @('sirkStandaloneRoot','data-view="devices"','data-view="settings"','portal-module-shell.css')) {
         if ($portal -notmatch [regex]::Escape($marker)) { throw "Portal UI marker missing: $marker" }
     }
 
