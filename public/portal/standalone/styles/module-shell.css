@@ -141,18 +141,23 @@
 #sirkPortalRoot .sirk-toolbar-button.is-active{
     border-color:#75a7ff!important;background:#edf3ff!important;color:#214fbd!important;
 }
-#sirkPortalRoot .sirk-toolbar-icon{
+#sirkPortalRoot .sirk-toolbar-icon,
+#sirkPortalRoot .sirk-toolbar-button > svg{
     display:inline-grid!important;place-items:center!important;width:20px!important;height:20px!important;
-    color:inherit!important;font-size:0!important;overflow:visible!important;
+    min-width:20px!important;min-height:20px!important;color:inherit!important;font-size:0!important;
+    overflow:visible!important;fill:none!important;stroke:currentColor!important;stroke-width:1.8!important;
+    stroke-linecap:round!important;stroke-linejoin:round!important;opacity:1!important;
 }
 #sirkPortalRoot .sirk-toolbar-icon > svg{
     display:block!important;width:20px!important;height:20px!important;overflow:visible!important;
     fill:none!important;stroke:currentColor!important;stroke-width:1.8!important;
     stroke-linecap:round!important;stroke-linejoin:round!important;opacity:1!important;
 }
-#sirkPortalRoot .sirk-toolbar-icon > svg :is(path,rect,circle,line,polyline,polygon,ellipse,use){
+#sirkPortalRoot .sirk-toolbar-icon > svg :is(path,rect,circle,line,polyline,polygon,ellipse,use),
+#sirkPortalRoot .sirk-toolbar-button > svg :is(path,rect,circle,line,polyline,polygon,ellipse,use){
     fill:none!important;stroke:currentColor!important;stroke-width:1.8!important;
     stroke-linecap:round!important;stroke-linejoin:round!important;opacity:1!important;
+    vector-effect:non-scaling-stroke!important;
 }
 #sirkPortalRoot .sirk-one-time-token code{
     display:block;margin:10px 0;padding:10px;border:1px solid #f0c36d;border-radius:6px;
