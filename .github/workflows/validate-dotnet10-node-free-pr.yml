@@ -1,0 +1,35 @@
+name: Validate Node-free .NET 10 rewrite
+
+on:
+  pull_request:
+    branches: [rewrite/dotnet10-node-free]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: validate-node-free-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  linux-build-api-ui:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+          cache: true
+          cache-dependency-path: '**/*.csproj'
+      - name: Build test publish API UI and container
+        run: bash .github/scripts/validate-node-free-dotnet10.sh
+
+  windows-clean-install:
+    runs-on: windows-latest
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install and verify from zero
+        shell: powershell
+        run: .\.github\scripts\Test-NodeFreeWindowsInstall.ps1 -Branch '${{ github.head_ref }}'
