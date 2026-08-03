@@ -122,11 +122,11 @@ internal static partial class FileSystemScriptLibrary
             }
         }
 
-        var localizedValue = labels.TryGetValue("PL", out var polish)
+        (string Label, string Description) localizedValue = labels.TryGetValue("PL", out var polish)
             ? polish
             : labels.TryGetValue("EN", out var english)
                 ? english
-                : (name, string.Empty);
+                : (Label: name, Description: string.Empty);
         var info = new FileInfo(file);
         var shell = Path.GetExtension(file).ToLowerInvariant() switch
         {
