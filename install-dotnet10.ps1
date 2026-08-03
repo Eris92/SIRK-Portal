@@ -41,6 +41,17 @@ function New-UrlSafeToken([int]$Bytes = 48) {
     return [Convert]::ToBase64String($buffer).TrimEnd('=').Replace('+','-').Replace('/','_')
 }
 
+function Get-FreeLoopbackPort {
+    $listener = [Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback, 0)
+    try {
+        $listener.Start()
+        return ([Net.IPEndPoint]$listener.LocalEndpoint).Port
+    }
+    finally {
+        $listener.Stop()
+    }
+}
+
 function Remove-ServiceCompletely([string]$Name) {
     $service = Get-Service -Name $Name -ErrorAction SilentlyContinue
     if (-not $service) { return }
@@ -231,11 +242,22 @@ try {
 
     Write-Step 'Konfiguracja HTTPS i trwałych danych'
     $publicUrl = if ($HttpsPort -eq 443) { "https://$portalFqdn" } else { "https://$portalFqdn`:$HttpsPort" }
-    $localOrigin = "https://localhost:$HttpsPort/"
+    $internalHttpPort = Get-FreeLoopbackPort
+    $localOrigin = "http://127.0.0.1:$internalHttpPort/"
     $appSettings = @{
         Logging = @{ LogLevel = @{ Default = 'Information'; 'Microsoft.AspNetCore' = 'Warning' } }
         AllowedHosts = '*'
-        Kestrel = @{ Endpoints = @{ Https = @{ Url = "https://0.0.0.0:$HttpsPort"; Certificate = @{ Path = $pfxPath; Password = $pfxPassword } } } }
+        Kestrel = @{
+            Endpoints = @{
+                Https = @{
+                    Url = "https://0.0.0.0:$HttpsPort"
+                    Certificate = @{ Path = $pfxPath; Password = $pfxPassword }
+                }
+                InternalTunnel = @{
+                    Url = "http://127.0.0.1:$internalHttpPort"
+                }
+            }
+        }
         Sirk = @{
             DataRoot = $DataRoot
             ReverseProxy = @{ TrustAll = $false }
