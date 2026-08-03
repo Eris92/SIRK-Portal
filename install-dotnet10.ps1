@@ -164,7 +164,13 @@ function Ensure-SystemDotNet10([string]$DownloadRoot) {
     }
     $env:PATH = (Split-Path -Parent $dotnetPath) + ';' + $env:PATH
 
-    $blockMu = (Get-ItemProperty -LiteralPath 'HKLM:\SOFTWARE\Microsoft\.NET' -Name BlockMU -ErrorAction SilentlyContinue).BlockMU
+    $blockMu = $null
+    try {
+        $blockMu = Get-ItemPropertyValue -LiteralPath 'HKLM:\SOFTWARE\Microsoft\.NET' -Name BlockMU -ErrorAction Stop
+    }
+    catch {
+        $blockMu = $null
+    }
     if ($blockMu -eq 1) {
         Write-Warning 'Aktualizacje .NET przez Microsoft Update są zablokowane kluczem HKLM\SOFTWARE\Microsoft\.NET\BlockMU.'
     }
