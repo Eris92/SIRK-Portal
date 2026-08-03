@@ -70,6 +70,110 @@ function Add-LocalHostsEntry([string]$DnsName) {
     Add-Content -LiteralPath $hostsPath -Value "`r`n127.0.0.1`t$DnsName`t# SIRK Portal local test" -Encoding ASCII
 }
 
+function Get-SystemDotNetPath {
+    return (Join-Path $env:ProgramFiles 'dotnet\dotnet.exe')
+}
+
+function Get-InstalledDotNetRuntimes {
+    $dotnetPath = Get-SystemDotNetPath
+    if (-not (Test-Path -LiteralPath $dotnetPath -PathType Leaf)) { return @() }
+    $lines = @(& $dotnetPath --list-runtimes 2>$null)
+    if ($LASTEXITCODE -ne 0) { return @() }
+    return $lines
+}
+
+function Test-DotNet10Runtime([string]$RuntimeName) {
+    return [bool](Get-InstalledDotNetRuntimes | Where-Object {
+        $_ -match ('^' + [regex]::Escape($RuntimeName) + ' 10\.0\.')
+    })
+}
+
+function Install-DotNet10Component {
+    param(
+        [Parameter(Mandatory)][string]$DisplayName,
+        [Parameter(Mandatory)][string]$MetadataProperty,
+        [Parameter(Mandatory)][string]$RuntimeName,
+        [Parameter(Mandatory)][string]$DownloadRoot
+    )
+
+    if (Test-DotNet10Runtime $RuntimeName) {
+        Write-Host "$DisplayName jest już zainstalowany." -ForegroundColor DarkGreen
+        return
+    }
+
+    $metadataUrl = 'https://dotnetcli.blob.core.windows.net/dotnet/release-metadata/10.0/releases.json'
+    $metadata = Invoke-RestMethod -UseBasicParsing -Uri $metadataUrl
+    $latestRelease = [string]$metadata.'latest-release'
+    $release = @($metadata.releases | Where-Object {
+        [string]$_.'release-version' -eq $latestRelease
+    } | Select-Object -First 1)
+    if ($release.Count -ne 1) {
+        throw "Nie można odnaleźć metadanych .NET 10 release $latestRelease."
+    }
+
+    $componentProperty = $release[0].PSObject.Properties[$MetadataProperty]
+    if (-not $componentProperty -or -not $componentProperty.Value) {
+        throw "Metadane .NET 10 nie zawierają komponentu: $MetadataProperty"
+    }
+    $component = $componentProperty.Value
+    $installerAsset = @($component.files | Where-Object {
+        $_.rid -eq 'win-x64' -and $_.name -match '\.exe$'
+    } | Select-Object -First 1)
+    if ($installerAsset.Count -ne 1) {
+        throw "Nie można odnaleźć instalatora win-x64 dla $DisplayName."
+    }
+
+    New-Item -ItemType Directory -Path $DownloadRoot -Force | Out-Null
+    $installerPath = Join-Path $DownloadRoot $installerAsset[0].name
+    Write-Host "Pobieranie $DisplayName $($component.version)..." -ForegroundColor DarkCyan
+    Invoke-WebRequest -UseBasicParsing -Uri $installerAsset[0].url -OutFile $installerPath
+
+    $expectedHash = ([string]$installerAsset[0].hash).Trim().ToLowerInvariant()
+    if (-not [string]::IsNullOrWhiteSpace($expectedHash)) {
+        $actualHash = (Get-FileHash -LiteralPath $installerPath -Algorithm SHA512).Hash.ToLowerInvariant()
+        if ($actualHash -ne $expectedHash) {
+            throw "Nieprawidłowy SHA-512 instalatora $DisplayName."
+        }
+    }
+
+    $process = Start-Process -FilePath $installerPath -ArgumentList @('/install','/quiet','/norestart') -Wait -PassThru
+    if ($process.ExitCode -notin @(0, 1641, 3010)) {
+        throw "Instalacja $DisplayName nie powiodła się. ExitCode=$($process.ExitCode)"
+    }
+    if (-not (Test-DotNet10Runtime $RuntimeName)) {
+        throw "$DisplayName nie został wykryty po instalacji."
+    }
+}
+
+function Ensure-SystemDotNet10([string]$DownloadRoot) {
+    Write-Step 'Instalacja współdzielonego .NET 10 Runtime'
+    Install-DotNet10Component `
+        -DisplayName 'Microsoft .NET Runtime 10 x64' `
+        -MetadataProperty 'runtime' `
+        -RuntimeName 'Microsoft.NETCore.App' `
+        -DownloadRoot $DownloadRoot
+    Install-DotNet10Component `
+        -DisplayName 'Microsoft ASP.NET Core Runtime 10 x64' `
+        -MetadataProperty 'aspnetcore-runtime' `
+        -RuntimeName 'Microsoft.AspNetCore.App' `
+        -DownloadRoot $DownloadRoot
+
+    $dotnetPath = Get-SystemDotNetPath
+    if (-not (Test-Path -LiteralPath $dotnetPath -PathType Leaf)) {
+        throw 'Systemowy dotnet.exe nie został odnaleziony.'
+    }
+    $env:PATH = (Split-Path -Parent $dotnetPath) + ';' + $env:PATH
+
+    $blockMu = (Get-ItemProperty -LiteralPath 'HKLM:\SOFTWARE\Microsoft\.NET' -Name BlockMU -ErrorAction SilentlyContinue).BlockMU
+    if ($blockMu -eq 1) {
+        Write-Warning 'Aktualizacje .NET przez Microsoft Update są zablokowane kluczem HKLM\SOFTWARE\Microsoft\.NET\BlockMU.'
+    }
+
+    Get-InstalledDotNetRuntimes |
+        Where-Object { $_ -match '^(Microsoft\.NETCore\.App|Microsoft\.AspNetCore\.App) 10\.0\.' } |
+        ForEach-Object { Write-Host "Runtime: $_" -ForegroundColor DarkGreen }
+}
+
 if (-not (Test-Administrator)) { throw 'Uruchom PowerShell jako Administrator.' }
 if ($HttpsPort -lt 1 -or $HttpsPort -gt 65535) { throw 'Port HTTPS jest nieprawidłowy.' }
 if ($TrustCertificate -and $DoNotTrustCertificate) { throw 'Nie można jednocześnie włączyć i wyłączyć zaufania certyfikatu.' }
@@ -131,7 +235,8 @@ $workRoot = Join-Path $env:TEMP ('SIRK-Portal-DotNet10-' + [guid]::NewGuid().ToS
 $sourceZip = Join-Path $workRoot 'source.zip'
 $sourceExtract = Join-Path $workRoot 'source'
 $publishRoot = Join-Path $workRoot 'publish'
-$dotnetRoot = Join-Path $workRoot 'dotnet'
+$dotnetRoot = Join-Path $workRoot 'dotnet-sdk'
+$runtimeDownloadRoot = Join-Path $workRoot 'runtime-installers'
 $dotnetExe = Join-Path $dotnetRoot 'dotnet.exe'
 $logRoot = 'C:\ProgramData\SIRK\Logs'
 $installLog = Join-Path $logRoot 'Portal-DotNet10-Install.log'
@@ -142,6 +247,8 @@ $pfxPassword = $null
 New-Item -ItemType Directory -Path $workRoot,$sourceExtract,$publishRoot,$dotnetRoot,$DataRoot,$logRoot,$backupRoot -Force | Out-Null
 Start-Transcript -Path $installLog -Append | Out-Null
 try {
+    Ensure-SystemDotNet10 -DownloadRoot $runtimeDownloadRoot
+
     Write-Step 'Pobieranie kompletnego SIRK Portal .NET 10'
     $encodedBranch = [Uri]::EscapeDataString($Branch)
     Invoke-WebRequest "https://codeload.github.com/Eris92/SIRK-Portal/zip/refs/heads/$encodedBranch" -OutFile $sourceZip -UseBasicParsing
@@ -153,7 +260,7 @@ try {
     if (-not (Test-Path -LiteralPath $project)) { throw "Brak projektu .NET 10: $project" }
     if (-not (Test-Path -LiteralPath $globalJsonPath)) { throw 'Brak global.json.' }
 
-    Write-Step 'Instalacja izolowanego .NET 10 SDK do procesu instalacji'
+    Write-Step 'Instalacja izolowanego .NET 10 SDK wyłącznie do kompilacji'
     $sdkVersion = (Get-Content -LiteralPath $globalJsonPath -Raw | ConvertFrom-Json).sdk.version
     $dotnetInstall = Join-Path $workRoot 'dotnet-install.ps1'
     Invoke-WebRequest 'https://dot.net/v1/dotnet-install.ps1' -OutFile $dotnetInstall -UseBasicParsing
@@ -162,12 +269,14 @@ try {
         throw "Instalacja .NET SDK $sdkVersion nie powiodła się. ExitCode=$LASTEXITCODE"
     }
 
-    Write-Step 'Publikowanie self-contained Windows x64'
-    & $dotnetExe publish $project --configuration Release --runtime win-x64 --self-contained true --output $publishRoot /p:PublishSingleFile=false /p:DebugType=None /p:DebugSymbols=false
+    Write-Step 'Publikowanie framework-dependent Windows x64'
+    & $dotnetExe publish $project --configuration Release --runtime win-x64 --self-contained false --output $publishRoot /p:PublishSingleFile=false /p:DebugType=None /p:DebugSymbols=false
     if ($LASTEXITCODE -ne 0) { throw "dotnet publish nie powiódł się. ExitCode=$LASTEXITCODE" }
     $publishedExe = Join-Path $publishRoot 'Sirk.Portal.exe'
     foreach ($required in @(
         $publishedExe,
+        (Join-Path $publishRoot 'Sirk.Portal.dll'),
+        (Join-Path $publishRoot 'Sirk.Portal.runtimeconfig.json'),
         (Join-Path $publishRoot 'public\portal\standalone\index.html'),
         (Join-Path $publishRoot 'public\portal\standalone\login.html'),
         (Join-Path $publishRoot 'public\portal\standalone\scripts\app.js'),
@@ -175,6 +284,11 @@ try {
         (Join-Path $publishRoot 'public\portal\standalone\styles\base.css')
     )) {
         if (-not (Test-Path -LiteralPath $required -PathType Leaf)) { throw "Publish jest niekompletny: $required" }
+    }
+    foreach ($forbidden in @('coreclr.dll','hostfxr.dll','hostpolicy.dll','clrjit.dll','System.Private.CoreLib.dll')) {
+        if (Test-Path -LiteralPath (Join-Path $publishRoot $forbidden)) {
+            throw "Publish zawiera prywatną kopię runtime: $forbidden"
+        }
     }
 
     Write-Step 'Usuwanie poprzedniej instalacji'
@@ -279,7 +393,7 @@ try {
     $installedExe = Join-Path $InstallRoot 'Sirk.Portal.exe'
     $binaryPath = '"' + $installedExe + '"'
     New-Service -Name $serviceName -BinaryPathName $binaryPath -DisplayName 'SIRK Portal' -StartupType Automatic | Out-Null
-    & sc.exe description $serviceName 'SIRK Portal native ASP.NET Core / .NET 10 service' | Out-Null
+    & sc.exe description $serviceName 'SIRK Portal ASP.NET Core / shared .NET 10 runtime service' | Out-Null
     & sc.exe failure $serviceName reset= 86400 actions= restart/5000/restart/15000/restart/60000 | Out-Null
     New-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Services\$serviceName" -Name Environment -PropertyType MultiString -Value @('ASPNETCORE_ENVIRONMENT=Production','DOTNET_CLI_TELEMETRY_OPTOUT=1','DOTNET_NOLOGO=1') -Force | Out-Null
 
@@ -338,6 +452,7 @@ try {
     Remove-Item -LiteralPath $passwordFile -Force -ErrorAction SilentlyContinue
 
     Write-Host "`nSIRK Portal .NET 10 został zainstalowany i przeszedł testy." -ForegroundColor Green
+    Write-Host 'Model wdrożenia: framework-dependent (współdzielony, aktualizowany Runtime 10)' -ForegroundColor Green
     Write-Host "URL: $publicUrl/login" -ForegroundColor Cyan
     Write-Host "Login: $BootstrapUserName" -ForegroundColor Cyan
     Write-Host "Access Code: $accessCode" -ForegroundColor Yellow
