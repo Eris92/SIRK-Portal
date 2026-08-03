@@ -14,6 +14,17 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
+$systemDotNet = Join-Path $env:ProgramFiles 'dotnet\dotnet.exe'
+if (-not (Test-Path -LiteralPath $systemDotNet -PathType Leaf)) {
+    throw 'Brak systemowego Microsoft .NET 10 Runtime w C:\Program Files\dotnet.'
+}
+$runtimeList = @(& $systemDotNet --list-runtimes)
+if ($LASTEXITCODE -ne 0 -or
+    -not ($runtimeList | Where-Object { $_ -match '^Microsoft\.NETCore\.App 10\.0\.' })) {
+    throw 'SIRK Updater wymaga systemowego Microsoft.NETCore.App 10.0.'
+}
+$env:PATH = (Split-Path -Parent $systemDotNet) + ';' + $env:PATH
+
 $updaterCli = "$env:ProgramFiles\SIRK\Updater\SirkUpdater.exe"
 $updaterService = Get-Service -Name SirkUpdater -ErrorAction SilentlyContinue
 if (-not $updaterService -or -not (Test-Path -LiteralPath $updaterCli)) {
@@ -57,7 +68,7 @@ try {
         healthUrl = $HealthUrl
         channel = $Channel
         updateSource = 'https://github.com/Eris92/SIRK-Portal'
-        runtime = 'dotnet10'
+        runtime = 'dotnet10-framework-dependent'
         signatureRequired = $false
     } | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $manifestPath -Encoding UTF8
 
