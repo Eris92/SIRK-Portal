@@ -54,8 +54,8 @@ jobs:
               "Cert:\\LocalMachine\\Root",
               'New-Service',
               'Kestrel',
-              'portal/standalone/index.html',
-              'portal/standalone/login.html',
+              'portal\\standalone\\index.html',
+              'portal\\standalone\\login.html',
               'New-NetFirewallRule',
           )
           missing = [value for value in required if value not in text]
@@ -66,6 +66,7 @@ jobs:
           if present:
               raise SystemExit('Legacy runtime found in native installer: ' + ', '.join(present))
           PY
+          pwsh -NoProfile -Command '$tokens=$null; $errors=$null; [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path "install-dotnet10.ps1"), [ref]$tokens, [ref]$errors) | Out-Null; if ($errors.Count) { $errors | ForEach-Object { Write-Error $_.Message }; exit 1 }'
 
       - name: Restore
         run: dotnet restore tests/Sirk.Portal.ProtocolTests/Sirk.Portal.ProtocolTests.csproj
