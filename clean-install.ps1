@@ -205,17 +205,17 @@ if ($RemoveData -and (Test-Path -LiteralPath $DataRoot)) {
 
 Ensure-NodeRuntime | Out-Null
 
-Write-Host '=== Run canonical one-line installer ==='
+Write-Host '=== Run canonical one-line installer v3 ==='
 $installerPath = Join-Path $env:TEMP ('sirk-portal-install-' + [guid]::NewGuid().ToString('N') + '.ps1')
 try {
     Invoke-WebRequest `
         -UseBasicParsing `
-        -Uri ('https://raw.githubusercontent.com/Eris92/SIRK-Portal/develop/install.ps1?nocache=' + [guid]::NewGuid()) `
+        -Uri ('https://raw.githubusercontent.com/Eris92/SIRK-Portal/develop/install-v3.ps1?nocache=' + [guid]::NewGuid()) `
         -OutFile $installerPath
 
     & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $installerPath -PortalName $PortalName
     if ($LASTEXITCODE -ne 0) {
-        throw "Canonical Portal installer failed. ExitCode=$LASTEXITCODE"
+        throw "Canonical Portal installer v3 failed. ExitCode=$LASTEXITCODE"
     }
 }
 finally {
@@ -246,5 +246,4 @@ Write-Host ''
 Write-Host 'SIRK_PORTAL_CLEAN_INSTALL_OK'
 Write-Host "Portal URL: $loginUrl"
 Write-Host "System status: $statusUrl"
-if ($backup) { Write-Host "Backup: $backup"
-}
+if ($backup) { Write-Host "Backup: $backup" }
