@@ -120,7 +120,7 @@ internal static class PortalUiEndpoints
             ["portal-module-shell.css"] = "portal/standalone/styles/module-shell.css",
             ["portal-management-frame.css"] = "portal/standalone/styles/management-frame.css",
             ["portal-cleanup.css"] = "portal/standalone/styles/cleanup.css",
-            ["settings.js"] = "portal/standalone/scripts/settings-native.js",
+            ["settings.js"] = "portal/standalone/scripts/settings-native-v2.js",
             ["main.css"] = "shared/styles/main.css",
             ["shared/icon-registry.js"] = "shared/icon-registry.js",
             ["myscripts.css"] = "modules/automation/style.css",
