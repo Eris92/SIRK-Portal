@@ -5,6 +5,10 @@ param(
     [string]$DataRoot = 'C:\ProgramData\SIRK\Portal',
     [int]$HttpsPort = 443,
     [string]$BootstrapUserName = 'admin',
+    [string]$PortalFqdn = '',
+    [switch]$TrustCertificate,
+    [switch]$DoNotTrustCertificate,
+    [switch]$NonInteractive,
     [switch]$RemoveData
 )
 
@@ -68,22 +72,60 @@ function Add-LocalHostsEntry([string]$DnsName) {
 
 if (-not (Test-Administrator)) { throw 'Uruchom PowerShell jako Administrator.' }
 if ($HttpsPort -lt 1 -or $HttpsPort -gt 65535) { throw 'Port HTTPS jest nieprawidłowy.' }
+if ($TrustCertificate -and $DoNotTrustCertificate) { throw 'Nie można jednocześnie włączyć i wyłączyć zaufania certyfikatu.' }
 
 $serviceName = 'SirkPortal'
 $defaultFqdn = ($env:COMPUTERNAME + '.local').ToLowerInvariant()
-$portalFqdn = (Read-Host "Nazwa DNS Portalu [$defaultFqdn]").Trim().ToLowerInvariant()
+if ([string]::IsNullOrWhiteSpace($PortalFqdn)) {
+    if (-not [string]::IsNullOrWhiteSpace($env:SIRK_INSTALL_FQDN)) {
+        $PortalFqdn = $env:SIRK_INSTALL_FQDN
+    }
+    elseif ($NonInteractive) {
+        $PortalFqdn = $defaultFqdn
+    }
+    else {
+        $PortalFqdn = Read-Host "Nazwa DNS Portalu [$defaultFqdn]"
+    }
+}
+$portalFqdn = $PortalFqdn.Trim().ToLowerInvariant()
 if ([string]::IsNullOrWhiteSpace($portalFqdn)) { $portalFqdn = $defaultFqdn }
 if (-not (Test-DnsName $portalFqdn)) { throw 'Nazwa DNS Portalu jest nieprawidłowa.' }
 
-$password1 = Read-Host 'Hasło administratora Break-Glass (minimum 14 znaków)' -AsSecureString
-$password2 = Read-Host 'Powtórz hasło' -AsSecureString
-$plain1 = ConvertFrom-SecureStringPlain $password1
-$plain2 = ConvertFrom-SecureStringPlain $password2
+$plain1 = $null
+$plain2 = $null
+if (-not [string]::IsNullOrWhiteSpace($env:SIRK_INSTALL_BREAKGLASS_PASSWORD)) {
+    $plain1 = $env:SIRK_INSTALL_BREAKGLASS_PASSWORD
+    $plain2 = $plain1
+    Remove-Item Env:SIRK_INSTALL_BREAKGLASS_PASSWORD -ErrorAction SilentlyContinue
+}
+elseif ($NonInteractive) {
+    throw 'W trybie NonInteractive ustaw zmienną SIRK_INSTALL_BREAKGLASS_PASSWORD.'
+}
+else {
+    $password1 = Read-Host 'Hasło administratora Break-Glass (minimum 14 znaków)' -AsSecureString
+    $password2 = Read-Host 'Powtórz hasło' -AsSecureString
+    $plain1 = ConvertFrom-SecureStringPlain $password1
+    $plain2 = ConvertFrom-SecureStringPlain $password2
+}
 if ([string]::IsNullOrWhiteSpace($plain1) -or $plain1.Length -lt 14) { throw 'Hasło musi mieć minimum 14 znaków.' }
 if ($plain1 -cne $plain2) { throw 'Hasła nie są identyczne.' }
 
-$trustAnswer = (Read-Host 'Dodać certyfikat Portalu do LocalMachine\Root? [T/n]').Trim().ToLowerInvariant()
-$trustCertificate = $trustAnswer -notin @('n','nie','no')
+if ($TrustCertificate) {
+    $trustCertificateValue = $true
+}
+elseif ($DoNotTrustCertificate) {
+    $trustCertificateValue = $false
+}
+elseif (-not [string]::IsNullOrWhiteSpace($env:SIRK_INSTALL_TRUST_CERTIFICATE)) {
+    $trustCertificateValue = $env:SIRK_INSTALL_TRUST_CERTIFICATE -notmatch '^(0|false|no|n|nie)$'
+}
+elseif ($NonInteractive) {
+    $trustCertificateValue = $true
+}
+else {
+    $trustAnswer = (Read-Host 'Dodać certyfikat Portalu do LocalMachine\Root? [T/n]').Trim().ToLowerInvariant()
+    $trustCertificateValue = $trustAnswer -notin @('n','nie','no')
+}
 
 $workRoot = Join-Path $env:TEMP ('SIRK-Portal-DotNet10-' + [guid]::NewGuid().ToString('N'))
 $sourceZip = Join-Path $workRoot 'source.zip'
@@ -95,6 +137,7 @@ $logRoot = 'C:\ProgramData\SIRK\Logs'
 $installLog = Join-Path $logRoot 'Portal-DotNet10-Install.log'
 $backupRoot = 'C:\ProgramData\SIRK\Install Backups'
 $health = $null
+$pfxPassword = $null
 
 New-Item -ItemType Directory -Path $workRoot,$sourceExtract,$publishRoot,$dotnetRoot,$DataRoot,$logRoot,$backupRoot -Force | Out-Null
 Start-Transcript -Path $installLog -Append | Out-Null
@@ -128,6 +171,7 @@ try {
         (Join-Path $publishRoot 'public\portal\standalone\index.html'),
         (Join-Path $publishRoot 'public\portal\standalone\login.html'),
         (Join-Path $publishRoot 'public\portal\standalone\scripts\app.js'),
+        (Join-Path $publishRoot 'public\portal\standalone\scripts\settings-native-v2.js'),
         (Join-Path $publishRoot 'public\portal\standalone\styles\base.css')
     )) {
         if (-not (Test-Path -LiteralPath $required -PathType Leaf)) { throw "Publish jest niekompletny: $required" }
@@ -170,6 +214,7 @@ try {
         'localhost'
     ) | ForEach-Object { $_.ToLowerInvariant() } | Select-Object -Unique
     Get-ChildItem 'Cert:\LocalMachine\My' | Where-Object FriendlyName -eq 'SIRK Portal HTTPS' | Remove-Item -Force -ErrorAction SilentlyContinue
+    Get-ChildItem 'Cert:\LocalMachine\Root' | Where-Object FriendlyName -eq 'SIRK Portal HTTPS' | Remove-Item -Force -ErrorAction SilentlyContinue
     $certificate = New-SelfSignedCertificate -Subject "CN=$portalFqdn" -DnsName $dnsNames `
         -CertStoreLocation 'Cert:\LocalMachine\My' -FriendlyName 'SIRK Portal HTTPS' `
         -NotBefore (Get-Date).AddMinutes(-5) -NotAfter (Get-Date).AddYears(3) `
@@ -178,8 +223,9 @@ try {
         -TextExtension @('2.5.29.37={text}1.3.6.1.5.5.7.3.1')
     Export-PfxCertificate -Cert $certificate -FilePath $pfxPath -Password $securePfxPassword -Force | Out-Null
     Export-Certificate -Cert $certificate -FilePath $cerPath -Type CERT -Force | Out-Null
-    if ($trustCertificate) {
-        Import-Certificate -FilePath $cerPath -CertStoreLocation 'Cert:\LocalMachine\Root' | Out-Null
+    if ($trustCertificateValue) {
+        $trusted = Import-Certificate -FilePath $cerPath -CertStoreLocation 'Cert:\LocalMachine\Root'
+        if (-not $trusted) { throw 'Nie można dodać certyfikatu do Trusted Root.' }
     }
     Add-LocalHostsEntry $portalFqdn
 
@@ -231,7 +277,8 @@ try {
     Write-Step 'Rejestracja usługi Windows'
     $installedExe = Join-Path $InstallRoot 'Sirk.Portal.exe'
     $binaryPath = '"' + $installedExe + '"'
-    New-Service -Name $serviceName -BinaryPathName $binaryPath -DisplayName 'SIRK Portal' -Description 'SIRK Portal native ASP.NET Core / .NET 10 service' -StartupType Automatic | Out-Null
+    New-Service -Name $serviceName -BinaryPathName $binaryPath -DisplayName 'SIRK Portal' -StartupType Automatic | Out-Null
+    & sc.exe description $serviceName 'SIRK Portal native ASP.NET Core / .NET 10 service' | Out-Null
     & sc.exe failure $serviceName reset= 86400 actions= restart/5000/restart/15000/restart/60000 | Out-Null
     New-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Services\$serviceName" -Name Environment -PropertyType MultiString -Value @('ASPNETCORE_ENVIRONMENT=Production','DOTNET_CLI_TELEMETRY_OPTOUT=1','DOTNET_NOLOGO=1') -Force | Out-Null
 
@@ -246,7 +293,7 @@ try {
     $deadline = (Get-Date).AddMinutes(2)
     do {
         try {
-            $raw = & curl.exe -k -sS --max-time 5 "$publicUrl/healthz"
+            $raw = & curl.exe -sS --max-time 5 "$publicUrl/healthz"
             if ($LASTEXITCODE -eq 0 -and $raw) {
                 $health = $raw | ConvertFrom-Json
                 if ($health.status -eq 'healthy') { break }
@@ -257,15 +304,17 @@ try {
     if (-not $health -or $health.status -ne 'healthy') {
         throw 'Portal nie przeszedł health check. Sprawdź Event Viewer i log instalacji.'
     }
-    $readyRaw = & curl.exe -k -sS --max-time 10 "$publicUrl/readyz"
+    $readyRaw = & curl.exe -sS --max-time 10 "$publicUrl/readyz"
     $ready = $readyRaw | ConvertFrom-Json
     if ($ready.status -ne 'ready') { throw 'Portal nie przeszedł readiness check.' }
-    $loginHtml = & curl.exe -k -sS --max-time 10 "$publicUrl/login"
+    $loginHtml = & curl.exe -sS --max-time 10 "$publicUrl/login"
     if ($loginHtml -notmatch 'sirk-login-page' -or $loginHtml -notmatch '/assets/portal-login.css') {
         throw 'Pełny frontend logowania nie został opublikowany.'
     }
-    $portalCssStatus = & curl.exe -k -sS -o NUL -w '%{http_code}' --max-time 10 "$publicUrl/assets/portal-standalone.css"
+    $portalCssStatus = & curl.exe -sS -o NUL -w '%{http_code}' --max-time 10 "$publicUrl/assets/portal-standalone.css"
     if ($portalCssStatus -ne '200') { throw "Frontend CSS nie jest dostępny. HTTP=$portalCssStatus" }
+    $settingsStatus = & curl.exe -sS -o NUL -w '%{http_code}' --max-time 10 "$publicUrl/assets/settings.js"
+    if ($settingsStatus -ne '200') { throw "Natywne Ustawienia nie są dostępne. HTTP=$settingsStatus" }
     if (-not (Test-Path (Join-Path $DataRoot 'identity.json'))) { throw 'Konto Break-Glass nie zostało zainicjalizowane.' }
     Remove-Item -LiteralPath $passwordFile -Force -ErrorAction SilentlyContinue
 
@@ -276,7 +325,7 @@ try {
     Write-Host "Access Code zapisano w: $accessFile" -ForegroundColor DarkYellow
     Write-Host "Certyfikat: $($certificate.Thumbprint)" -ForegroundColor Cyan
     Write-Host "Log instalacji: $installLog"
-    Start-Process "$publicUrl/login"
+    if (-not $NonInteractive) { Start-Process "$publicUrl/login" }
 }
 catch {
     Write-Host "`nInstalacja nie powiodła się: $($_.Exception.Message)" -ForegroundColor Red
