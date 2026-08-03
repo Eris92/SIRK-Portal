@@ -22,9 +22,9 @@ test("updater owns a maintenance lock and removes it in finally", function () {
 });
 
 test("success is committed only after service start and health verification", function () {
-    var startIndex = helper.indexOf("startWindowsService(serviceName)");
-    var healthIndex = helper.indexOf("requestHealthy(healthUrl");
-    var completeIndex = helper.indexOf("complete(stateFile");
+    var startIndex = helper.indexOf("startWindowsService(serviceName)", helper.indexOf("function main()"));
+    var healthIndex = helper.indexOf("requestHealthy(healthUrl", startIndex);
+    var completeIndex = helper.indexOf("complete(stateFile, manifest.history", healthIndex);
     assert.ok(startIndex >= 0);
     assert.ok(healthIndex > startIndex);
     assert.ok(completeIndex > healthIndex);
