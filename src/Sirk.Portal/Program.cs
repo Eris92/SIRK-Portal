@@ -24,10 +24,12 @@ if (RuntimeHealthProbe.IsRequested(args))
     return;
 }
 
+var applicationRoot = AppContext.BaseDirectory;
 var builder = WebApplication.CreateBuilder(new WebApplicationOptions
 {
     Args = args,
-    WebRootPath = "public"
+    ContentRootPath = applicationRoot,
+    WebRootPath = Path.Combine(applicationRoot, "public")
 });
 
 builder.Host.UseWindowsService(options => options.ServiceName = "SIRK Portal");
