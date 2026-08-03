@@ -1,3 +1,51 @@
+/* Persistent shell icons: do not depend on inherited or dynamically injected colors. */
+#sirkPortalRoot .sirk-standalone-nav button[data-view="overview"],
+#sirkPortalRoot .sirk-standalone-nav button[data-view="devices"] { --sirk-shell-icon-color: #55b8ff; }
+#sirkPortalRoot .sirk-standalone-nav button[data-view="approvals"] { --sirk-shell-icon-color: #35d7a4; }
+#sirkPortalRoot .sirk-standalone-nav button[data-view="automation"] { --sirk-shell-icon-color: #ffae00; }
+#sirkPortalRoot .sirk-standalone-nav button[data-view="monitoring"] { --sirk-shell-icon-color: #34d1e7; }
+#sirkPortalRoot .sirk-standalone-nav button[data-view="assets"] { --sirk-shell-icon-color: #9a7cff; }
+#sirkPortalRoot .sirk-standalone-nav button[data-view="management"] { --sirk-shell-icon-color: #ff5f7d; }
+#sirkPortalRoot .sirk-standalone-nav button[data-view="reports"] { --sirk-shell-icon-color: #7f85ff; }
+#sirkPortalRoot .sirk-standalone-nav button[data-view="security"] { --sirk-shell-icon-color: #ff385d; }
+#sirkPortalRoot .sirk-standalone-nav button[data-view="settings"] { --sirk-shell-icon-color: #94a3b8; }
+
+#sirkPortalRoot .sirk-standalone-nav button[data-view] > span {
+    color: var(--sirk-shell-icon-color, #55b8ff) !important;
+    -webkit-text-fill-color: var(--sirk-shell-icon-color, #55b8ff) !important;
+    filter: none !important;
+    clip-path: none !important;
+    mask: none !important;
+    -webkit-mask: none !important;
+}
+
+#sirkPortalRoot .sirk-standalone-nav button[data-view] > span > svg,
+#sirkPortalRoot .sirk-standalone-nav button[data-view] > span > svg :is(path,rect,circle,line,polyline,polygon,ellipse) {
+    color: var(--sirk-shell-icon-color, #55b8ff) !important;
+    stroke: var(--sirk-shell-icon-color, #55b8ff) !important;
+    stroke-opacity: 1 !important;
+    fill-opacity: 1 !important;
+    filter: none !important;
+    clip-path: none !important;
+    mask: none !important;
+    -webkit-mask: none !important;
+}
+
+#sirkPortalRoot .sirk-standalone-controls [data-action="sidebar"],
+#sirkPortalRoot .sirk-standalone-controls [data-action="sidebar"] svg,
+#sirkPortalRoot .sirk-standalone-controls [data-action="sidebar"] svg path {
+    color: #edf4ff !important;
+    stroke: #edf4ff !important;
+    stroke-opacity: 1 !important;
+    fill: none !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    filter: none !important;
+    clip-path: none !important;
+    mask: none !important;
+    -webkit-mask: none !important;
+}
+
 /* Main shell icons. This file is loaded as portal-module-shell.css after vendored styles. */
 #sirkPortalRoot .sirk-standalone-controls [data-action="sidebar"] svg,
 #sirkPortalRoot .sirk-standalone-nav button > span > svg {

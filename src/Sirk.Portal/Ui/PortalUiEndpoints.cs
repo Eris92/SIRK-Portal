@@ -6,6 +6,7 @@ namespace Sirk.Portal.Ui;
 
 internal static class PortalUiEndpoints
 {
+    private const string AssetRevision = "shell-icons-20260803-1";
     private static readonly IReadOnlyDictionary<string, string> Assets = BuildAssets();
 
     public static IEndpointRouteBuilder MapPortalUi(this IEndpointRouteBuilder endpoints)
@@ -29,6 +30,7 @@ internal static class PortalUiEndpoints
         var path = Path.Combine(environment.WebRootPath, "portal", "standalone", "index.html");
         var html = await File.ReadAllTextAsync(path, Encoding.UTF8, context.RequestAborted);
         var version = VersionInfo.Current;
+        var assetVersion = ResolveAssetVersion(version);
         html = html
             .Replace("__API_BASE_JSON__", "\"/api/v1\"", StringComparison.Ordinal)
             .Replace("__ASSET_BASE_JSON__", "\"/assets\"", StringComparison.Ordinal)
@@ -36,12 +38,12 @@ internal static class PortalUiEndpoints
             .Replace("__LOGOUT_URL_JSON__", "\"/auth/logout\"", StringComparison.Ordinal)
             .Replace("__USER_IMAGE_URL_JSON__", "\"/assets/icons/sirk-ui.svg\"", StringComparison.Ordinal)
             .Replace("__DEFAULT_USER_IMAGE_URL_JSON__", "\"/assets/icons/sirk-ui.svg\"", StringComparison.Ordinal)
-            .Replace("__VERSION_JSON__", System.Text.Json.JsonSerializer.Serialize(version), StringComparison.Ordinal)
+            .Replace("__VERSION_JSON__", System.Text.Json.JsonSerializer.Serialize(assetVersion), StringComparison.Ordinal)
             .Replace("__ASSET_BASE__", "/assets", StringComparison.Ordinal)
-            .Replace("__VERSION__", Uri.EscapeDataString(version), StringComparison.Ordinal);
+            .Replace("__VERSION__", Uri.EscapeDataString(assetVersion), StringComparison.Ordinal);
         html = html.Replace(
             "</head>",
-            $"<link rel=\"stylesheet\" href=\"/assets/portal-management-frame.css?v={Uri.EscapeDataString(version)}\"></head>",
+            $"<link rel=\"stylesheet\" href=\"/assets/portal-management-frame.css?v={Uri.EscapeDataString(assetVersion)}\"></head>",
             StringComparison.Ordinal);
         return Results.Content(html, "text/html; charset=utf-8", Encoding.UTF8);
     }
@@ -57,12 +59,13 @@ internal static class PortalUiEndpoints
         var path = Path.Combine(environment.WebRootPath, "portal", "standalone", "login.html");
         var html = await File.ReadAllTextAsync(path, Encoding.UTF8, context.RequestAborted);
         var version = VersionInfo.Current;
+        var assetVersion = ResolveAssetVersion(version);
         html = html
             .Replace("__ASSET_BASE_JSON__", "\"/assets\"", StringComparison.Ordinal)
             .Replace("__PORTAL_URL_JSON__", "\"/\"", StringComparison.Ordinal)
-            .Replace("__VERSION_JSON__", System.Text.Json.JsonSerializer.Serialize(version), StringComparison.Ordinal)
+            .Replace("__VERSION_JSON__", System.Text.Json.JsonSerializer.Serialize(assetVersion), StringComparison.Ordinal)
             .Replace("__ASSET_BASE__", "/assets", StringComparison.Ordinal)
-            .Replace("__VERSION__", Uri.EscapeDataString(version), StringComparison.Ordinal);
+            .Replace("__VERSION__", Uri.EscapeDataString(assetVersion), StringComparison.Ordinal);
         return Results.Content(html, "text/html; charset=utf-8", Encoding.UTF8);
     }
 
@@ -93,6 +96,9 @@ internal static class PortalUiEndpoints
             await context.SignOutAsync(PortalAuthenticationSchemes.Session);
         return Results.Redirect("/login", permanent: false, preserveMethod: false);
     }
+
+    private static string ResolveAssetVersion(string productVersion) =>
+        productVersion + "-" + AssetRevision;
 
     private static IReadOnlyDictionary<string, string> BuildAssets()
     {
