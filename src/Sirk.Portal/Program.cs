@@ -14,6 +14,7 @@ using Sirk.Portal.Central;
 using Sirk.Portal.Modules;
 using Sirk.Portal.Security;
 using Sirk.Portal.Settings;
+using Sirk.Portal.Ui;
 using Sirk.Portal.Workflows;
 
 if (RuntimeHealthProbe.IsRequested(args))
@@ -266,26 +267,7 @@ app.UseMiddleware<InternalTunnelAuthenticationMiddleware>();
 app.UseAuthorization();
 app.UseStaticFiles();
 
-app.MapGet("/", (HttpContext context) =>
-{
-    if (context.User.Identity?.IsAuthenticated != true)
-        return Results.Redirect("/login", permanent: false, preserveMethod: false);
-    return Results.Content(
-        """
-        <!doctype html>
-        <html lang="pl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>SIRK Portal</title></head>
-        <body><main><h1>SIRK Portal</h1><p>Natywny runtime ASP.NET Core / .NET 10 jest gotowy.</p><p>Interfejs modułowy jest dostępny przez API v1.</p></main></body></html>
-        """,
-        "text/html; charset=utf-8");
-}).AllowAnonymous();
-
-app.MapGet("/login", () => Results.Content(
-    """
-    <!doctype html>
-    <html lang="pl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Logowanie - SIRK Portal</title></head>
-    <body><main><h1>SIRK Portal</h1><form id="login"><label>Login <input id="user" autocomplete="username" required></label><label>Hasło <input id="password" type="password" autocomplete="current-password" required></label><label>Access code <input id="access" type="password" autocomplete="off"></label><button>Zaloguj</button><p id="error"></p></form></main><script>'use strict';document.getElementById('login').addEventListener('submit',async function(e){e.preventDefault();const r=await fetch('/api/v1/auth/login',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({userName:document.getElementById('user').value,password:document.getElementById('password').value,accessCode:document.getElementById('access').value})});const v=await r.json();if(r.ok){location.replace('/');}else{document.getElementById('error').textContent=v.error||'Logowanie nie powiodło się.';}});</script></body></html>
-    """,
-    "text/html; charset=utf-8")).AllowAnonymous();
+app.MapPortalUi();
 
 app.MapGet("/healthz", () => Results.Ok(new
 {
