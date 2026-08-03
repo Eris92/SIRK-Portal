@@ -23,15 +23,24 @@ class Browser:
         self.opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(self.cookies))
         self.csrf = ""
 
-    def call(self, method: str, path: str, payload=None, expected: int = 200, accept: str = "application/json"):
-        headers = {"Accept": accept}
+    def call(
+        self,
+        method: str,
+        path: str,
+        payload=None,
+        expected: int = 200,
+        accept: str = "application/json",
+        headers: dict[str, str] | None = None,
+    ):
+        request_headers = {"Accept": accept}
         body = None
         if payload is not None:
             body = json.dumps(payload, separators=(",", ":")).encode("utf-8")
-            headers["Content-Type"] = "application/json; charset=utf-8"
+            request_headers["Content-Type"] = "application/json; charset=utf-8"
         if method not in ("GET", "HEAD", "OPTIONS") and self.csrf:
-            headers["X-SIRK-CSRF"] = self.csrf
-        request = urllib.request.Request(BASE_URL + path, data=body, headers=headers, method=method)
+            request_headers["X-SIRK-CSRF"] = self.csrf
+        request_headers.update(headers or {})
+        request = urllib.request.Request(BASE_URL + path, data=body, headers=request_headers, method=method)
         try:
             response = self.opener.open(request, timeout=20)
             status = response.status
@@ -45,16 +54,28 @@ class Browser:
             raise RuntimeError(f"{method} {path}: expected {expected}, got {status}: {raw.decode(errors='replace')}")
         return raw, response_headers
 
-    def json(self, method: str, path: str, payload=None, expected: int = 200):
-        raw, _ = self.call(method, path, payload, expected)
+    def json(
+        self,
+        method: str,
+        path: str,
+        payload=None,
+        expected: int = 200,
+        headers: dict[str, str] | None = None,
+    ):
+        raw, _ = self.call(method, path, payload, expected, headers=headers)
         return json.loads(raw.decode("utf-8")) if raw else {}
 
     def authenticate(self) -> None:
-        result = self.json("POST", "/api/v1/auth/login", {
-            "userName": "admin",
-            "password": PASSWORD,
-            "accessCode": ACCESS_CODE,
-        })
+        result = self.json(
+            "POST",
+            "/api/v1/auth/login",
+            {
+                "userName": "admin",
+                "password": PASSWORD,
+                "accessCode": ACCESS_CODE,
+            },
+            headers={"Authorization": "Bearer " + ACCESS_CODE},
+        )
         if result.get("user", {}).get("role") != "Break-Glass":
             raise RuntimeError("Break-Glass session was not established.")
         token = self.json("GET", "/api/v1/auth/csrf")
