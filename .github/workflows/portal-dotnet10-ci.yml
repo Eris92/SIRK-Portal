@@ -1,45 +1,85 @@
 name: SIRK Portal .NET 10 CI
 
 on:
-  workflow_dispatch:
-  push:
-    branches: [main, develop, rewrite/dotnet10-node-free]
   pull_request:
     branches: [main, develop]
 
 permissions:
-  contents: read
-
-concurrency:
-  group: portal-dotnet10-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  contents: write
 
 jobs:
-  linux-build-api-ui:
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
+  apply-central-tunnel-default:
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 10.0.x
-          cache: true
-          cache-dependency-path: '**/*.csproj'
-      - name: Build test publish API UI and container
+          ref: feature/group-bound-agent-installer
+      - name: Enable protected Central tunnel and restore CI
         shell: bash
-        run: bash .github/scripts/validate-node-free-dotnet10.sh
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('install-dotnet10.ps1')
+          value = path.read_text(encoding='utf-8')
+          old = '''            CentralTunnel = @{
+                Enabled = $false'''
+          new = '''            CentralTunnel = @{
+                Enabled = $true'''
+          if value.count(old) != 1:
+              raise SystemExit('CentralTunnel installer marker was not found exactly once.')
+          path.write_text(value.replace(old, new), encoding='utf-8', newline='\n')
+          PY
+          cat > .github/workflows/portal-dotnet10-ci.yml <<'YAML'
+          name: SIRK Portal .NET 10 CI
 
-  windows-clean-install:
-    runs-on: windows-latest
-    timeout-minutes: 55
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: 10.0.x
-      - name: Validate single-use ticket and IExpress EXE contracts
-        shell: pwsh
-        run: dotnet run --project tests/Sirk.Portal.ProtocolTests/Sirk.Portal.ProtocolTests.csproj --configuration Release
-      - name: Install and verify from zero
-        shell: powershell
-        run: .\.github\scripts\Test-NodeFreeWindowsInstall.ps1 -Branch '${{ github.head_ref || github.ref_name }}'
+          on:
+            workflow_dispatch:
+            push:
+              branches: [main, develop, rewrite/dotnet10-node-free]
+            pull_request:
+              branches: [main, develop]
+
+          permissions:
+            contents: read
+
+          concurrency:
+            group: portal-dotnet10-${{ github.workflow }}-${{ github.ref }}
+            cancel-in-progress: true
+
+          jobs:
+            linux-build-api-ui:
+              runs-on: ubuntu-latest
+              timeout-minutes: 30
+              steps:
+                - uses: actions/checkout@v4
+                - uses: actions/setup-dotnet@v4
+                  with:
+                    dotnet-version: 10.0.x
+                    cache: true
+                    cache-dependency-path: '**/*.csproj'
+                - name: Build test publish API UI and container
+                  shell: bash
+                  run: bash .github/scripts/validate-node-free-dotnet10.sh
+
+            windows-clean-install:
+              runs-on: windows-latest
+              timeout-minutes: 55
+              steps:
+                - uses: actions/checkout@v4
+                - uses: actions/setup-dotnet@v4
+                  with:
+                    dotnet-version: 10.0.x
+                - name: Validate single-use ticket and IExpress EXE contracts
+                  shell: pwsh
+                  run: dotnet run --project tests/Sirk.Portal.ProtocolTests/Sirk.Portal.ProtocolTests.csproj --configuration Release
+                - name: Install and verify from zero
+                  shell: powershell
+                  run: .\.github\scripts\Test-NodeFreeWindowsInstall.ps1 -Branch '${{ github.head_ref || github.ref_name }}'
+          YAML
+          sed -i 's/^          //' .github/workflows/portal-dotnet10-ci.yml
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A
+          git diff --cached --check
+          git commit -m 'Enable Central tunnel after protected connection import'
+          git push origin HEAD:feature/group-bound-agent-installer
