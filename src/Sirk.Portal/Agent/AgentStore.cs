@@ -65,7 +65,7 @@ internal sealed record AgentHeartbeatRequest(
     string Status,
     IReadOnlyDictionary<string, string>? Metadata);
 
-internal sealed class AgentStore
+internal sealed partial class AgentStore
 {
     private const int SchemaVersion = 1;
     private static readonly Regex IdPattern = new(
@@ -190,7 +190,7 @@ internal sealed class AgentStore
     public AgentDeviceIssue Enroll(
         AgentEnrollmentRequest request,
         string remoteAddress,
-        bool enrollmentTokenPrevalidated = false)
+        bool enrollmentTokenPrevalidated)
     {
         ArgumentNullException.ThrowIfNull(request);
         var groupId = NormalizeId(request.GroupId, "Group ID");
