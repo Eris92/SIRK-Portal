@@ -1,3 +1,40 @@
+/* Shell icons must remain visible even when vendored styles override generic SVG rules. */
+#sirkPortalRoot .sirk-standalone-controls [data-action="sidebar"] svg,
+#sirkPortalRoot .sirk-standalone-nav button > span > svg {
+    display: block !important;
+    width: 22px !important;
+    height: 22px !important;
+    overflow: visible !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    fill: none !important;
+    stroke: currentColor !important;
+    stroke-width: 1.8 !important;
+    stroke-linecap: round !important;
+    stroke-linejoin: round !important;
+}
+
+#sirkPortalRoot .sirk-standalone-controls [data-action="sidebar"] svg *,
+#sirkPortalRoot .sirk-standalone-nav button > span > svg * {
+    fill: none !important;
+    stroke: currentColor !important;
+    stroke-width: inherit !important;
+    stroke-linecap: inherit !important;
+    stroke-linejoin: inherit !important;
+    vector-effect: non-scaling-stroke;
+}
+
+#sirkPortalRoot .sirk-standalone-controls [data-action="sidebar"] {
+    color: #edf4ff !important;
+}
+
+#sirkPortalRoot .sirk-standalone-nav button > span {
+    min-width: 25px !important;
+    min-height: 25px !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+}
+
 /* Management owns the visible card. The Portal host must not draw a second frame. */
 #sirkPortalRoot .sirk-standalone-content.sirk-unified-content > .,
 #sirkPortalRoot .sirk-portal-view-management > . {
