@@ -9,6 +9,14 @@ var WebSocket = require("ws");
 var WebSocketServer = WebSocket.WebSocketServer;
 var clientFactory = require("../server/core/central-tunnel-client.js");
 
+async function waitFor(predicate, timeoutMilliseconds) {
+    var deadline = Date.now() + (timeoutMilliseconds || 3000);
+    while (!predicate()) {
+        if (Date.now() >= deadline) throw new Error("Timed out waiting for the tunnel client state.");
+        await new Promise(function (resolve) { setTimeout(resolve, 10); });
+    }
+}
+
 async function run() {
     var updaterRoot = fs.mkdtempSync(path.join(os.tmpdir(), "sirk-updater-telemetry-"));
     fs.mkdirSync(path.join(updaterRoot, "applications"), { recursive: true });
@@ -63,6 +71,9 @@ async function run() {
         });
         tunnel.connect();
         var socket = await connected;
+        if (expectedUpdaterRunning) {
+            await waitFor(function () { return tunnel.heartbeatBody().health === "ok"; });
+        }
         var heartbeat = tunnel.heartbeatBody();
         assert.strictEqual(heartbeat.health, expectedUpdaterRunning ? "ok" : "warning");
         assert.strictEqual(heartbeat.updateChannel, "dev");
