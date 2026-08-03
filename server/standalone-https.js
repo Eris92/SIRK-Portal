@@ -7,7 +7,9 @@ var https = require("https");
 var net = require("net");
 var path = require("path");
 var connectionConfigFactory = require("./core/central-connection-config.js");
+var systemStatusFactory = require("./core/system-status.js");
 var standalone = require("./standalone.js");
+var VERSION = require("../config.json").version;
 
 var ROOT = path.resolve(__dirname, "..");
 
@@ -31,6 +33,15 @@ function redirect(res, location) {
     res.setHeader("Cache-Control", "no-store");
     res.setHeader("Content-Length", "0");
     res.end();
+}
+function sendStatus(res, method, value) {
+    var body = Buffer.from(JSON.stringify(value));
+    res.statusCode = value.status === "critical" ? 503 : 200;
+    res.setHeader("Content-Type", "application/json; charset=utf-8");
+    res.setHeader("Content-Length", String(body.length));
+    res.setHeader("Cache-Control", "no-store");
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.end(method === "HEAD" ? undefined : body);
 }
 function microsoftPage() {
     return fs.readFileSync(path.join(ROOT, "public/portal/standalone/microsoft-login.html"), "utf8");
@@ -67,6 +78,7 @@ async function start(options) {
     options = options || {};
     var dataRoot = path.resolve(options.dataRoot || process.env.SIRK_DATA_ROOT || "C:\\ProgramData\\SIRK\\Portal");
     applyCentralConnection(dataRoot);
+    var statusCollector = systemStatusFactory.create({ dataRoot: dataRoot, version: VERSION });
     var internalPort = Number(options.internalPort || process.env.SIRK_INTERNAL_PORT || 9080);
     var httpsPort = Number(options.httpsPort || process.env.SIRK_HTTPS_PORT || 443);
     var certificatePath = options.certificatePath || process.env.SIRK_TLS_CERT;
@@ -92,6 +104,11 @@ async function start(options) {
         try { url = new URL(req.url, "https://sirk.local"); } catch (error) { res.statusCode = 400; res.end("Bad request"); return; }
 
         var safeMethod = req.method === "GET" || req.method === "HEAD";
+        if (safeMethod && url.pathname === "/api/system/status") {
+            try { sendStatus(res, req.method, statusCollector.collect()); }
+            catch (error) { sendStatus(res, req.method, { ok: false, status: "critical", error: "System status collection failed." }); }
+            return;
+        }
         var hasPortalSession = Boolean(cookie(req, "sirk_session"));
         if (safeMethod && url.pathname === "/" && !hasPortalSession) {
             redirect(res, "/login" + url.search);

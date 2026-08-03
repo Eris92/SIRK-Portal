@@ -9,6 +9,14 @@ var WebSocket = require("ws");
 var WebSocketServer = WebSocket.WebSocketServer;
 var clientFactory = require("../server/core/central-tunnel-client.js");
 
+async function waitFor(predicate, timeoutMilliseconds) {
+    var deadline = Date.now() + (timeoutMilliseconds || 3000);
+    while (!predicate()) {
+        if (Date.now() >= deadline) throw new Error("Timed out waiting for the tunnel client state.");
+        await new Promise(function (resolve) { setTimeout(resolve, 10); });
+    }
+}
+
 async function run() {
     var updaterRoot = fs.mkdtempSync(path.join(os.tmpdir(), "sirk-updater-telemetry-"));
     fs.mkdirSync(path.join(updaterRoot, "applications"), { recursive: true });
@@ -44,8 +52,9 @@ async function run() {
     try {
         assert.strictEqual(tunnel.configured(), true);
         var updater = tunnel.updaterSummary();
+        var expectedUpdaterRunning = process.platform !== "win32";
         assert.strictEqual(updater.installed, true);
-        assert.strictEqual(updater.running, true);
+        assert.strictEqual(updater.running, expectedUpdaterRunning);
         assert.strictEqual(updater.channel, "dev");
         assert.strictEqual(updater.targetVersion, "2.0.0-dev.30");
         assert.strictEqual(updater.phase, "Completed");
@@ -62,12 +71,15 @@ async function run() {
         });
         tunnel.connect();
         var socket = await connected;
+        if (expectedUpdaterRunning) {
+            await waitFor(function () { return tunnel.heartbeatBody().health === "ok"; });
+        }
         var heartbeat = tunnel.heartbeatBody();
-        assert.strictEqual(heartbeat.health, "ok");
+        assert.strictEqual(heartbeat.health, expectedUpdaterRunning ? "ok" : "warning");
         assert.strictEqual(heartbeat.updateChannel, "dev");
         assert.strictEqual(heartbeat.availableVersion, "2.0.0-dev.30");
         assert.ok(heartbeat.capabilities.includes("shared-updater"));
-        assert.ok(heartbeat.capabilities.includes("shared-updater-running"));
+        assert.strictEqual(heartbeat.capabilities.includes("shared-updater-running"), expectedUpdaterRunning);
         assert.ok(heartbeat.capabilities.includes("shared-updater-phase:completed"));
 
         var response = new Promise(function (resolve) {

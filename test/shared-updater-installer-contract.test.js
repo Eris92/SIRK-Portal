@@ -4,21 +4,28 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 
-const installer = fs.readFileSync(path.join(__dirname, "..", "install.ps1"), "utf8");
+const root = path.join(__dirname, "..");
+const installer = fs.readFileSync(path.join(root, "install-v3.ps1"), "utf8");
+const integration = fs.readFileSync(path.join(root, "tools", "installer", "Ensure-SirkUpdater.ps1"), "utf8");
 
-assert.match(installer, /function\s+Ensure-SirkUpdater\b/);
-assert.match(installer, /Get-Service\s+-Name\s+'SirkUpdater'/);
-assert.match(installer, /SIRK-Updater\/main\/install-release\.ps1/);
-assert.match(installer, /-AllowSourceFallback/);
-assert.doesNotMatch(installer, /SIRK-Updater\/main\/install\.ps1/);
-assert.match(installer, /function\s+Register-PortalWithUpdater\b/);
-assert.match(installer, /applicationId\s*=\s*'sirk-portal'/);
-assert.match(installer, /serviceName\s*=\s*\$PortalService\.Name/);
-assert.match(installer, /watchdogServiceName\s*=\s*if\s*\(\$WatchdogService\)/);
-assert.match(installer, /healthUrl\s*=\s*'https:\/\/127\.0\.0\.1\/login'/);
-assert.match(installer, /channel\s*=\s*'dev'/);
-assert.match(installer, /&\s*\$UpdaterCli\s+register\s+\$manifestPath/);
-assert.match(installer, /&\s*\$UpdaterCli\s+show\s+sirk-portal/);
-assert.match(installer, /Shared updater:\s*SIRK Updater/);
+assert.match(installer, /Ensure-SirkUpdater\.ps1/);
+assert.match(installer, /SirkPortalWatchdog/);
+assert.match(installer, /Channel dev/);
+assert.doesNotMatch(installer, /AllowSourceFallback/);
+assert.doesNotMatch(installer, /install-release\.ps1/);
+
+assert.match(integration, /Get-Service -Name 'SirkUpdater'/);
+assert.match(integration, /SIRK-Updater\/main\/install-release-v2\.ps1/);
+assert.doesNotMatch(integration, /AllowSourceFallback/);
+assert.doesNotMatch(integration, /SIRK-Updater\/main\/install-release\.ps1/);
+assert.doesNotMatch(integration, /SIRK-Updater\/main\/install\.ps1/);
+assert.match(integration, /applicationId\s*=\s*'sirk-portal'/);
+assert.match(integration, /serviceName\s*=\s*\$portalService\.Name/);
+assert.match(integration, /watchdogServiceName\s*=\s*if\s*\(\$watchdog\)/);
+assert.match(integration, /healthUrl\s*=\s*'https:\/\/127\.0\.0\.1\/login'/);
+assert.match(integration, /channel\s*=\s*\$Channel/);
+assert.match(integration, /&\s*\$updaterCli\s+register\s+\$manifestPath/);
+assert.match(integration, /&\s*\$updaterCli\s+show\s+sirk-portal/);
+assert.match(integration, /SIRK_PORTAL_SHARED_UPDATER_READY/);
 
 console.log("shared-updater-installer-contract: OK");

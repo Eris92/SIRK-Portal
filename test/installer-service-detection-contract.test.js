@@ -3,16 +3,26 @@
 var assert = require("assert");
 var fs = require("fs");
 
-var installer = fs.readFileSync("install.ps1", "utf8");
+var installer = fs.readFileSync("install-v3.ps1", "utf8");
+var cleaner = fs.readFileSync("clean-install.ps1", "utf8");
 
-assert.match(installer, /Get-CimInstance Win32_Service/);
-assert.match(installer, /DisplayName -eq 'SIRK Portal'/);
-assert.match(installer, /DisplayName -eq 'SIRK Portal Watchdog'/);
-assert.match(installer, /sirkportal\.exe/);
-assert.match(installer, /sirkportalwatchdog\.exe/);
-assert.match(installer, /CurrentControlSet\\Services/);
-assert.match(installer, /Stop-Service -Name \$watchdog\.Name/);
-assert.match(installer, /Start-Service -Name \$watchdog\.Name/);
-assert.doesNotMatch(installer, /Get-CimInstance Win32_Service -Filter \"Name='SirkPortal'\"/);
+assert.match(installer, /function Remove-ServiceIfPresent/);
+assert.match(installer, /Get-Service -Name \$Name/);
+assert.match(installer, /Install-WinSwService -ServiceName 'SirkPortal'/);
+assert.match(installer, /Install-WinSwService -ServiceName 'SirkPortalWatchdog'/);
+assert.match(installer, /SIRK_SERVICE_NAME = 'SirkPortal'/);
+assert.match(installer, /SIRK_PORTAL_SERVICE_NAME = 'SirkPortal'/);
+assert.match(installer, /SIRK_PORTAL_WATCHDOG_SERVICE_NAME|PortalWatchdogServiceName SirkPortalWatchdog/);
+assert.match(installer, /'SirkPortalStandalone'/);
+assert.match(installer, /'sirkportal\.exe'/);
+assert.match(installer, /'sirkportalwatchdog\.exe'/);
+
+assert.match(cleaner, /function Remove-SirkService/);
+assert.match(cleaner, /Wait-ServiceDeletion/);
+assert.match(cleaner, /'SirkPortal'/);
+assert.match(cleaner, /'SirkPortalWatchdog'/);
+assert.match(cleaner, /'SirkPortalStandalone'/);
+assert.match(cleaner, /sc\.exe delete \$Name/);
+assert.doesNotMatch(cleaner, /install\.ps1\?nocache/);
 
 console.log("installer-service-detection-contract: OK");

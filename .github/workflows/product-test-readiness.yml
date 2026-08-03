@@ -1,0 +1,85 @@
+name: SIRK Portal Product Test Readiness
+
+on:
+  push:
+    branches: [develop, main]
+  pull_request:
+    branches: [develop, main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  portal-readiness:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.x'
+          cache: npm
+
+      - name: Install dependencies
+        shell: pwsh
+        run: npm ci
+
+      - name: Validate JavaScript syntax
+        shell: pwsh
+        run: |
+          $files = Get-ChildItem server,public,test -Recurse -File -Filter '*.js'
+          foreach ($file in $files) {
+            node --check $file.FullName
+            if ($LASTEXITCODE -ne 0) { throw "Syntax validation failed: $($file.FullName)" }
+          }
+
+      - name: Validate clean-install-only contract
+        shell: pwsh
+        run: |
+          foreach ($legacyFile in @(
+            'install.ps1',
+            'tools/installer/SIRK-Portal.iss',
+            'tools/installer/Install-SIRK-Portal-Service.ps1',
+            '.github/workflows/release-windows.yml'
+          )) {
+            if (Test-Path -LiteralPath $legacyFile) { throw "Legacy Portal installer is forbidden: $legacyFile" }
+          }
+
+          $files = @(
+            Get-Item clean-install-managed.ps1,install-v3.ps1
+            Get-ChildItem tools -Recurse -File -ErrorAction SilentlyContinue |
+              Where-Object { $_.Extension -in '.ps1','.js' }
+          )
+          $patterns = @(
+            ('AllowSource' + 'Fallback'),
+            ('install-release' + '\.ps1'),
+            'Microsoft\.DotNet\.Runtime\.(?:8|9)(?:\D|$)',
+            'Microsoft\.NETCore\.App (?:8|9)\.',
+            'net(?:8|9)\.0',
+            'agent-enrollment-token\.txt',
+            'SIRK_ENROLLMENT_TOKEN_FILE'
+          )
+          $legacy = @()
+          foreach ($file in $files) {
+            $text = Get-Content $file.FullName -Raw
+            foreach ($pattern in $patterns) {
+              if ($text -match $pattern) { $legacy += "$($file.FullName) => $pattern" }
+            }
+          }
+          if ($legacy.Count) { throw "Legacy compatibility references detected:`n$($legacy -join "`n")" }
+
+          $joined = $files | ForEach-Object { Get-Content $_.FullName -Raw } | Join-String -Separator "`n"
+          if ($joined -notmatch 'install-release-v2\.ps1') { throw 'Canonical Updater v2 installer reference is missing.' }
+          if ($joined -notmatch 'Node\.js 24') { throw 'Node.js 24 LTS contract is missing.' }
+          if ($joined -notmatch '\.NET 10') { throw '.NET 10 LTS contract is missing.' }
+
+      - name: Run Central enrollment and platform tests
+        shell: pwsh
+        run: |
+          node test/central-enrollment-client.test.js
+          node test/platform-management-service.test.js
+
+      - name: Run Portal test suite
+        shell: pwsh
+        run: npm test
