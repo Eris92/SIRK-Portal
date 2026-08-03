@@ -110,7 +110,7 @@ try {
     $shellIconCss = (Invoke-WebRequest "$baseUrl/assets/portal-module-shell.css" -UseBasicParsing).Content
     foreach ($marker in @(
         '[data-action="sidebar"] svg',
-        '.sirk-standalone-nav button > span > svg',
+        '.sirk-standalone-nav button[data-view] > span > svg',
         'stroke: currentColor !important',
         'visibility: visible !important',
         'svg :is(path,rect,circle,line,polyline,polygon,ellipse)'

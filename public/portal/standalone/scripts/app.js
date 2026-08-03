@@ -89,7 +89,7 @@
         }
     };
 
-    var moduleViews = { assets: "myjira", security: "defendertools" };
+    var moduleViews = { assets: "jira", security: "security" };
     var VIEW_KEYS = ["overview", "devices", "approvals", "automation", "monitoring", "assets", "management", "reports", "security", "settings"];
     var THEME_ICONS = {
         moon: '<svg class="sirk-theme-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.7 15.1A8.5 8.5 0 0 1 8.9 3.4a8.7 8.7 0 1 0 11.8 11.7Z"/><path class="sirk-theme-star" d="m17.5 3 .55 1.45L19.5 5l-1.45.55L17.5 7l-.55-1.45L15.5 5l1.45-.55Z"/></svg>',
@@ -123,7 +123,7 @@
         return views && views[view] && typeof views[view] === "object" ? views[view] : {};
     }
 
-    var VIEW_MODULE_KEYS = { assets: "myjira", security: "defendertools" };
+    var VIEW_MODULE_KEYS = { assets: "jira", security: "security" };
     function viewEnabled(view) {
         if (viewConfig(view).enabled === false) return false;
         var moduleKey = VIEW_MODULE_KEYS[view];
@@ -162,9 +162,8 @@
     }
 
     function applyViewSurface(view) {
-        var unified = view !== "devices";
-        content.classList.toggle("sirk-unified-content", unified);
-        content.classList.toggle("sirk-device-content", !unified);
+        content.classList.add("sirk-unified-content");
+        content.classList.toggle("sirk-device-content", view === "devices");
         content.setAttribute("data-active-view", view);
         root.style.setProperty("--sirk-active-accent", viewAccent(view));
     }
@@ -184,6 +183,39 @@
         host.className = "sirk-portal-view-host sirk-portal-view-" + view;
         content.appendChild(host);
         return host;
+    }
+
+    function createViewShell(view, options) {
+        options = options || {};
+        clearLoadingOverlay();
+        content.innerHTML = "";
+        content.removeAttribute("style");
+        content.removeAttribute("data-module-view");
+        var shell = document.createElement("section");
+        shell.className = "sirk-view-shell";
+        shell.setAttribute("data-sirk-view-shell", view);
+        var toolbar = document.createElement("div");
+        toolbar.className = "sirk-toolbar-host";
+        var layout = document.createElement("div");
+        layout.className = "sirk-layout-host";
+        var primary = document.createElement("aside");
+        primary.className = "sirk-column-primary";
+        var secondary = document.createElement("aside");
+        secondary.className = "sirk-column-secondary";
+        var details = document.createElement("div");
+        details.className = "sirk-column-details";
+        layout.appendChild(primary);
+        layout.appendChild(secondary);
+        layout.appendChild(details);
+        shell.appendChild(toolbar);
+        shell.appendChild(layout);
+        content.appendChild(shell);
+        var columns = options.columns || "details";
+        layout.setAttribute("data-columns", columns);
+        primary.hidden = columns === "details";
+        secondary.hidden = columns !== "all";
+        toolbar.hidden = options.toolbar === false;
+        return { root: shell, toolbar: toolbar, layout: layout, primary: primary, secondary: secondary, details: details };
     }
 
     function syncThemeButton(dark) {
@@ -351,15 +383,20 @@
     }
 
     function overview(sequence) {
+        var config = viewConfig("overview");
+        var showDevices = viewEnabled("devices") && config.showDevicesCard !== false;
+        var showSystem = config.showSystemStatusCard !== false;
+        var showIntegrations = config.showIntegrationsCard !== false;
         var cards = [];
-        if (viewEnabled("devices")) cards.push('<button type="button" class="sirk-standalone-card sirk-overview-link" data-open-view="devices"><h2>' + escapeHtml(viewName("devices")) + '</h2><p><strong id="sirkOverviewDeviceCount">…</strong> <span id="sirkOverviewDeviceSuffix">' + escapeHtml(t("overviewDevicesLoading")) + '</span></p></button>');
+        if (showDevices) cards.push('<button type="button" class="sirk-standalone-card sirk-overview-link" data-open-view="devices"><h2>' + escapeHtml(viewName("devices")) + '</h2><p><strong id="sirkOverviewDeviceCount">…</strong> <span id="sirkOverviewDeviceSuffix">' + escapeHtml(t("overviewDevicesLoading")) + '</span></p></button>');
         if (viewEnabled("approvals")) cards.push('<button type="button" class="sirk-standalone-card sirk-overview-link" data-open-view="approvals"><h2>' + escapeHtml(viewName("approvals")) + '</h2><p><strong id="sirkOverviewApprovalCount">…</strong> <span id="sirkOverviewApprovalSuffix">' + escapeHtml(t("overviewApprovalsLoading")) + '</span></p></button>');
-        cards.push('<section class="sirk-standalone-card sirk-overview-system"><h2>Stan systemu</h2><p><span id="sirkOverviewSystemStatus" class="sirk-health-badge is-unknown">Sprawdzanie…</span></p><p>Aktualna wersja: <strong id="sirkOverviewSystemVersion">—</strong></p><p>Dostępna wersja: <strong id="sirkOverviewSystemAvailable">—</strong></p></section>');
-        cards.push('<section class="sirk-standalone-card sirk-overview-health"><h2>' + escapeHtml(t("overviewIntegrationsTitle")) + '</h2><p><span id="sirkOverviewHealthBadge" class="sirk-health-badge is-unknown">' + escapeHtml(t("healthUnknown")) + '</span> <span id="sirkOverviewHealthText">' + escapeHtml(t("healthLoading")) + '</span></p><ul id="sirkOverviewHealthIssues" hidden></ul></section>');
-        content.innerHTML = '<div class="sirk-standalone-view-scroll"><div class="sirk-standalone-grid">' + cards.join("") + '</div></div>';
-        loadUpdateOverview(sequence);
+        if (showSystem) cards.push('<section class="sirk-standalone-card sirk-overview-system"><h2>Stan systemu</h2><p><span id="sirkOverviewSystemStatus" class="sirk-health-badge is-unknown">Sprawdzanie…</span></p><p>Aktualna wersja: <strong id="sirkOverviewSystemVersion">—</strong></p><p>Dostępna wersja: <strong id="sirkOverviewSystemAvailable">—</strong></p></section>');
+        if (showIntegrations) cards.push('<section class="sirk-standalone-card sirk-overview-health"><h2>' + escapeHtml(t("overviewIntegrationsTitle")) + '</h2><p><span id="sirkOverviewHealthBadge" class="sirk-health-badge is-unknown">' + escapeHtml(t("healthUnknown")) + '</span> <span id="sirkOverviewHealthText">' + escapeHtml(t("healthLoading")) + '</span></p><ul id="sirkOverviewHealthIssues" hidden></ul></section>');
+        var page = createViewShell("overview", { toolbar: false, columns: "details" });
+        page.details.innerHTML = '<div class="sirk-standalone-grid">' + cards.join("") + '</div>';
+        if (showSystem) loadUpdateOverview(sequence);
 
-        if (viewEnabled("devices")) loadDevices(false).then(function (inventory) {
+        if (showDevices) loadDevices(false).then(function (inventory) {
             if (!isCurrent(sequence) || activeView !== "overview") return;
             var count = document.getElementById("sirkOverviewDeviceCount");
             var suffix = document.getElementById("sirkOverviewDeviceSuffix");
@@ -441,14 +478,14 @@
     }
 
     function management(sequence) {
-        var state = moduleState("myscripts");
-        if (!moduleAllowed("myscripts")) {
+        var state = moduleState("management");
+        if (!moduleAllowed("management")) {
             showError(viewName("management") + ": " + t("moduleDisabled"));
             return;
         }
         loading(t("managementLoading"));
         if (!window.SirkPlatformPortalManagement || typeof window.SirkPlatformPortalManagement.mount !== "function") {
-            showError("MyScripts renderer is unavailable.");
+            showError("Management renderer is unavailable.");
             return;
         }
         var outerHost = prepareModuleHost("management");
@@ -456,14 +493,14 @@
         host.className = "";
         outerHost.appendChild(host);
         var timer = window.setTimeout(function () {
-            if (isCurrent(sequence) && !host.querySelector(".sirk-standalone-view-scroll,.sirk-error,.sirk-card")) {
-                showError("Automation did not finish initialization.", "/api/modules/myscripts/scripts");
+            if (isCurrent(sequence) && !host.querySelector(".sirk-view-shell,.sirk-error,.sirk-card")) {
+                showError("Management did not finish initialization.", "/api/v1/modules/management/tree");
             }
         }, 12000);
         Promise.resolve(window.SirkPlatformPortalManagement.mount(host)).then(function () {
             window.clearTimeout(timer);
             if (!isCurrent(sequence)) return;
-            if (!host.querySelector(".sirk-standalone-view-scroll,.sirk-error,.sirk-card")) throw new Error("MyScripts renderer did not create a view.");
+            if (!host.querySelector(".sirk-view-shell,.sirk-error,.sirk-card")) throw new Error("Management renderer did not create a view.");
         }).catch(function (reason) {
             window.clearTimeout(timer);
             if (isCurrent(sequence)) showError(viewName("management") + ": " + t("loadFailed"), reason && (reason.stack || reason.message) || reason);
@@ -471,14 +508,14 @@
     }
 
     function approvals(sequence) {
-        if (!moduleAllowed("approvalcenter")) {
+        if (!moduleAllowed("approvals")) {
             showError(viewName("approvals") + ": " + t("moduleDisabled"));
             return;
         }
         loading(t("approvalsLoading"));
-        initializeModule("approvalcenter").then(function () {
+        initializeModule("approvals").then(function () {
             if (!isCurrent(sequence)) return;
-            var module = window.SirkPlatformModules.approvalcenter;
+            var module = window.SirkPlatformModules.approvals;
             if (!module || typeof module.mount !== "function") throw new Error("Approval Center does not expose a Portal view.");
             var host = prepareModuleHost("approvals");
             return Promise.resolve(module.mount(host, "sirk-standalone-approval"));
@@ -490,135 +527,16 @@
     function settings() {
         var portal = moduleState("portal") || {};
         var access = portal.access || bootstrap && bootstrap.access || {};
-        if (access.siteAdmin !== true) { showError(t("settingsAdminOnly")); return; }
+        if (access.siteAdmin !== true) {
+            showError(t("settingsAdminOnly"));
+            return;
+        }
         var host = prepareModuleHost("settings");
-        if (window.SirkPortalSettings && typeof window.SirkPortalSettings.mount === "function") { window.SirkPortalSettings.mount(host); return; }
-        var shell = document.createElement("section");
-        shell.className = "sirk-standalone-view-scroll sirk-settings-module-shell";
-        var toolbar = document.createElement("header");
-        toolbar.className = "sirk-toolbar sirk-toolbar-host sirk-settings-module-toolbar";
-        toolbar.innerHTML = '<strong>' + escapeHtml(viewName("settings")) + '</strong>';
-        var workspace = document.createElement("div");
-        workspace.className = "sirk-layout sirk-settings-module-workspace";
-        var primary = document.createElement("aside"); primary.className = "sirk-column-primary";
-        var secondary = document.createElement("aside"); secondary.className = "sirk-column-secondary";
-        var details = document.createElement("div"); details.className = "sirk-column-details";
-        workspace.appendChild(primary); workspace.appendChild(secondary); workspace.appendChild(details);
-        function renderSecondary(items, selected, onSelect) { secondary.innerHTML = ""; items.forEach(function (name, index) { var button = document.createElement("button"); button.type = "button"; button.className = "sirk-nav-item" + (name === selected || (!selected && index === 0) ? " active" : ""); button.textContent = name; button.onclick = function () { Array.prototype.forEach.call(secondary.children, function (node) { node.classList.remove("active"); }); button.classList.add("active"); onSelect(name); }; secondary.appendChild(button); }); }
-        var systemUpdatesHost = null, agentGroupsHost = null;
-        function selectSettingsPane(name) { title.textContent = name; status.textContent = ""; output.hidden = true; form.hidden = false; if (systemUpdatesHost) systemUpdatesHost.hidden = true; Array.prototype.forEach.call(form.children, function (node) { node.hidden = node.getAttribute("data-settings-pane") !== name && node !== save; }); details.querySelectorAll(".sirk-settings-section").forEach(function (node) { node.hidden = node.getAttribute("data-settings-pane") !== name; }); }
-        function renderAdminPane(name, sub) {
-            title.textContent = name + " / " + sub;
-            form.hidden = true;
-            details.querySelectorAll(".sirk-settings-section").forEach(function (node) { node.hidden = true; });
-            if (name === "System" && window.SirkSystemUpdates) {
-                output.hidden = true;
-                if (!systemUpdatesHost) { systemUpdatesHost = document.createElement("div"); systemUpdatesHost.className = "sirk-settings-system-updates"; details.appendChild(systemUpdatesHost); }
-                systemUpdatesHost.hidden = false;
-                window.SirkSystemUpdates.mount(systemUpdatesHost, { "Aktualizacje": "updates", "Backupy": "backups", "Historia": "history", "Kanał": "channel" }[sub] || "updates");
-                status.textContent = "";
-                return;
-            }
-            output.hidden = false;
-            var source = settingsSnapshot || {};
-            if (name === "Overview") source = { plugin: source.plugin, modules: source.modules, generatedAt: source.generatedAt };
-            else if (name === "Debug") source = sub === "Błędy" ? (source.diagnostics && source.diagnostics.errors || source.moduleLoadErrors || {}) : sub === "Logi" ? (source.diagnostics && source.diagnostics.logs || "Brak logów.") : source;
-            else if (name === "System") source = { version: window.__SIRK_PLATFORM_PORTAL_VERSION__, diagnostics: source.diagnostics || {}, generatedAt: source.generatedAt };
-            else if (name === "Server") source = { standalone: true, meshDatabase: "local", devices: deviceInventory && deviceInventory.nodes.length || 0 };
-            output.textContent = typeof source === "string" ? source : JSON.stringify(source, null, 2);
-            status.textContent = "";
+        if (!window.SirkPortalSettings || typeof window.SirkPortalSettings.mount !== "function") {
+            showError("Settings renderer is unavailable.");
+            return;
         }
-        function renderAgentGroups() {
-            title.textContent = "Grupy hostów SIRK Agent"; form.hidden = true; output.hidden = true;
-            if (systemUpdatesHost) systemUpdatesHost.hidden = true;
-            details.querySelectorAll(".sirk-settings-section").forEach(function (node) { node.hidden = true; });
-            if (!agentGroupsHost) { agentGroupsHost = document.createElement("div"); details.appendChild(agentGroupsHost); }
-            agentGroupsHost.hidden = false; agentGroupsHost.innerHTML = "<p>Ładowanie grup…</p>";
-            fetch("/api/admin/agent-groups", { credentials: "same-origin", cache: "no-store" })
-                .then(function (response) { return response.json().then(function (value) { if (!response.ok) throw new Error(value.error || "Nie można pobrać grup."); return value.value || []; }); })
-                .then(function (groups) {
-                    agentGroupsHost.innerHTML = "";
-                    var create = document.createElement("form"); create.className = "sirk-card sirk-agent-group-create";
-                    create.innerHTML = '<h3>Nowa grupa hostów</h3><label>Nazwa<input name="name" required maxlength="100"></label><label>Opis<input name="description" maxlength="500"></label><button type="submit" class="sirk-admin-primary">Dodaj grupę</button>';
-                    create.onsubmit = function (event) {
-                        event.preventDefault();
-                        var payload = { name: create.elements.name.value, description: create.elements.description.value };
-                        fetch("/api/admin/agent-groups", { method: "POST", credentials: "same-origin",
-                            headers: { "Content-Type": "application/json", "X-SIRK-CSRF": bootstrap.csrfToken || "" },
-                            body: JSON.stringify(payload) }).then(function (response) { return response.json().then(function (value) { if (!response.ok) throw new Error(value.error || "Nie dodano grupy."); }); })
-                            .then(renderAgentGroups).catch(function (error) { status.textContent = error.message || String(error); });
-                    };
-                    agentGroupsHost.appendChild(create);
-                    groups.forEach(function (group) {
-                        var card = document.createElement("section"); card.className = "sirk-card sirk-agent-group-card";
-                        var heading = document.createElement("h3"); heading.textContent = group.name; card.appendChild(heading);
-                        var copy = document.createElement("p"); copy.textContent = group.description || "Bez opisu"; card.appendChild(copy);
-                        var actions = document.createElement("div"); actions.className = "sirk-agent-group-actions";
-                        [["silent", "Pobierz instalację cichą"], ["run", "Pobierz tryb uruchomienia"]].forEach(function (item) {
-                            var link = document.createElement("a"); link.className = "sirk-button"; link.textContent = item[1];
-                            link.href = "/api/admin/agent-groups?groupId=" + encodeURIComponent(group.id) + "&download=" + item[0];
-                            actions.appendChild(link);
-                        });
-                        var remove = document.createElement("button"); remove.type = "button"; remove.textContent = "Usuń grupę";
-                        remove.onclick = function () {
-                            if (!window.confirm("Usunąć grupę " + group.name + "?")) return;
-                            fetch("/api/admin/agent-groups", { method: "DELETE", credentials: "same-origin",
-                                headers: { "Content-Type": "application/json", "X-SIRK-CSRF": bootstrap.csrfToken || "" },
-                                body: JSON.stringify({ id: group.id }) }).then(function (response) { if (!response.ok) return response.json().then(function (value) { throw new Error(value.error || "Nie usunięto grupy."); }); })
-                                .then(renderAgentGroups).catch(function (error) { status.textContent = error.message || String(error); });
-                        };
-                        actions.appendChild(remove); card.appendChild(actions); agentGroupsHost.appendChild(card);
-                    });
-                    status.textContent = groups.length ? "Grupy hostów: " + groups.length : "Nie utworzono jeszcze grup hostów.";
-                }).catch(function (error) { agentGroupsHost.innerHTML = ""; status.textContent = error.message || String(error); });
-        }
-        ["Overview", "Settings", "Grupy hostów", "Plugins", "Server", "Debug", "System"].forEach(function (name, index) { var button = document.createElement("button"); button.type = "button"; button.className = "sirk-nav-item" + (name === "Settings" ? " active" : ""); button.textContent = name; button.onclick = function () { Array.prototype.forEach.call(primary.children, function (node) { node.classList.remove("active"); }); button.classList.add("active"); if (agentGroupsHost) agentGroupsHost.hidden = true; if (name === "Settings") { renderSecondary(["Overview", "Portal", "Moduły", "Integracje", "Uprawnienia", "Diagnostyka", "Aktualizacje"], "Overview", selectSettingsPane); selectSettingsPane("Overview"); return; } if (name === "Grupy hostów") { renderSecondary(["Grupy i instalatory"], "Grupy i instalatory", renderAgentGroups); renderAgentGroups(); return; } var subcategories = name === "Debug" ? ["Config", "Logi", "Błędy"] : name === "System" ? ["Aktualizacje", "Backupy", "Historia", "Kanał"] : name === "Plugins" ? ["Zainstalowane", "Dostępne", "Historia"] : ["Przegląd", "Status", "Historia"]; renderSecondary(subcategories, subcategories[0], function (sub) { renderAdminPane(name, sub); }); renderAdminPane(name, subcategories[0]); }; primary.appendChild(button); });
-        renderSecondary(["Overview", "Portal", "Moduły", "Integracje", "Uprawnienia", "Diagnostyka", "Aktualizacje"], "Overview", selectSettingsPane);
-        var panel = document.createElement("section"); panel.className = "sirk-card";
-        var title = document.createElement("h2"); title.textContent = "Portal settings"; panel.appendChild(title);
-        var tabs = document.createElement("nav"); tabs.className = "sirk-settings-tabs"; tabs.hidden = true;
-        ["Overview", "Settings", "Server", "Debug", "System"].forEach(function (name, index) { var tab = document.createElement("button"); tab.type = "button"; tab.className = "sirk-admin-secondary" + (index === 1 ? " is-active" : ""); tab.textContent = name; tabs.appendChild(tab); });
-        panel.appendChild(tabs);
-        var status = document.createElement("p"); status.className = "sirk-shared-muted"; status.textContent = "Loading…"; panel.appendChild(status);
-        var output = document.createElement("pre"); output.className = "sirk-settings-output"; output.hidden = true; panel.appendChild(output);
-        var settingsSnapshot = null;
-        var form = document.createElement("form"); form.className = "sirk-shared-settings-form"; form.hidden = true;
-        var overviewControls = document.createElement("div"); overviewControls.className = "sirk-admin-grid"; overviewControls.setAttribute("data-settings-pane", "Overview"); form.appendChild(overviewControls);
-        var portalControls = document.createElement("div"); portalControls.className = "sirk-admin-grid"; portalControls.setAttribute("data-settings-pane", "Portal");
-        var modules = document.createElement("div"); modules.className = "sirk-admin-grid";
-        modules.setAttribute("data-settings-pane", "Moduły");
-        var save = document.createElement("button"); save.type = "submit"; save.className = "sirk-admin-primary"; save.textContent = "Save settings";
-        form.appendChild(portalControls); form.appendChild(modules); form.appendChild(save); panel.appendChild(form); details.appendChild(panel);
-        var restartResume = null;
-        try { restartResume = JSON.parse(sessionStorage.getItem("sirkPortal.restartState") || "null"); } catch (error) {}
-        if (restartResume && restartResume.section) primary.children[6].click();
-        var base = "/api";
-        fetch(base + "/admin/settings", { credentials: "same-origin", cache: "no-store" }).then(function (response) { return response.json().then(function (value) { if (!response.ok) throw new Error(value.error || "Settings unavailable."); return value.value; }); }).then(function (snapshot) {
-            settingsSnapshot = snapshot;
-            var portalSettings = snapshot.moduleSettings && snapshot.moduleSettings.portal || {};
-            var configuredViews = portalSettings.views || {};
-            var viewLabels = { overview: "Overview", devices: "Devices", approvals: "Approval", automation: "Automation", monitoring: "Monitoring", assets: "Assets", management: "Management", reports: "Reports", security: "Security", settings: "Settings" };
-            VIEW_KEYS.forEach(function (key) { var row = document.createElement("label"); row.className = "sirk-card"; var input = document.createElement("input"); input.type = "checkbox"; input.name = "view." + key; input.checked = !configuredViews[key] || configuredViews[key].enabled !== false; row.appendChild(input); row.appendChild(document.createTextNode(" " + viewLabels[key])); overviewControls.appendChild(row); });
-            var portalFields = document.createElement("div"); portalFields.className = "sirk-admin-grid";
-            portalFields.setAttribute("data-settings-pane", "Portal");
-            [["defaultView", "Domyślny widok", portalSettings.defaultView || "overview"], ["siteName", "Nazwa portalu", portalSettings.siteName || "SirK Portal"], ["passwordResetUrl", "Adres resetu hasła", portalSettings.passwordResetUrl || ""]].forEach(function (item) { var label = document.createElement("label"); label.className = "sirk-card"; label.textContent = item[1]; var input = document.createElement("input"); input.type = "text"; input.name = "portal." + item[0]; input.value = item[2]; label.appendChild(input); portalFields.appendChild(label); });
-            form.appendChild(portalFields);
-            ["forceNewLogin"].forEach(function (key) { var row = document.createElement("label"); row.className = "sirk-card"; var input = document.createElement("input"); input.type = "checkbox"; input.name = "portal." + key; input.checked = portalSettings[key] === true; row.appendChild(input); row.appendChild(document.createTextNode(" " + key)); portalControls.appendChild(row); });
-            Object.keys(snapshot.moduleSettings || {}).forEach(function (key) { if (key === "portal") return; var row = document.createElement("label"); row.className = "sirk-card"; var input = document.createElement("input"); input.type = "checkbox"; input.name = "module." + key; input.checked = snapshot.moduleSettings[key] && snapshot.moduleSettings[key].enabled === true; row.appendChild(input); row.appendChild(document.createTextNode(" " + key)); modules.appendChild(row); });
-            var sections = document.createElement("div"); sections.className = "sirk-admin-settings-sections";
-            [["Portal", "Ustawienia samodzielnego Portalu i sesji."], ["Moduły", "Włączanie niezależnych modułów Portalu."], ["Integracje", "Stan połączeń z usługami zewnętrznymi (bez ujawniania sekretów)."], ["Uprawnienia", "Konfiguracja dostępu i uprawnień folderów."], ["Diagnostyka", "Ostatni stan diagnostyki i błędów API."], ["Aktualizacje", "Wersja portalu i stan wdrożenia."]].forEach(function (item) { var section = document.createElement("section"); section.className = "sirk-card sirk-settings-section"; section.setAttribute("data-settings-pane", item[0]); section.hidden = item[0] !== "Portal"; var heading = document.createElement("h3"); heading.textContent = item[0]; section.appendChild(heading); var description = document.createElement("p"); description.className = "sirk-shared-muted"; description.textContent = item[1]; section.appendChild(description); sections.appendChild(section); });
-            var integrations = snapshot.integrations || {}; var integrationSection = sections.children[2]; Object.keys(integrations).forEach(function (key) { var value = integrations[key]; var line = document.createElement("div"); line.textContent = key + ": " + (value && typeof value === "object" ? (value.enabled ? "włączona" : "wyłączona") : "—"); integrationSection.appendChild(line); });
-            var permissions = snapshot.folderPermissions || {}; var permissionSection = sections.children[3]; var permissionText = document.createElement("pre"); permissionText.textContent = JSON.stringify(permissions, null, 2); permissionSection.appendChild(permissionText);
-            var diagnostics = snapshot.diagnostics || {}; var diagnosticSection = sections.children[4]; var diagnosticText = document.createElement("pre"); diagnosticText.textContent = JSON.stringify(diagnostics, null, 2); diagnosticSection.appendChild(diagnosticText);
-            var updateSection = sections.children[5]; var version = document.createElement("p"); version.textContent = "Wersja: " + String(window.__SIRK_PLATFORM_PORTAL_VERSION__ || "—"); updateSection.appendChild(version);
-            panel.appendChild(sections);
-            status.textContent = "Settings loaded."; form.hidden = false;
-            if (!restartResume || !restartResume.section) selectSettingsPane("Overview");
-        }).catch(function (error) { status.textContent = error.message || String(error); status.classList.add("sirk-error"); });
-        form.addEventListener("submit", function (event) { event.preventDefault(); save.disabled = true; var values = {}, portal = {}, views = {}; Array.prototype.forEach.call(form.querySelectorAll("input[name]"), function (input) { var parts = input.name.split("."); if (parts[0] === "portal") portal[parts[1]] = input.type === "checkbox" ? input.checked : input.value; else if (parts[0] === "view") views[parts[1]] = { enabled: input.checked }; else values[parts[1]] = input.checked; }); portal.views = views; fetch(base + "/admin/settings", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8" }, body: "payload=" + encodeURIComponent(JSON.stringify({ modules: values, portal: portal })) }).then(function (response) { return response.json().then(function (value) { if (!response.ok) throw new Error(value.error || "Save failed."); return value; }); }).then(function () { status.textContent = "Settings saved."; }).catch(function (error) { status.textContent = error.message || String(error); }).finally(function () { save.disabled = false; }); });
-        shell.appendChild(toolbar);
-        shell.appendChild(workspace);
-        host.appendChild(shell);
+        window.SirkPortalSettings.mount(host);
     }
 
     function detailItem(label, value) {
@@ -628,15 +546,17 @@
     function renderDeviceDetails(node) {
         var map = groupMap(deviceInventory || { groups: [] });
         var online = nodeOnline(node);
-        content.innerHTML = '<div class="sirk-standalone-view-scroll" data-sirk-device-detail>' +
-            '<div class="sirk-device-detail-head"><button type="button" class="sirk-device-back" data-device-back="1">← ' + escapeHtml(t("backToDevices")) + '</button></div>' +
-            '<section class="sirk-device-hero"><span class="sirk-device-hero-icon">' + DEVICE_ICON + '</span><div><h2>' + escapeHtml(node.name || t("unknownHost")) + '</h2><p>' + escapeHtml(nodeGroup(node, map)) + ' · ' + escapeHtml(node.os || t("noOs")) + '</p></div><span class="sirk-device-connection ' + (online ?"is-online" : "is-offline") + '"><i></i>' + escapeHtml(online ? t("online") : t("offline")) + '</span></section>' +
+        var page = createViewShell("devices", { toolbar: true, columns: "details" });
+        page.root.setAttribute("data-sirk-device-detail", "1");
+        page.toolbar.innerHTML = '<button type="button" class="sirk-device-back" data-device-back="1">← ' + escapeHtml(t("backToDevices")) + '</button>';
+        page.details.innerHTML =
+            '<section class="sirk-device-hero"><span class="sirk-device-hero-icon">' + DEVICE_ICON + '</span><div><h2>' + escapeHtml(node.name || t("unknownHost")) + '</h2><p>' + escapeHtml(nodeGroup(node, map)) + ' · ' + escapeHtml(node.os || t("noOs")) + '</p></div><span class="sirk-device-connection ' + (online ? "is-online" : "is-offline") + '"><i></i>' + escapeHtml(online ? t("online") : t("offline")) + '</span></section>' +
             '<div class="sirk-device-detail-grid">' +
             detailItem(t("name"), node.name) + detailItem(t("status"), online ? t("online") : t("offline")) +
             detailItem(t("group"), nodeGroup(node, map)) + detailItem(t("system"), node.os || t("noOs")) +
             detailItem(t("ipAddress"), node.ip || t("noIp")) + detailItem(t("lastSeen"), formatLastSeen(node.lastSeen)) +
             detailItem(t("agentVersion"), node.agentVersion || "—") + detailItem(t("nodeId"), node.id) +
-            '</div></div>';
+            '</div>';
     }
 
     function renderDeviceGroups(inventory) {
@@ -688,7 +608,9 @@
     }
 
     function renderDevices(inventory) {
-        content.innerHTML = '<div class="sirk-standalone-view-scroll"><div class="sirk-device-toolbar"><div class="sirk-device-summary"><span><strong id="sirkDeviceTotal">0</strong>' + escapeHtml(t("total")) + '</span><span><strong id="sirkDeviceOnline">0</strong>' + escapeHtml(t("online")) + '</span><span><strong id="sirkDeviceOffline">0</strong>' + escapeHtml(t("offline")) + '</span></div><div class="sirk-device-controls"><input id="sirkDeviceSearch" class="sirk-device-input" type="search" value="' + escapeHtml(deviceSearch) + '" placeholder="' + escapeHtml(t("searchDevices")) + '" autocomplete="off"><select id="sirkDeviceFilter" class="sirk-device-select"><option value="all">' + escapeHtml(t("total")) + '</option><option value="online">' + escapeHtml(t("online")) + '</option><option value="offline">' + escapeHtml(t("offline")) + '</option></select><button id="sirkRefreshDevices" type="button" class="sirk-device-refresh">' + escapeHtml(t("refresh")) + '</button></div></div><div id="sirkDevicesHost" class="sirk-device-groups"><div class="sirk-device-status">' + escapeHtml(t("waitingDevices")) + '</div></div></div>';
+        var page = createViewShell("devices", { toolbar: true, columns: "details" });
+        page.toolbar.innerHTML = '<div class="sirk-device-summary"><span><strong id="sirkDeviceTotal">0</strong>' + escapeHtml(t("total")) + '</span><span><strong id="sirkDeviceOnline">0</strong>' + escapeHtml(t("online")) + '</span><span><strong id="sirkDeviceOffline">0</strong>' + escapeHtml(t("offline")) + '</span></div><div class="sirk-device-controls"><input id="sirkDeviceSearch" class="sirk-device-input" type="search" value="' + escapeHtml(deviceSearch) + '" placeholder="' + escapeHtml(t("searchDevices")) + '" autocomplete="off"><select id="sirkDeviceFilter" class="sirk-device-select"><option value="all">' + escapeHtml(t("total")) + '</option><option value="online">' + escapeHtml(t("online")) + '</option><option value="offline">' + escapeHtml(t("offline")) + '</option></select><button id="sirkRefreshDevices" type="button" class="sirk-device-refresh">' + escapeHtml(t("refresh")) + '</button></div>';
+        page.details.innerHTML = '<div id="sirkDevicesHost" class="sirk-device-groups"><div class="sirk-device-status">' + escapeHtml(t("waitingDevices")) + '</div></div>';
         var search = document.getElementById("sirkDeviceSearch");
         var filter = document.getElementById("sirkDeviceFilter");
         var refresh = document.getElementById("sirkRefreshDevices");
@@ -715,12 +637,14 @@
     }
 
     function placeholder(view, description) {
-        content.innerHTML = '<section class="sirk-standalone-view-scroll"><div class="sirk-content"><h2>' + escapeHtml(viewName(view)) + '</h2><p class="sirk-muted">' + escapeHtml(description) + '</p></div></section>';
+        var page = createViewShell(view, { toolbar: false, columns: "details" });
+        page.details.innerHTML = '<div class="sirk-content"><h2>' + escapeHtml(viewName(view)) + '</h2><p class="sirk-muted">' + escapeHtml(description) + '</p></div>';
     }
 
     function automation(sequence) {
         if (!isCurrent(sequence)) return;
-        content.innerHTML = '<section class="sirk-standalone-view-scroll"><div class="sirk-content"><h2>' + escapeHtml(viewName("automation")) + '</h2><div class="sirk-card"><h3>Harmonogram serwera</h3><p class="sirk-muted">Automatyzacje będą zarządzać zadaniami serwera w katalogu harmonogramu <strong>SIRK</strong>. Polecenia urządzeń są dostępne wyłącznie w widoku Urządzenia.</p><p class="sirk-muted">Katalogi automatyzacji i zadania zostaną utworzone przez Portal po udostępnieniu usługi harmonogramu.</p></div></div></section>';
+        var page = createViewShell("automation", { toolbar: false, columns: "details" });
+        page.details.innerHTML = '<div class="sirk-content"><h2>' + escapeHtml(viewName("automation")) + '</h2><div class="sirk-card"><h3>Harmonogram serwera</h3><p class="sirk-muted">Automatyzacje zarządzają zadaniami serwera w katalogu harmonogramu <strong>SIRK</strong>. Polecenia urządzeń są dostępne w widoku Urządzenia.</p></div></div>';
     }
 
     function render(view) {
@@ -844,9 +768,9 @@
             ["sirk-shared-script-definition", "shared-ui/script-definition-form.js"], ["sirk-shared-confirm", "shared-ui/confirm-execution-form.js"],
             ["sirk-shared-edit-actions", "shared-ui/script-edit-actions.js"], ["sirk-shared-system-credentials", "shared-ui/system-credentials-form.js"],
             ["sirk-module-shell", "module-shell.js"], ["sirk-icon-data", "portal-icon-data.js"],
-            ["sirk-approval-module", "approvalcenter.js"], ["sirk-move-module", "moverequests.js"],
-            ["sirk-commands-module", "mycommands.js"], ["sirk-jira-module", "myjira.js"],
-            ["sirk-defender-module", "defendertools.js"], ["sirk-management-renderer", "portal-management.js"],
+            ["sirk-approval-module", "approvals.js"], ["sirk-move-module", "move-requests.js"],
+            ["sirk-commands-module", "commands.js"], ["sirk-jira-module", "jira.js"],
+            ["sirk-defender-module", "security.js"], ["sirk-management-renderer", "management.js"],
             ["sirk-subfolder-icons", "portal-subfolder-icons.js"], ["sirk-folder-collapse", "portal-folder-collapse.js"]
         ];
         var chain = Promise.resolve();

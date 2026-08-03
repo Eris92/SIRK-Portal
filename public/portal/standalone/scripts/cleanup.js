@@ -11,19 +11,19 @@
     var approvalState = { settings: null, loading: null, saving: false };
     var PERMISSION_TARGETS = {
         "Urządzenia": { view: "devices" },
-        "Commands": { module: "mycommands" },
-        "Przenoszenie urządzeń": { module: "moverequests" },
-        "Automatyzacja": { module: "myscripts", view: "automation" },
+        "Commands": { module: "commands" },
+        "Przenoszenie urządzeń": { module: "move-requests" },
+        "Automatyzacja": { module: "management", view: "automation" },
         "Monitoring": { view: "monitoring" },
-        "Zasoby": { module: "myjira", view: "assets" },
+        "Zasoby": { module: "jira", view: "assets" },
         "Zarządzanie": { view: "management" },
         "Raporty": { view: "reports" },
-        "Bezpieczeństwo": { module: "defendertools", view: "security" }
+        "Bezpieczeństwo": { module: "security", view: "security" }
     };
     var APPROVAL_PROVIDERS = {
-        "Commands": { type: "mycommands" },
-        "Przenoszenie urządzeń": { type: "moverequests" },
-        "Automatyzacja": { type: "myscripts" }
+        "Commands": { type: "commands" },
+        "Przenoszenie urządzeń": { type: "move-requests" },
+        "Automatyzacja": { type: "management" }
     };
 
     function core() { return window.SirkPlatformCore || null; }
@@ -31,11 +31,11 @@
 
     function addPortalClasses(scope) {
         if (!scope || !scope.querySelectorAll) return;
-        Array.prototype.forEach.call(scope.querySelectorAll(".sirk-standalone-view-scroll,.mc-admin-management-shell"), function (shell) {
-            shell.classList.add("sirk-standalone-view-scroll");
+        Array.prototype.forEach.call(scope.querySelectorAll(".sirk-view-shell,.mc-admin-management-shell"), function (shell) {
+            shell.classList.add("sirk-view-shell");
         });
-        Array.prototype.forEach.call(scope.querySelectorAll(".sirk-layout,.mc-admin-management-layout"), function (layout) {
-            layout.classList.add("sirk-layout-host", "sirk-layout");
+        Array.prototype.forEach.call(scope.querySelectorAll(".sirk-layout-host,.mc-admin-management-layout"), function (layout) {
+            layout.classList.add("sirk-layout-host", "sirk-layout-host");
             if (layout.children[0]) layout.children[0].classList.add("sirk-column-primary");
             if (layout.children[1]) layout.children[1].classList.add("sirk-column-secondary");
             if (layout.children[2]) layout.children[2].classList.add("sirk-column-details");
@@ -260,7 +260,7 @@
         if (approvalState.loading) return approvalState.loading;
         var api = core();
         if (!api || typeof api.api !== "function") return Promise.reject(new Error("API modułu Akceptacje nie jest jeszcze dostępne."));
-        approvalState.loading = api.api("approvalcenter", "settings").then(function (result) {
+        approvalState.loading = api.api("approvals", "settings").then(function (result) {
             approvalState.settings = result.settings || result;
             approvalState.loading = null;
             return approvalState.settings;
@@ -275,7 +275,7 @@
     function saveProvider(provider) {
         var api = core();
         if (!api || typeof api.post !== "function") return Promise.reject(new Error("API modułu Akceptacje nie jest jeszcze dostępne."));
-        return api.post("approvalcenter", "provider-settings", {
+        return api.post("approvals", "provider-settings", {
             type: provider.type,
             enabled: provider.enabled !== false,
             showTab: provider.showTab !== false,
@@ -494,7 +494,7 @@
 
     function refresh() {
         addPortalClasses(root);
-        var workspace = root.querySelector("[data-portal-settings] .sirk-layout");
+        var workspace = root.querySelector("[data-portal-settings] .sirk-layout-host");
         if (workspace) {
             removeEmptyNotices(workspace);
             bindPermissionSave(workspace);

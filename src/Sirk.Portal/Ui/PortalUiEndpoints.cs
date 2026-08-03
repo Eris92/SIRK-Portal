@@ -6,7 +6,7 @@ namespace Sirk.Portal.Ui;
 
 internal static class PortalUiEndpoints
 {
-    private const string AssetRevision = "shell-icons-20260803-1";
+    private const string AssetRevision = "canonical-modules-shell-20260803-1";
     private static readonly IReadOnlyDictionary<string, string> Assets = BuildAssets();
 
     public static IEndpointRouteBuilder MapPortalUi(this IEndpointRouteBuilder endpoints)
@@ -129,18 +129,17 @@ internal static class PortalUiEndpoints
             ["settings.js"] = "portal/standalone/scripts/settings-native-v2.js",
             ["main.css"] = "shared/styles/main.css",
             ["shared/icon-registry.js"] = "shared/icon-registry.js",
-            ["myscripts.css"] = "modules/automation/style.css",
+            ["management.css"] = "modules/management/style.css",
             ["shared-ui/shared-ui.css"] = "shared/ui/shared-ui.css",
             ["shared-ui/toolbar.css"] = "shared/ui/toolbar.css",
             ["module-shell.js"] = "shared/module-shell.js",
             ["portal-icon-data.js"] = "portal/icons.js",
-            ["approvalcenter.js"] = "modules/approvals/index.js",
-            ["moverequests.js"] = "modules/move-requests/index.js",
-            ["mycommands.js"] = "modules/commands/index.js",
-            ["myscripts.js"] = "portal/management.js",
-            ["myjira.js"] = "modules/jira/index.js",
-            ["defendertools.js"] = "modules/security/index.js",
-            ["portal-management.js"] = "portal/management.js",
+            ["approvals.js"] = "modules/approvals/index.js",
+            ["move-requests.js"] = "modules/move-requests/index.js",
+            ["commands.js"] = "modules/commands/index.js",
+            ["management.js"] = "portal/management.js",
+            ["jira.js"] = "modules/jira/index.js",
+            ["security.js"] = "modules/security/index.js",
             ["portal-subfolder-icons.js"] = "portal/subfolder-icons.js",
             ["portal-folder-collapse.js"] = "portal/folder-collapse.js",
             ["vendor/sirk-portal/sirk-portal.css"] = "portal/vendor/sirk-portal.css",

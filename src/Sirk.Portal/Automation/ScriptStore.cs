@@ -49,6 +49,19 @@ internal sealed record ScriptSaveRequest(
     IReadOnlyList<int>? ApprovalLevels,
     IReadOnlyList<ScriptVariableDefinition>? Variables);
 
+internal static class ScriptLibraries
+{
+    public const string Commands = "commands";
+    public const string Management = "management";
+
+    public static string Normalize(string? value) => (value ?? string.Empty).Trim().ToLowerInvariant() switch
+    {
+        Commands => Commands,
+        Management => Management,
+        _ => throw new InvalidDataException("Script library is invalid.")
+    };
+}
+
 internal sealed class ScriptStore
 {
     private const int SchemaVersion = 1;
@@ -57,20 +70,25 @@ internal sealed class ScriptStore
         "^[A-Za-z_][A-Za-z0-9_]{0,63}$",
         RegexOptions.CultureInvariant | RegexOptions.Compiled);
     private readonly object _sync = new();
-    private readonly string _path;
-    private ScriptDocument _document;
+    private readonly Dictionary<string, LibraryState> _libraries;
 
     public ScriptStore(PortalPaths paths)
     {
-        _path = Path.Combine(paths.DataRoot, "automation-scripts.json");
-        _document = File.Exists(_path)
-            ? Validate(AtomicJsonFile.Read<ScriptDocument>(_path))
-            : new ScriptDocument(SchemaVersion, [], DateTimeOffset.UtcNow);
+        _libraries = new Dictionary<string, LibraryState>(StringComparer.Ordinal)
+        {
+            [ScriptLibraries.Commands] = Load(
+                ScriptLibraries.Commands,
+                Path.Combine(paths.CommandsDirectory, "scripts.json")),
+            [ScriptLibraries.Management] = Load(
+                ScriptLibraries.Management,
+                Path.Combine(paths.ManagementDirectory, "scripts.json"))
+        };
     }
 
-    public ScriptDefinition Save(ScriptSaveRequest request)
+    public ScriptDefinition Save(string library, ScriptSaveRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
+        var state = Library(library);
         var path = NormalizePath(request.Path);
         var original = string.IsNullOrWhiteSpace(request.OriginalPath)
             ? path
@@ -89,7 +107,7 @@ internal sealed class ScriptStore
 
         lock (_sync)
         {
-            var scripts = _document.Scripts.ToList();
+            var scripts = state.Document.Scripts.ToList();
             var index = scripts.FindIndex(value => value.Path == original);
             if (original != path && scripts.Any(value => value.Path == path))
                 throw new InvalidOperationException("A script with the target path already exists.");
@@ -113,50 +131,55 @@ internal sealed class ScriptStore
             else scripts.Add(value);
             if (scripts.Count > MaximumScripts)
                 throw new InvalidOperationException("Maximum script count was reached.");
-            Save(new ScriptDocument(SchemaVersion, scripts, now));
+            Save(state, new ScriptDocument(SchemaVersion, scripts, now));
             return value;
         }
     }
 
-    public void Delete(string path)
+    public void Delete(string library, string path)
     {
+        var state = Library(library);
         var normalized = NormalizePath(path);
         lock (_sync)
         {
-            if (!_document.Scripts.Any(value => value.Path == normalized))
+            if (!state.Document.Scripts.Any(value => value.Path == normalized))
                 throw new KeyNotFoundException("Script was not found.");
-            Save(new ScriptDocument(
+            Save(state, new ScriptDocument(
                 SchemaVersion,
-                _document.Scripts.Where(value => value.Path != normalized).ToArray(),
+                state.Document.Scripts.Where(value => value.Path != normalized).ToArray(),
                 DateTimeOffset.UtcNow));
         }
     }
 
-    public ScriptDefinition? Get(string path)
+    public ScriptDefinition? Get(string library, string path)
     {
+        var state = Library(library);
         var normalized = NormalizePath(path);
         lock (_sync)
         {
-            return _document.Scripts.FirstOrDefault(value => value.Path == normalized);
+            return state.Document.Scripts.FirstOrDefault(value => value.Path == normalized);
         }
     }
 
-    public IReadOnlyList<ScriptDefinition> List()
+    public IReadOnlyList<ScriptDefinition> List(string library)
     {
+        var state = Library(library);
         lock (_sync)
         {
-            return _document.Scripts
+            return state.Document.Scripts
                 .OrderBy(value => value.Path, StringComparer.OrdinalIgnoreCase)
                 .ToArray();
         }
     }
 
-    public object Tree()
+    public object Tree(string library)
     {
+        var key = ScriptLibraries.Normalize(library);
+        var state = Library(key);
         lock (_sync)
         {
             var root = new TreeDirectory(string.Empty, string.Empty);
-            foreach (var script in _document.Scripts.OrderBy(value => value.Path, StringComparer.OrdinalIgnoreCase))
+            foreach (var script in state.Document.Scripts.OrderBy(value => value.Path, StringComparer.OrdinalIgnoreCase))
             {
                 var segments = script.Path.Split('/', StringSplitOptions.RemoveEmptyEntries);
                 var directory = root;
@@ -164,13 +187,29 @@ internal sealed class ScriptStore
                 {
                     directory = directory.Directories.GetOrAdd(
                         segments[index],
-                        static (name, state) => new TreeDirectory(state.Path, name),
+                        static (name, parent) => new TreeDirectory(parent.Path, name),
                         directory);
                 }
                 directory.Scripts.Add(script);
             }
-            return ToTree(root, isRoot: true);
+            var rootLabel = key == ScriptLibraries.Commands ? "Commands" : "Management";
+            return ToTree(root, isRoot: true, rootLabel);
         }
+    }
+
+    private LibraryState Library(string value)
+    {
+        var key = ScriptLibraries.Normalize(value);
+        return _libraries[key];
+    }
+
+    private static LibraryState Load(string key, string path)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        var document = File.Exists(path)
+            ? Validate(AtomicJsonFile.Read<ScriptDocument>(path))
+            : new ScriptDocument(SchemaVersion, [], DateTimeOffset.UtcNow);
+        return new LibraryState(key, path, document);
     }
 
     public static IReadOnlyDictionary<string, string> ValidateValues(
@@ -202,10 +241,10 @@ internal sealed class ScriptStore
         return result;
     }
 
-    private void Save(ScriptDocument value)
+    private static void Save(LibraryState state, ScriptDocument value)
     {
-        _document = Validate(value);
-        AtomicJsonFile.Write(_path, _document);
+        state.Document = Validate(value);
+        AtomicJsonFile.Write(state.Path, state.Document);
     }
 
     private static ScriptDocument Validate(ScriptDocument value)
@@ -312,15 +351,15 @@ internal sealed class ScriptStore
         return Convert.ToHexString(SHA256.HashData(canonical)).ToLowerInvariant();
     }
 
-    private static object ToTree(TreeDirectory directory, bool isRoot) =>
+    private static object ToTree(TreeDirectory directory, bool isRoot, string rootLabel) =>
         new
         {
             type = "directory",
-            name = isRoot ? "Scripts" : directory.Name,
+            name = isRoot ? rootLabel : directory.Name,
             path = directory.Path,
             children = directory.Directories.Values
                 .OrderBy(value => value.Name, StringComparer.OrdinalIgnoreCase)
-                .Select(value => ToTree(value, isRoot: false))
+                .Select(value => ToTree(value, isRoot: false, rootLabel))
                 .Concat<object>(directory.Scripts
                     .OrderBy(value => value.Name, StringComparer.OrdinalIgnoreCase)
                     .Select(value => new
@@ -339,6 +378,13 @@ internal sealed class ScriptStore
                     }))
                 .ToArray()
         };
+
+    private sealed class LibraryState(string key, string path, ScriptDocument document)
+    {
+        public string Key { get; } = key;
+        public string Path { get; } = path;
+        public ScriptDocument Document { get; set; } = document;
+    }
 
     private sealed class TreeDirectory(string parentPath, string name)
     {

@@ -124,6 +124,9 @@ internal static class PortalAdministrationEndpoints
             storage = new
             {
                 paths.DataRoot,
+                paths.FilesDirectory,
+                paths.CommandsDirectory,
+                paths.ManagementDirectory,
                 writable = Directory.Exists(paths.DataRoot)
             },
             central = central.Snapshot(),
@@ -140,7 +143,7 @@ internal static class PortalAdministrationEndpoints
         var csrf = await PortalAuthenticationEndpoints.ValidateCsrfAsync(context, antiforgery);
         if (csrf is not null) return csrf;
         var retention = 365;
-        var module = settings.Module("approvalcenter");
+        var module = settings.Module("approvals");
         if (module.Options.ValueKind == System.Text.Json.JsonValueKind.Object &&
             module.Options.TryGetProperty("retentionDays", out var value) &&
             value.TryGetInt32(out var configured))

@@ -275,7 +275,7 @@
     }
 
     function selectPrimary(host, kind) {
-        var layout = host.querySelector("[data-portal-settings] .sirk-layout");
+        var layout = host.querySelector("[data-portal-settings] .sirk-layout-host");
         if (!layout) return;
         var primary = layout.querySelector(":scope > .sirk-column-primary");
         var secondary = layout.querySelector(":scope > .sirk-column-secondary");
@@ -305,7 +305,7 @@
 
     function upgradeSettings(host) {
         settingsHost = host;
-        var layout = host.querySelector("[data-portal-settings] .sirk-layout");
+        var layout = host.querySelector("[data-portal-settings] .sirk-layout-host");
         if (!layout) return;
         var primary = layout.querySelector(":scope > .sirk-column-primary");
         if (!primary) return;

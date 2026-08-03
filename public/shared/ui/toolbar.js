@@ -19,9 +19,10 @@
     window.SharedToolbar = {
         mount: function (options) {
             options = options || {};
-            var host = resolve(options.container);
-            if (!host) throw new Error("Toolbar container not found.");
-            var root = document.createElement("div"); root.className = "sirk-toolbar";
+            var root = resolve(options.container);
+            if (!root) throw new Error("Toolbar container not found.");
+            root.innerHTML = "";
+            root.className = "sirk-toolbar-host";
             var left = document.createElement("div"); left.className = "sirk-group sirk-left";
             var center = document.createElement("div"); center.className = "sirk-group sirk-center";
             var right = document.createElement("div"); right.className = "sirk-group sirk-right";
@@ -47,7 +48,10 @@
             var timer = 0;
             searchInput.oninput = function () { context.state.search = searchInput.value || ""; clearTimeout(timer); timer = setTimeout(function () { if (typeof handlers.onSearch === "function") handlers.onSearch(context.state.search, api); }, 120); };
             if (context.buttons.clear && typeof handlers.onClear !== "function") context.buttons.clear.onclick = function () { api.clearSearch(true); };
-            center.hidden = center.childNodes.length === 0; right.hidden = right.childNodes.length === 0; root.hidden = Object.keys(context.buttons).length === 0; host.appendChild(root); return api;
+            center.hidden = center.childNodes.length === 0;
+            right.hidden = right.childNodes.length === 0;
+            root.hidden = Object.keys(context.buttons).length === 0;
+            return api;
         }
     };
 }());

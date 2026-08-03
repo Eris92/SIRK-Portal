@@ -7,11 +7,11 @@
     var providers = [];
     var requests = [];
 
-    var order = ["moverequests", "mycommands", "myscripts"];
+    var order = ["move-requests", "commands", "management"];
     var titles = {
-        moverequests: "Move Requests",
-        mycommands: "Commands",
-        myscripts: "Scripts"
+        "move-requests": "Move Requests",
+        commands: "Commands",
+        management: "Management"
     };
 
     function isStandalone(shell) {
@@ -24,9 +24,9 @@
 
     var icons = {
         overview: svg('<path d="M4 5h16v14H4z"/><path d="M8 9h8M8 13h8M8 17h5"/>'),
-        moverequests: svg('<path d="M7 7h11l-3-3M18 7l-3 3"/><path d="M17 17H6l3 3M6 17l3-3"/>'),
-        mycommands: svg('<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m7 10 3 2-3 2M12 15h5"/>'),
-        myscripts: svg('<path d="M6 3h9l3 3v15H6V3Z"/><path d="M9 11h6M9 15h6"/>'),
+        "move-requests": svg('<path d="M7 7h11l-3-3M18 7l-3 3"/><path d="M17 17H6l3 3M6 17l3-3"/>'),
+        commands: svg('<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m7 10 3 2-3 2M12 15h5"/>'),
+        management: svg('<path d="M6 3h9l3 3v15H6V3Z"/><path d="M9 11h6M9 15h6"/>'),
         all: svg('<path d="M4 5h16v14H4z"/><path d="M8 9h8M8 13h8"/>'),
         pending: svg('<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'),
         executing: svg('<circle cx="12" cy="12" r="9"/><path d="m10 8 6 4-6 4V8Z"/>'),
@@ -45,7 +45,7 @@
     function skin(shell) {
         var page = shell.state.page;
         if (!page || !page.root || !isStandalone(shell)) return;
-        page.root.classList.add("sirk-module-approvalcenter");
+        page.root.classList.add("sirk-module-approvals");
     }
 
     function nav(host, options, shell) {
@@ -106,7 +106,7 @@
     }
 
     function counts(rows) {
-        var result = { all: rows.length, moverequests: 0, mycommands: 0, myscripts: 0 };
+        var result = { all: rows.length, "move-requests": 0, commands: 0, management: 0 };
         rows.forEach(function (row) {
             if (Object.prototype.hasOwnProperty.call(result, row.type)) result[row.type]++;
         });
@@ -272,11 +272,11 @@
     }
 
     var module = window.SirkPlatformModuleShell.create({
-        key: "approvalcenter",
+        key: "approvals",
         title: "Approval Center",
         menuTitle: "Approval Center",
         order: 110,
-        preset: "approvalcenter",
+        preset: "approvals",
         buttons: {
             collapse: { side: "left", order: 10 },
             link: false,
@@ -325,5 +325,5 @@
         }
     });
 
-    window.SirkPlatformModules.approvalcenter = module;
+    window.SirkPlatformModules.approvals = module;
 }());

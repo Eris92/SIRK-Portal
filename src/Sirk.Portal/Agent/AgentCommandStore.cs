@@ -77,7 +77,7 @@ internal sealed class AgentCommandStore
 
     public AgentCommandStore(PortalPaths paths, AgentStore agents)
     {
-        _path = paths.CommandsFile;
+        _path = paths.AgentCommandsFile;
         _agents = agents;
         _document = File.Exists(_path)
             ? Validate(AtomicJsonFile.Read<AgentCommandDocument>(_path))

@@ -85,13 +85,73 @@ if 'portal-module-shell.css' not in index_html:
 shell_css = Path('public/portal/standalone/styles/module-shell.css').read_text(encoding='utf-8')
 for marker in (
     '[data-action="sidebar"] svg',
-    '.sirk-standalone-nav button > span > svg',
+    '.sirk-standalone-nav button[data-view] > span > svg',
     'stroke: currentColor !important',
     'visibility: visible !important',
     'svg :is(path,rect,circle,line,polyline,polygon,ellipse)',
 ):
     if marker not in shell_css:
         raise SystemExit('Loaded sidebar icon rendering contract is missing: ' + marker)
+
+for path in (Path('seed/Files/commands'), Path('seed/Files/management')):
+    if not path.is_dir():
+        raise SystemExit('Canonical script library path is missing: ' + str(path))
+
+legacy_terms = ('myscripts', 'mycommands', 'approvalcenter', 'moverequests', 'myjira', 'defendertools')
+legacy_classes = (
+    'sirk-standalone-view-scroll',
+    'sirk-toolbar sirk-toolbar-host',
+    'sirk-layout sirk-layout-host',
+    'sirk-tabs sirk-tabs-host',
+)
+text_extensions = {'.cs', '.js', '.css', '.html', '.json', '.py', '.ps1', '.md', '.yml', '.yaml'}
+for path in Path('.').rglob('*'):
+    if not path.is_file() or path.suffix.lower() not in text_extensions or any(part in {'.git', 'artifacts', 'bin', 'obj'} for part in path.parts):
+        continue
+    content = path.read_text(encoding='utf-8', errors='replace')
+    lowered = content.lower()
+    for term in legacy_terms:
+        if term in lowered:
+            raise SystemExit(f'Legacy module name {term!r} remains in {path}.')
+    for value in legacy_classes:
+        if value in content:
+            raise SystemExit(f'Legacy/duplicated shell class {value!r} remains in {path}.')
+
+component_markers = {
+    Path('public/portal/standalone/scripts/app.js'): (
+        'sirk-view-shell', 'sirk-toolbar-host', 'sirk-layout-host',
+    ),
+    Path('public/portal/standalone/scripts/settings-native-v2.js'): (
+        'sirk-view-shell', 'sirk-toolbar-host', 'sirk-layout-host',
+        'sirk-column-primary', 'sirk-column-secondary', 'sirk-column-details',
+    ),
+    Path('public/portal/management.js'): (
+        'sirk-view-shell', 'sirk-toolbar-host', 'sirk-layout-host',
+    ),
+    Path('public/shared/ui/page.js'): (
+        'sirk-view-shell', 'sirk-tabs-host', 'sirk-toolbar-host', 'sirk-layout-host',
+    ),
+    Path('public/shared/ui/layout.js'): (
+        'sirk-layout-host', 'sirk-column-primary', 'sirk-column-secondary', 'sirk-column-details',
+    ),
+}
+for path, markers in component_markers.items():
+    content = path.read_text(encoding='utf-8')
+    for marker in markers:
+        if marker not in content:
+            raise SystemExit(f'Unified view-shell marker {marker!r} is missing from {path}.')
+
+management = Path('public/portal/management.js').read_text(encoding='utf-8')
+for marker in ('core.api("management"', 'api("tree")', 'sirk-toolbar-host', 'sirk-layout-host'):
+    if marker not in management:
+        raise SystemExit('Management module contract is missing: ' + marker)
+if 'api("scripts")' in management or 'post("refresh")' in management:
+    raise SystemExit('Management still calls a removed module action.')
+
+settings_ui = Path('public/portal/standalone/scripts/settings-native-v2.js').read_text(encoding='utf-8')
+for marker in ('sirk-column-primary', 'sirk-column-secondary', 'sirk-column-details', 'data-portal-settings-native", "3'):
+    if marker not in settings_ui:
+        raise SystemExit('Native Settings three-column contract is missing: ' + marker)
 PY
 
 portal_dll='artifacts/linux-x64/Sirk.Portal.dll'
@@ -100,6 +160,7 @@ python3 .github/scripts/test-dotnet10-central-heartbeat.py "$portal_dll"
 python3 .github/scripts/test-dotnet10-native-api.py "$portal_dll"
 python3 .github/scripts/test-dotnet10-native-settings-v2.py "$portal_dll"
 python3 .github/scripts/test-dotnet10-full-ui.py "$portal_dll"
+python3 .github/scripts/test-dotnet10-modules-v2.py "$portal_dll"
 
 docker build --tag sirk-portal:dotnet10 .
 docker run --detach --name sirk-portal-smoke \

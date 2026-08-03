@@ -48,7 +48,7 @@
     function t(key) { return TEXT[language()][key] || key; }
 
     function commandModule() {
-        return window.SirkPlatformModules && window.SirkPlatformModules.mycommands || null;
+        return window.SirkPlatformModules && window.SirkPlatformModules.commands || null;
     }
 
     function localized(item, field) {
@@ -1103,7 +1103,7 @@
         var payload = { nodeId: String(selectedNode && (selectedNode.id || selectedNode._id) || ""), nodeName: selectedNode && selectedNode.name || "", variableValues: values || {}, confirmedExecution: item.confirmExecution === true, note: "" };
         if (item.kind === "command") payload.commandId = item.commandId;
         else payload.scriptPath = item.path;
-        core.post("mycommands", "execute", payload).then(function (response) {
+        core.post("commands", "execute", payload).then(function (response) {
             status.textContent = response.request && response.request.status === "pending" ? t("commandPending") : t("commandSent");
             status.classList.remove("is-error");
         }).catch(function (error) {
@@ -1138,7 +1138,7 @@
             runHost.appendChild(run);
         }
         if (item.kind !== "script") { show(item); return; }
-        core.api("mycommands", "script", null, { path: item.path }).then(function (response) {
+        core.api("commands", "script", null, { path: item.path }).then(function (response) {
             var script = response.script || item;
             show({ kind: "script", path: script.path, label: localized(script, "label") || script.label || script.name, description: localized(script, "description") || script.description || "", variables: script.variables || [], requiresApproval: script.requiresApproval === true, confirmExecution: script.confirmExecution === true });
         }).catch(function (error) { status.textContent = error.message || String(error); status.classList.add("is-error"); });

@@ -3,19 +3,21 @@
 
     function storageKey(options) {
         if (options.layoutStorageKey) return String(options.layoutStorageKey);
-        return "sirkPlatform.layout." + String(options.preset || "standard").toLowerCase() + ".collapsed";
+        return "sirkPortal.layout." + String(options.preset || "standard").toLowerCase() + ".collapsed";
     }
 
     window.SharedPage = {
         mount: function (options) {
             options = options || {};
             var host = typeof options.container === "string" ? document.querySelector(options.container) : options.container;
+            if (!host) throw new Error("View container not found.");
             host.innerHTML = "";
-            host.className = "sirk-standalone-view-scroll";
+            host.className = "sirk-view-shell";
+            host.setAttribute("data-sirk-view-shell", String(options.view || options.preset || "standard"));
             host.setAttribute("data-frontend", "sirkportal");
 
             var tabsHost = document.createElement("div");
-            tabsHost.className = "sirk-tabs";
+            tabsHost.className = "sirk-tabs-host";
             var toolbarHost = document.createElement("div");
             toolbarHost.className = "sirk-toolbar-host";
             var layoutHost = document.createElement("div");

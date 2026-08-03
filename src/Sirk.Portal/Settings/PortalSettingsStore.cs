@@ -30,12 +30,12 @@ internal sealed class PortalSettingsStore
     private static readonly string[] ModuleKeys =
     [
         "portal",
-        "approvalcenter",
-        "moverequests",
-        "mycommands",
-        "myscripts",
-        "myjira",
-        "defendertools",
+        "approvals",
+        "move-requests",
+        "commands",
+        "management",
+        "jira",
+        "security",
         "monitoring",
         "assets",
         "reports"
@@ -262,12 +262,12 @@ internal sealed class PortalSettingsStore
     {
         var name = key switch
         {
-            "approvalcenter" => "Approvals",
-            "moverequests" => "Move Requests",
-            "mycommands" => "Commands",
-            "myscripts" => "Automation",
-            "myjira" => "Jira",
-            "defendertools" => "Security",
+            "approvals" => "Approvals",
+            "move-requests" => "Move Requests",
+            "commands" => "Commands",
+            "management" => "Management",
+            "jira" => "Jira",
+            "security" => "Security",
             "monitoring" => "Monitoring",
             "assets" => "Assets",
             "reports" => "Reports",
@@ -279,12 +279,12 @@ internal sealed class PortalSettingsStore
             name,
             script = key switch
             {
-                "approvalcenter" => "approvalcenter.js",
-                "moverequests" => "moverequests.js",
-                "mycommands" => "mycommands.js",
-                "myscripts" => "myscripts.js",
-                "myjira" => "myjira.js",
-                "defendertools" => "defendertools.js",
+                "approvals" => "approvals.js",
+                "move-requests" => "move-requests.js",
+                "commands" => "commands.js",
+                "management" => "management.js",
+                "jira" => "jira.js",
+                "security" => "security.js",
                 _ => string.Empty
             },
             options = value.Options
@@ -346,7 +346,7 @@ internal sealed class PortalSettingsStore
         var modules = ModuleKeys.ToDictionary(
             key => key,
             key => new PortalModuleSettings(
-                key is not ("myjira" or "defendertools"),
+                key is not ("jira" or "security"),
                 [],
                 DefaultModuleOptions(key)),
             StringComparer.Ordinal);
@@ -391,9 +391,9 @@ internal sealed class PortalSettingsStore
     {
         object value = key switch
         {
-            "approvalcenter" => new { retentionDays = 365 },
-            "moverequests" => new { hostButtonEnabled = true },
-            "mycommands" => new
+            "approvals" => new { retentionDays = 365 },
+            "move-requests" => new { hostButtonEnabled = true },
+            "commands" => new
             {
                 showOnDevice = true,
                 maxMultiHostNodes = 200,

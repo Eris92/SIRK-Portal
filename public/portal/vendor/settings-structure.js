@@ -62,7 +62,7 @@
     }
 
     function layout() {
-        return mountedHost && mountedHost.querySelector("[data-portal-settings] .sirk-layout");
+        return mountedHost && mountedHost.querySelector("[data-portal-settings] .sirk-layout-host");
     }
     function directPrimaryButtons(primary) {
         return primary ? Array.prototype.slice.call(primary.querySelectorAll(":scope > .sirk-nav-item")) : [];

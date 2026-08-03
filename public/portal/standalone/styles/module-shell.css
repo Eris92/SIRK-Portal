@@ -1,87 +1,16 @@
-/* Persistent shell icons: do not depend on inherited or dynamically injected colors. */
+/* Portal navigation icons. Kept separate from the reusable view-shell layout. */
 #sirkPortalRoot .sirk-standalone-nav button[data-view="overview"],
-#sirkPortalRoot .sirk-standalone-nav button[data-view="devices"] { --sirk-shell-icon-color: #55b8ff; }
-#sirkPortalRoot .sirk-standalone-nav button[data-view="approvals"] { --sirk-shell-icon-color: #35d7a4; }
-#sirkPortalRoot .sirk-standalone-nav button[data-view="automation"] { --sirk-shell-icon-color: #ffae00; }
-#sirkPortalRoot .sirk-standalone-nav button[data-view="monitoring"] { --sirk-shell-icon-color: #34d1e7; }
-#sirkPortalRoot .sirk-standalone-nav button[data-view="assets"] { --sirk-shell-icon-color: #9a7cff; }
-#sirkPortalRoot .sirk-standalone-nav button[data-view="management"] { --sirk-shell-icon-color: #ff5f7d; }
-#sirkPortalRoot .sirk-standalone-nav button[data-view="reports"] { --sirk-shell-icon-color: #7f85ff; }
-#sirkPortalRoot .sirk-standalone-nav button[data-view="security"] { --sirk-shell-icon-color: #ff385d; }
-#sirkPortalRoot .sirk-standalone-nav button[data-view="settings"] { --sirk-shell-icon-color: #94a3b8; }
+#sirkPortalRoot .sirk-standalone-nav button[data-view="devices"]{ --sirk-shell-icon-color: #55b8ff; }
+#sirkPortalRoot .sirk-standalone-nav button[data-view="approvals"]{ --sirk-shell-icon-color: #35d7a4; }
+#sirkPortalRoot .sirk-standalone-nav button[data-view="automation"]{ --sirk-shell-icon-color: #ffae00; }
+#sirkPortalRoot .sirk-standalone-nav button[data-view="monitoring"]{ --sirk-shell-icon-color: #34d1e7; }
+#sirkPortalRoot .sirk-standalone-nav button[data-view="assets"]{ --sirk-shell-icon-color: #9a7cff; }
+#sirkPortalRoot .sirk-standalone-nav button[data-view="management"]{ --sirk-shell-icon-color: #ff5f7d; }
+#sirkPortalRoot .sirk-standalone-nav button[data-view="reports"]{ --sirk-shell-icon-color: #7f85ff; }
+#sirkPortalRoot .sirk-standalone-nav button[data-view="security"]{ --sirk-shell-icon-color: #ff385d; }
+#sirkPortalRoot .sirk-standalone-nav button[data-view="settings"]{ --sirk-shell-icon-color: #94a3b8; }
 
-#sirkPortalRoot .sirk-standalone-nav button[data-view] > span {
-    color: var(--sirk-shell-icon-color, #55b8ff) !important;
-    -webkit-text-fill-color: var(--sirk-shell-icon-color, #55b8ff) !important;
-    filter: none !important;
-    clip-path: none !important;
-    mask: none !important;
-    -webkit-mask: none !important;
-}
-
-#sirkPortalRoot .sirk-standalone-nav button[data-view] > span > svg,
-#sirkPortalRoot .sirk-standalone-nav button[data-view] > span > svg :is(path,rect,circle,line,polyline,polygon,ellipse) {
-    color: var(--sirk-shell-icon-color, #55b8ff) !important;
-    stroke: var(--sirk-shell-icon-color, #55b8ff) !important;
-    stroke-opacity: 1 !important;
-    fill-opacity: 1 !important;
-    filter: none !important;
-    clip-path: none !important;
-    mask: none !important;
-    -webkit-mask: none !important;
-}
-
-#sirkPortalRoot .sirk-standalone-controls [data-action="sidebar"],
-#sirkPortalRoot .sirk-standalone-controls [data-action="sidebar"] svg,
-#sirkPortalRoot .sirk-standalone-controls [data-action="sidebar"] svg path {
-    color: #edf4ff !important;
-    stroke: #edf4ff !important;
-    stroke-opacity: 1 !important;
-    fill: none !important;
-    opacity: 1 !important;
-    visibility: visible !important;
-    filter: none !important;
-    clip-path: none !important;
-    mask: none !important;
-    -webkit-mask: none !important;
-}
-
-/* Main shell icons. This file is loaded as portal-module-shell.css after vendored styles. */
-#sirkPortalRoot .sirk-standalone-controls [data-action="sidebar"] svg,
-#sirkPortalRoot .sirk-standalone-nav button > span > svg {
-    display: block !important;
-    width: 22px !important;
-    height: 22px !important;
-    min-width: 22px !important;
-    min-height: 22px !important;
-    overflow: visible !important;
-    opacity: 1 !important;
-    visibility: visible !important;
-    fill: none !important;
-    stroke: currentColor !important;
-    stroke-width: 1.8 !important;
-    stroke-linecap: round !important;
-    stroke-linejoin: round !important;
-}
-
-#sirkPortalRoot .sirk-standalone-controls [data-action="sidebar"] svg :is(path,rect,circle,line,polyline,polygon,ellipse),
-#sirkPortalRoot .sirk-standalone-nav button > span > svg :is(path,rect,circle,line,polyline,polygon,ellipse) {
-    display: inline !important;
-    opacity: 1 !important;
-    visibility: visible !important;
-    fill: none !important;
-    stroke: currentColor !important;
-    stroke-width: 1.8 !important;
-    stroke-linecap: round !important;
-    stroke-linejoin: round !important;
-    vector-effect: non-scaling-stroke;
-}
-
-#sirkPortalRoot .sirk-standalone-controls [data-action="sidebar"] {
-    color: #edf4ff !important;
-}
-
-#sirkPortalRoot .sirk-standalone-nav button > span {
+#sirkPortalRoot .sirk-standalone-nav button[data-view] > span{
     display: grid !important;
     place-items: center !important;
     flex: 0 0 25px !important;
@@ -89,103 +18,89 @@
     min-width: 25px !important;
     height: 25px !important;
     min-height: 25px !important;
+    color: var(--sirk-shell-icon-color, #55b8ff) !important;
+    -webkit-text-fill-color: var(--sirk-shell-icon-color, #55b8ff) !important;
     opacity: 1 !important;
     visibility: visible !important;
+    filter: none !important;
+    clip-path: none !important;
+    mask: none !important;
+    -webkit-mask: none !important;
 }
 
-#sirkPortalRoot .sirk-standalone-root.is-collapsed .sirk-standalone-nav button > span {
+#sirkPortalRoot .sirk-standalone-controls [data-action="sidebar"] svg,
+#sirkPortalRoot .sirk-standalone-nav button[data-view] > span > svg{
+    display: block !important;
+    width: 22px !important;
+    height: 22px !important;
+    min-width: 22px !important;
+    min-height: 22px !important;
+    overflow: visible !important;
+    fill: none !important;
+    stroke: currentColor !important;
+    stroke-width: 1.8 !important;
+    stroke-linecap: round !important;
+    stroke-linejoin: round !important;
+    stroke-opacity: 1 !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    filter: none !important;
+    clip-path: none !important;
+    mask: none !important;
+    -webkit-mask: none !important;
+}
+
+#sirkPortalRoot .sirk-standalone-controls [data-action="sidebar"] svg :is(path,rect,circle,line,polyline,polygon,ellipse),
+#sirkPortalRoot .sirk-standalone-nav button[data-view] > span > svg :is(path,rect,circle,line,polyline,polygon,ellipse){
+    display: inline !important;
+    fill: none !important;
+    stroke: currentColor !important;
+    stroke-width: 1.8 !important;
+    stroke-linecap: round !important;
+    stroke-linejoin: round !important;
+    stroke-opacity: 1 !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    vector-effect: non-scaling-stroke;
+}
+
+#sirkPortalRoot .sirk-standalone-controls [data-action="sidebar"]{
+    color: #edf4ff !important;
+}
+
+#sirkPortalRoot .sirk-standalone-root.is-collapsed .sirk-standalone-nav button > span{
     margin: 0 auto !important;
 }
 
-#sirkPortalRoot .sirk-standalone-content.sirk-unified-content {
-    min-width: 0;
-    min-height: 0;
-    overflow: hidden;
-}
-
-#sirkPortalRoot .sirk-standalone-view-scroll {
-    display: flex;
-    flex-direction: column;
-    width: 100%;
-    height: 100%;
-    min-width: 0;
-    min-height: 0;
-    margin: 0;
-    padding: 0;
-    overflow: hidden;
-    border: 0;
-    border-radius: 0;
-    background: transparent;
-    color: var(--sirk-text, #172033);
-    box-sizing: border-box;
-}
-
-#sirkPortalRoot .sirk-tabs:empty { display: none; }
-
-#sirkPortalRoot .sirk-toolbar-host {
-    flex: 0 0 48px;
-    width: 100%;
-    height: 48px;
-    min-height: 48px;
-    overflow: hidden;
-    background: transparent;
-}
-
-#sirkPortalRoot .sirk-toolbar {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    width: 100%;
-    height: 48px;
-    margin: 0;
-    padding: 7px 10px;
-    border: 0;
-    border-bottom: 1px solid var(--sirk-border, #dce3ec);
-    background: transparent;
-    box-sizing: border-box;
-}
-
-#sirkPortalRoot .sirk-group {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    min-width: 0;
-}
-
-#sirkPortalRoot .sirk-center { flex: 1 1 auto; justify-content: center; }
-#sirkPortalRoot .sirk-right { margin-left: auto; }
-
-#sirkPortalRoot .sirk-toolbar-button {
+#sirkPortalRoot .sirk-toolbar-button{
     display: grid;
     place-items: center;
     width: 34px;
     min-width: 34px;
     height: 34px;
     min-height: 34px;
-    margin: 0;
     padding: 0;
     border: 1px solid transparent;
     border-radius: 7px;
     background: transparent;
     color: inherit;
-    box-shadow: none;
     cursor: pointer;
 }
 
 #sirkPortalRoot .sirk-toolbar-button:hover,
-#sirkPortalRoot .sirk-toolbar-button.is-active {
+#sirkPortalRoot .sirk-toolbar-button.is-active{
     border-color: rgba(96, 165, 250, .2);
     background: rgba(96, 165, 250, .14);
 }
 
 #sirkPortalRoot .sirk-toolbar-icon,
-#sirkPortalRoot .sirk-toolbar-icon svg {
+#sirkPortalRoot .sirk-toolbar-icon svg{
     display: block;
     width: 20px;
     height: 20px;
 }
 
-#sirkPortalRoot .sirk-toolbar-icon svg {
+#sirkPortalRoot .sirk-toolbar-icon svg{
     fill: none;
     stroke: currentColor;
     stroke-width: 1.8;
@@ -193,98 +108,12 @@
     stroke-linejoin: round;
 }
 
-#sirkPortalRoot .sirk-toolbar-search input,
-#sirkPortalRoot .sirk-filter,
-#sirkPortalRoot .sirk-standalone-view-scroll input[type="search"] {
-    min-height: 34px;
-    padding: 7px 10px;
-    border: 1px solid var(--sirk-border, #dce3ec);
-    border-radius: 7px;
-    background: transparent;
-    color: inherit;
-    box-sizing: border-box;
-}
-
-#sirkPortalRoot .sirk-layout-host {
-    flex: 1 1 auto;
-    width: 100%;
-    min-width: 0;
-    min-height: 0;
-    overflow: hidden;
-    background: transparent;
-}
-
-#sirkPortalRoot .sirk-layout {
-    display: grid;
-    grid-template-columns: 184px 236px minmax(0, 1fr);
-    width: 100%;
-    height: 100%;
-    min-width: 0;
-    min-height: 0;
-    overflow: hidden;
-    border: 0;
-    background: transparent;
-}
-
-#sirkPortalRoot .sirk-layout.is-collapsed {
-    grid-template-columns: 56px 236px minmax(0, 1fr);
-}
-
-#sirkPortalRoot :is(.sirk-column-primary,.sirk-column-secondary,.sirk-column-details) {
-    min-width: 0;
-    min-height: 0;
-    height: 100%;
-    overflow-x: hidden;
-    overflow-y: auto;
-    background: transparent;
-    box-sizing: border-box;
-}
-
-#sirkPortalRoot .sirk-column-primary,
-#sirkPortalRoot .sirk-column-secondary {
-    padding: 12px;
-    border-right: 1px solid var(--sirk-border, #dce3ec);
-}
-
-#sirkPortalRoot .sirk-column-details {
-    padding: 18px;
-    overscroll-behavior: contain;
-}
-
-#sirkPortalRoot .sirk-nav-item {
+#sirkPortalRoot .sirk-group{
     display: flex;
     align-items: center;
-    gap: 10px;
-    width: 100%;
+    gap: 6px;
     min-width: 0;
-    min-height: 42px;
-    margin: 0 0 4px;
-    padding: 9px 11px;
-    border: 1px solid transparent;
-    border-radius: 7px;
-    background: transparent;
-    color: inherit;
-    text-align: left;
-    font: 500 14px "Segoe UI", Arial, sans-serif;
-    cursor: pointer;
-    box-sizing: border-box;
 }
 
-#sirkPortalRoot .sirk-nav-item:hover { background: rgba(96, 165, 250, .09); }
-#sirkPortalRoot .sirk-nav-item.active,
-#sirkPortalRoot .sirk-nav-item.is-active {
-    background: rgba(96, 165, 250, .16);
-    box-shadow: inset 3px 0 0 var(--sirk-active-accent, #60a5fa);
-    font-weight: 700;
-}
-
-#sirkPortalRoot .sirk-card {
-    margin: 0 0 10px;
-    padding: 14px;
-    border: 1px solid var(--sirk-border, #dce3ec);
-    border-radius: 8px;
-    background: transparent;
-    color: inherit;
-    box-shadow: none;
-    box-sizing: border-box;
-}
+#sirkPortalRoot .sirk-center{ flex: 1 1 auto; justify-content: center; }
+#sirkPortalRoot .sirk-right{ margin-left: auto; }

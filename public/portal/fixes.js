@@ -115,10 +115,10 @@
         showOnlyManagement(portalRoot, host);
         setActiveButton(portalRoot);
         if (!window.SirkPlatformPortalManagement || typeof window.SirkPlatformPortalManagement.mount !== "function") {
-            host.innerHTML = '<div class="sirk-card"><h3>Zarządzanie</h3><p>Renderer MyScripts nie został załadowany.</p></div>';
+            host.innerHTML = '<div class="sirk-card"><h3>Zarządzanie</h3><p>Renderer Management nie został załadowany.</p></div>';
             return;
         }
-        if (force || !host.querySelector(".sirk-standalone-view-scroll")) {
+        if (force || !host.querySelector(".sirk-view-shell")) {
             host.innerHTML = "";
             window.SirkPlatformPortalManagement.mount(host);
         }
@@ -177,7 +177,7 @@
 
         // The native Management renderer owns every click inside its shell.
         // Do not treat its Collapse button as the global SirK Portal sidebar toggle.
-        if (event.target.closest && event.target.closest(".sirk-standalone-view-scroll")) return;
+        if (event.target.closest && event.target.closest(".sirk-view-shell")) return;
 
         var toggle = collapseButton(event.target, portalRoot);
         if (toggle) {

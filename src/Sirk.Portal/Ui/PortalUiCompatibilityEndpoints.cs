@@ -24,8 +24,8 @@ internal static class PortalUiCompatibilityEndpoints
 {
     private static readonly string[] ModuleKeys =
     [
-        "portal", "approvalcenter", "moverequests", "mycommands", "myscripts",
-        "myjira", "defendertools", "monitoring", "assets", "reports"
+        "portal", "approvals", "move-requests", "commands", "management",
+        "jira", "security", "monitoring", "assets", "reports"
     ];
 
     public static IEndpointRouteBuilder MapPortalUiCompatibility(
@@ -120,7 +120,7 @@ internal static class PortalUiCompatibilityEndpoints
         PortalSettingsStore settings)
     {
         var pending = approvals.List(null, "pending", null, 2000).Count;
-        var integrations = new[] { "myjira", "defendertools", "monitoring" }
+        var integrations = new[] { "jira", "security", "monitoring" }
             .Select(key => new
             {
                 key,
@@ -354,7 +354,7 @@ internal static class PortalUiCompatibilityEndpoints
             StringComparer.Ordinal);
         moduleSettings["portal"] = settings.Portal();
         var integrations = new Dictionary<string, JsonElement>(StringComparer.Ordinal);
-        foreach (var key in new[] { "myjira", "defendertools", "monitoring", "entra", "zabbix" })
+        foreach (var key in new[] { "jira", "security", "monitoring", "entra", "zabbix" })
             integrations[key] = settings.Integration(key);
         return new
         {

@@ -3,7 +3,7 @@
     var active = "agent";
     var agentState = { snapshot: null, category: "overview" };
     var module = window.SirkPlatformModuleShell.create({
-        key: "defendertools", title: "Bezpieczeństwo", menuTitle: "Bezpieczeństwo", order: 140, preset: "standard",
+        key: "security", title: "Bezpieczeństwo", menuTitle: "Bezpieczeństwo", order: 140, preset: "standard",
         tabs: [{ key: "agent", title: "SIRK Agent" }, { key: "incidents", title: "Incidents" }, { key: "email", title: "Email Explorer" }, { key: "trusted", title: "Tenant Allow/Block" }, { key: "hunting", title: "Advanced Hunting" }, { key: "settings", title: "Settings" }],
         defaultTab: "agent",
         render: function (shell) {
@@ -72,5 +72,5 @@
         shell.nav(shell.state.page.primary, [{ key: "agent", title: "SIRK Agent", icon: "S" }], "agent", function () {}); shell.state.page.secondary.innerHTML = ""; shell.state.page.details.innerHTML = ""; shell.state.page.details.appendChild(shell.card("SIRK Agent", "Ładowanie pełnego katalogu możliwości…"));
         return shell.api("agent-overview").then(function (result) { agentState.snapshot = result; var categories = result.categories || []; if (!categories.some(function (item) { return item.key === agentState.category; })) agentState.category = categories.length ? categories[0].key : "overview"; renderCategoryNavigation(shell, categories); renderCategory(shell, categories.find(function (item) { return item.key === agentState.category; })); }).catch(function (error) { shell.error(shell.state.page.details, error); });
     }
-    window.SirkPlatformModules.defendertools = module;
+    window.SirkPlatformModules.security = module;
 }());

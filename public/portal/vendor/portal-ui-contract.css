@@ -1,10 +1,10 @@
 /* Final Portal surface rules. Shared content remains transparent. */
-#sirkPortalRoot .sirk-standalone-content.sirk-unified-content {
+#sirkPortalRoot .sirk-standalone-content.sirk-unified-content{
     min-width: 0;
     min-height: 0;
 }
 
-#sirkPortalRoot .sirk-standalone-content.sirk-unified-content > .sirk-portal-view-host {
+#sirkPortalRoot .sirk-standalone-content.sirk-unified-content > .sirk-portal-view-host{
     flex: 1 1 auto;
     width: 100%;
     height: 100%;
@@ -17,7 +17,7 @@
     box-sizing: border-box;
 }
 
-#sirkPortalRoot .sirk-portal-view-host > .sirk-standalone-view-scroll {
+#sirkPortalRoot .sirk-portal-view-host > .sirk-view-shell{
     width: 100%;
     height: 100%;
     min-width: 0;
