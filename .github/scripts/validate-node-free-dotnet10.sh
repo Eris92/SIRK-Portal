@@ -170,7 +170,7 @@ filesystem_store = Path('src/Sirk.Portal/Automation/FileSystemScriptLibrary.cs')
 for marker in ('FileSystemScriptLibrary.Scan', 'FileSystemScriptLibrary.Write', 'FileSystemScriptLibrary.Delete'):
     if marker not in script_store:
         raise SystemExit('Filesystem script synchronization is missing: ' + marker)
-for marker in ('VariableRequired', 'Files', 'ScriptStore.HashDefinition'):
+for marker in ('VariableHeader', 'Required|Switch|Select', 'ScriptStore.HashDefinition'):
     if marker not in filesystem_store:
         raise SystemExit('Filesystem script parser contract is missing: ' + marker)
 PY
