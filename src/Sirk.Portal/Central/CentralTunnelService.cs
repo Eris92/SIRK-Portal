@@ -375,11 +375,13 @@ internal sealed class CentralTunnelService : BackgroundService
 
     private static Uri ValidateLocalOrigin(string value)
     {
-        if (!Uri.TryCreate(value, UriKind.Absolute, out var uri) ||
-            uri is null ||
-            (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps) ||
-            !IPAddress.TryParse(uri.Host, out var address) ||
-            !IPAddress.IsLoopback(address) ||
+        if (!Uri.TryCreate(value, UriKind.Absolute, out var uri) || uri is null)
+            throw new InvalidDataException("Central tunnel local origin must be a loopback HTTP(S) origin.");
+
+        var loopbackHost = uri.Host.Equals("localhost", StringComparison.OrdinalIgnoreCase) ||
+                           (IPAddress.TryParse(uri.Host, out var address) && IPAddress.IsLoopback(address));
+        if ((uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps) ||
+            !loopbackHost ||
             !string.IsNullOrEmpty(uri.UserInfo) ||
             !string.IsNullOrEmpty(uri.Query) ||
             !string.IsNullOrEmpty(uri.Fragment) ||
