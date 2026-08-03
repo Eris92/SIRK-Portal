@@ -310,6 +310,8 @@ app.MapGet("/api/v1/portal/status", () => Results.Ok(new
 app.MapPortalAuthentication();
 app.MapPortalIdentity();
 app.MapAgentEndpoints();
+app.MapLegacyAgentCompatibility();
+app.MapAgentInstallScript();
 app.MapPortalModules();
 app.MapPortalAdministration();
 app.MapPortalMaintenance();
