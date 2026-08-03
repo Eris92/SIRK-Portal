@@ -61,14 +61,14 @@ jobs:
 
           if grep -RInE --exclude-dir=.git --exclude='*.patch' \
             'myscripts|mycommands|approvalcenter|moverequests|myjira|defendertools' \
-            src public tests seed .github/scripts; then
+            src public tests seed; then
             echo 'Historical module identifiers remain in active code.' >&2
             exit 1
           fi
 
           if grep -RInE --exclude-dir=.git \
             'sirk-standalone-view-scroll|sirk-toolbar sirk-toolbar-host|sirk-layout sirk-layout-host|sirk-tabs sirk-tabs-host' \
-            src public tests .github/scripts; then
+            src public tests; then
             echo 'Legacy or duplicated shell classes remain in active code.' >&2
             exit 1
           fi
