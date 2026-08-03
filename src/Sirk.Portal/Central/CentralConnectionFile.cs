@@ -186,6 +186,20 @@ internal sealed class CentralConnectionResolver
         return document;
     }
 
+    internal static CentralConnectionFileDocument SaveProtectedDocument(
+        CentralConnectionFileDocument document,
+        string? destinationPath)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+        ValidateDocument(document);
+        ValidateTunnelOrigin(document.CentralUrl, document.TunnelUrl);
+        var normalized = document with { UpdatedAtUtc = DateTimeOffset.UtcNow };
+        var destination = ResolveConnectionFilePath(destinationPath);
+        AtomicJsonFile.Write(destination, normalized);
+        SecureFile(destination);
+        return ReadProtectedDocument(destination);
+    }
+
     internal static bool RemoveProtectedDocument(string path)
     {
         var resolved = ResolveConnectionFilePath(path);

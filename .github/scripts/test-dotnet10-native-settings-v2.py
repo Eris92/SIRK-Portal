@@ -122,6 +122,7 @@ def main() -> int:
             "ASPNETCORE_URLS": BASE_URL,
             "Sirk__DataRoot": str(data_root),
             "Sirk__Central__Enabled": "false",
+            "Sirk__Central__ConnectionFile": str(data_root / "central-connection.json"),
             "Sirk__CentralTunnel__Enabled": "false",
             "SIRK_BOOTSTRAP_PASSWORD": PASSWORD,
             "SIRK_BOOTSTRAP_ACCESS_CODE": ACCESS_CODE,
@@ -147,6 +148,11 @@ def main() -> int:
                 "/api/v1/admin/settings",
                 "/api/v1/admin/identity/",
                 "/api/v1/admin/maintenance/status",
+                "/api/v1/admin/central",
+                "/api/v1/admin/computer-groups",
+                '"Aktualizuj teraz"',
+                '"Połączenie z Central"',
+                '"Grupy komputerów"',
                 '"Break-Glass"',
                 '"Operator L1"',
                 '"Support L2"',
@@ -209,6 +215,56 @@ def main() -> int:
             })["value"]
             if user["id"] not in item_by(identity["groups"], "id", "native-test").get("memberIds", []):
                 raise RuntimeError("Group membership was not persisted.")
+
+            icon_sprite, _ = browser.call("GET", "/assets/icons/sirk-ui.svg", accept="image/svg+xml")
+            icon_source = icon_sprite.decode("utf-8")
+            for symbol in ("home", "devices", "management", "settings", "chevron-left"):
+                if f'<symbol id="{symbol}"' not in icon_source:
+                    raise RuntimeError(f"Canonical icon sprite is missing symbol: {symbol}")
+
+            central_payload = {
+                "schemaVersion": 1,
+                "centralUrl": "https://central.example.test",
+                "tunnelUrl": "wss://central.example.test/tunnel",
+                "portalId": "native-test-portal",
+                "portalName": "Native Test Portal",
+                "portalToken": "Abcdefghijklmnopqrstuvwxyz0123456789_-TOKEN",
+                "publicUrl": "https://portal.example.test",
+            }
+            central = browser.json("PUT", "/api/v1/admin/central", central_payload)["value"]
+            if not central.get("configured") or not central.get("restartRequired"):
+                raise RuntimeError("Central connection was not persisted.")
+            if central_payload["portalToken"] in json.dumps(central):
+                raise RuntimeError("Central token was returned without redaction.")
+            central = browser.json("GET", "/api/v1/admin/central")["value"]
+            if central.get("configuration", {}).get("portalId") != "native-test-portal":
+                raise RuntimeError("Central connection status is incomplete.")
+            central = browser.json("DELETE", "/api/v1/admin/central")["value"]
+            if central.get("configured") is not False:
+                raise RuntimeError("Central connection was not removed.")
+
+            groups = browser.json("POST", "/api/v1/admin/computer-groups", {
+                "id": "native-computers",
+                "name": "Native Computers",
+                "description": "Native settings E2E",
+            })
+            first_token = groups.get("enrollmentToken")
+            if not first_token:
+                raise RuntimeError("Computer group enrollment token was not issued.")
+            item_by(groups["value"]["groups"], "id", "native-computers")
+            groups = browser.json("PUT", "/api/v1/admin/computer-groups/native-computers", {
+                "name": "Native Computers Updated",
+                "description": "Updated",
+                "enabled": True,
+            })
+            if item_by(groups["value"]["groups"], "id", "native-computers").get("name") != "Native Computers Updated":
+                raise RuntimeError("Computer group update was not persisted.")
+            rotated = browser.json("POST", "/api/v1/admin/computer-groups/native-computers/rotate-token", {})
+            if not rotated.get("enrollmentToken") or rotated["enrollmentToken"] == first_token:
+                raise RuntimeError("Computer group token was not rotated.")
+            groups = browser.json("DELETE", "/api/v1/admin/computer-groups/native-computers")
+            if any(value.get("id") == "native-computers" for value in groups["value"]["groups"]):
+                raise RuntimeError("Computer group was not deleted.")
 
             maintenance = browser.json("GET", "/api/v1/admin/maintenance/status")["value"]
             if maintenance["current"].get("channel") != "dev":
