@@ -2,7 +2,7 @@
 
 ## Wersja
 
-`3.0.0-dev.2`, ASP.NET Core / .NET 10 LTS.
+`3.0.0-dev.1`, ASP.NET Core / .NET 10 LTS.
 
 ## Zrealizowane
 
