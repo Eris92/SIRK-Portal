@@ -1,132 +1,39 @@
 name: SIRK Portal .NET 10 CI
 
 on:
+  workflow_dispatch:
+  push:
+    branches: [main, develop, rewrite/dotnet10-node-free]
   pull_request:
     branches: [main, develop]
 
 permissions:
-  contents: write
+  contents: read
+
+concurrency:
+  group: portal-dotnet10-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  apply-group-installer:
-    runs-on: ubuntu-24.04
+  linux-build-api-ui:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
         with:
-          ref: feature/group-bound-agent-installer
-      - name: Apply feature and restore canonical CI
+          dotnet-version: 10.0.x
+          cache: true
+          cache-dependency-path: '**/*.csproj'
+      - name: Build test publish API UI and container
         shell: bash
-        run: |
-          sed -n "/python3 - <<'PY'/,/^          PY$/p" .github/workflows/apply-group-installer.yml | sed '1d;$d;s/^          //' > /tmp/apply-group-installer.py
-          python3 - <<'PY'
-          from pathlib import Path
-          path = Path('/tmp/apply-group-installer.py')
-          value = path.read_text(encoding='utf-8')
+        run: bash .github/scripts/validate-node-free-dotnet10.sh
 
-          start = value.index("old = '''                        deviceCount = _document.Devices.Count")
-          end = value.index("old = '''    private void Save", start)
-          line_start = value.rfind('\n', 0, start) + 1
-          indent = value[line_start:start]
-          snapshot = indent + '''old = "                        deviceCount = _document.Devices.Count(device => device.GroupId == value.Id),"
-          new = old + "\\n" + "                        activeInstallerCount = (_document.InstallerTickets ?? []).Count(ticket =>" + "\\n" + "                            ticket.GroupId == value.Id &&" + "\\n" + "                            ticket.UsedAtUtc is null &&" + "\\n" + "                            ticket.ExpiresAtUtc > now),"
-          if text.count(old) != 1: raise SystemExit('Snapshot deviceCount marker mismatch.')
-          text = text.replace(old, new)
-
-          '''
-          value = value[:line_start] + snapshot + value[end:]
-
-          start = value.index("old = '''    private void Save")
-          end = value.index("helper_marker = '''    private static string NormalizeId", start)
-          line_start = value.rfind('\n', 0, start) + 1
-          indent = value[line_start:start]
-          save_validate = indent + '''save_start = text.index("    private void Save(AgentDocument value)")
-          save_end = text.index("    private static string NormalizeId", save_start)
-          save_block = """    private void Save(AgentDocument value)
-    {
-        var normalized = value with
-        {
-            InstallerTickets = PruneInstallerTickets(
-                value.InstallerTickets,
-                DateTimeOffset.UtcNow)
-        };
-        _document = Validate(normalized);
-        AtomicJsonFile.Write(_paths.AgentsFile, _document);
-    }
-
-    private static AgentDocument Validate(AgentDocument value)
-    {
-        if (value.SchemaVersion != SchemaVersion)
-            throw new InvalidDataException(\"Agent store schema is unsupported.\");
-        var tickets = value.InstallerTickets ?? [];
-        if (value.Groups.GroupBy(group => group.Id, StringComparer.Ordinal).Any(group => group.Count() > 1) ||
-            value.Devices.GroupBy(device => device.Id, StringComparer.Ordinal).Any(group => group.Count() > 1) ||
-            tickets.GroupBy(ticket => ticket.Id, StringComparer.Ordinal).Any(group => group.Count() > 1))
-        {
-            throw new InvalidDataException(\"Agent store contains duplicate identifiers.\");
-        }
-        if (tickets.Any(ticket =>
-                !value.Groups.Any(group => group.Id == ticket.GroupId) ||
-                ticket.ExpiresAtUtc <= ticket.CreatedAtUtc))
-        {
-            throw new InvalidDataException(\"Agent installer ticket store is invalid.\");
-        }
-        return value with { InstallerTickets = tickets };
-    }
-
-"""
-          text = text[:save_start] + save_block + text[save_end:]
-
-          '''
-          value = value[:line_start] + save_validate + value[end:]
-          path.write_text(value, encoding='utf-8', newline='\n')
-          PY
-          python3 /tmp/apply-group-installer.py
-          rm -f .github/workflows/apply-group-installer.yml
-          cat > .github/workflows/portal-dotnet10-ci.yml <<'YAML'
-          name: SIRK Portal .NET 10 CI
-
-          on:
-            workflow_dispatch:
-            push:
-              branches: [main, develop, rewrite/dotnet10-node-free]
-            pull_request:
-              branches: [main, develop]
-
-          permissions:
-            contents: read
-
-          concurrency:
-            group: portal-dotnet10-${{ github.workflow }}-${{ github.ref }}
-            cancel-in-progress: true
-
-          jobs:
-            linux-build-api-ui:
-              runs-on: ubuntu-latest
-              timeout-minutes: 30
-              steps:
-                - uses: actions/checkout@v4
-                - uses: actions/setup-dotnet@v4
-                  with:
-                    dotnet-version: 10.0.x
-                    cache: true
-                    cache-dependency-path: '**/*.csproj'
-                - name: Build test publish API UI and container
-                  shell: bash
-                  run: bash .github/scripts/validate-node-free-dotnet10.sh
-
-            windows-clean-install:
-              runs-on: windows-latest
-              timeout-minutes: 50
-              steps:
-                - uses: actions/checkout@v4
-                - name: Install and verify from zero
-                  shell: powershell
-                  run: .\.github\scripts\Test-NodeFreeWindowsInstall.ps1 -Branch '${{ github.head_ref || github.ref_name }}'
-          YAML
-          sed -i 's/^          //' .github/workflows/portal-dotnet10-ci.yml
-          git config user.name github-actions[bot]
-          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add -A
-          git diff --cached --check
-          git commit -m 'Add single-use group-bound Agent EXE installers'
-          git push origin HEAD:feature/group-bound-agent-installer
+  windows-clean-install:
+    runs-on: windows-latest
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install and verify from zero
+        shell: powershell
+        run: .\.github\scripts\Test-NodeFreeWindowsInstall.ps1 -Branch '${{ github.head_ref || github.ref_name }}'
