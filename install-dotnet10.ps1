@@ -284,8 +284,26 @@ try {
     New-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Services\$serviceName" -Name Environment -PropertyType MultiString -Value @('ASPNETCORE_ENVIRONMENT=Production','DOTNET_CLI_TELEMETRY_OPTOUT=1','DOTNET_NOLOGO=1') -Force | Out-Null
 
     $firewallName = 'SIRK Portal HTTPS'
-    Remove-NetFirewallRule -DisplayName $firewallName -ErrorAction SilentlyContinue
-    New-NetFirewallRule -DisplayName $firewallName -Direction Inbound -Action Allow -Protocol TCP -LocalPort $HttpsPort -Profile Domain,Private | Out-Null
+    $firewallConfigured = $false
+    try {
+        Remove-NetFirewallRule -DisplayName $firewallName -ErrorAction SilentlyContinue
+        New-NetFirewallRule -DisplayName $firewallName -Direction Inbound -Action Allow -Protocol TCP -LocalPort $HttpsPort -Profile Domain,Private -ErrorAction Stop | Out-Null
+        $firewallConfigured = $true
+    }
+    catch {
+        Write-Warning ('Nie można skonfigurować zapory przez NetSecurity: {0}. Próba netsh.exe.' -f $_.Exception.Message)
+        try {
+            & netsh.exe advfirewall firewall delete rule name="$firewallName" | Out-Null
+            & netsh.exe advfirewall firewall add rule name="$firewallName" dir=in action=allow protocol=TCP localport=$HttpsPort profile=domain,private enable=yes | Out-Null
+            if ($LASTEXITCODE -eq 0) { $firewallConfigured = $true }
+        }
+        catch {
+            Write-Warning ('Nie można skonfigurować zapory przez netsh.exe: {0}' -f $_.Exception.Message)
+        }
+    }
+    if (-not $firewallConfigured) {
+        Write-Warning "Nie udało się dodać reguły zapory dla TCP/$HttpsPort. Portal będzie działał lokalnie; regułę można dodać później ręcznie."
+    }
 
     Start-Service $serviceName
     (Get-Service $serviceName).WaitForStatus('Running', [TimeSpan]::FromSeconds(60))
