@@ -30,12 +30,12 @@ try {
     $installer = [scriptblock]::Create($source)
     $installOutput = @(& $installer -Branch $Branch -NonInteractive -RemoveData -PortalFqdn $Fqdn -HttpsPort $Port -TrustCertificate 6>&1)
     $installOutput | Out-Host
-    $installText = $installOutput | Out-String
+    $installText = (($installOutput | Out-String) -replace '\s+', ' ').Trim()
     $expectedAccessPrefix = "Access URL: $baseUrl/login#access="
-    if ($installText -notmatch [regex]::Escape($expectedAccessPrefix)) {
+    if (-not $installText.Contains($expectedAccessPrefix)) {
         throw "Final installer output does not contain the complete Access URL: $expectedAccessPrefix"
     }
-    if ($installText -notmatch 'SIRK_PORTAL_DOTNET10_INSTALL_OK') {
+    if (-not $installText.Contains('SIRK_PORTAL_DOTNET10_INSTALL_OK')) {
         throw 'Final one-line installer success marker is missing.'
     }
 
