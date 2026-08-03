@@ -1,261 +1,379 @@
-/* Final standalone Portal normalization. This file is loaded last. */
-#sirkPortalRoot {
-    --portal-surface-radius: 11px;
-    --portal-surface-padding: 14px;
-    --portal-toolbar-height: 48px;
-    --portal-primary-width: 184px;
-    --portal-secondary-width: 236px;
-    --portal-secondary-edit-width: 440px;
-    --portal-primary-collapsed-width: 56px;
+/* Canonical Portal view shell. Loaded last and shared by every Portal view. */
+#sirkPortalRoot{
+    --sirk-view-radius: 10px;
+    --sirk-view-toolbar-height: 48px;
+    --sirk-view-primary-width: 190px;
+    --sirk-view-secondary-width: 250px;
+    --sirk-view-primary-collapsed-width: 60px;
 }
 
-#sirkPortalRoot .sirk-standalone-content {
+#sirkPortalRoot .sirk-standalone-content{
+    min-width: 0;
+    min-height: 0;
     padding: 12px;
+    overflow: hidden;
+    background: var(--sirk-bg, #f3f6fb);
+    color: var(--sirk-text, #172033);
 }
 
 #sirkPortalRoot .sirk-standalone-content > .sirk-portal-view-host,
-#sirkPortalRoot .sirk-standalone-content > .sirk-standalone-view-scroll,
-#sirkPortalRoot .sirk-standalone-content > .sirk-device-workspace {
-    flex: 1 1 auto;
-    width: 100% !important;
-    max-width: none !important;
-    height: 100% !important;
-    min-width: 0 !important;
-    min-height: 0 !important;
-    margin: 0 !important;
-}
-
+#sirkPortalRoot .sirk-standalone-content > .sirk-view-shell,
 #sirkPortalRoot .sirk-portal-view-host,
-#sirkPortalRoot .sirk-portal-view-host > *,
-#sirkPortalRoot .,
-#sirkPortalRoot . > * {
-    width: 100% !important;
-    max-width: none !important;
-    min-width: 0 !important;
-    height: 100% !important;
-    min-height: 0 !important;
-    box-sizing: border-box !important;
+#sirkPortalRoot .sirk-portal-view-host > div,
+#sirkPortalRoot .sirk-portal-view-host > div > .sirk-view-shell{
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    margin: 0;
+    box-sizing: border-box;
 }
 
-/* One outer surface for all module views. */
-#sirkPortalRoot .sirk-unified-content > .sirk-portal-view-host,
-#sirkPortalRoot .sirk-unified-content > .sirk-standalone-view-scroll {
+#sirkPortalRoot .sirk-view-shell{
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    margin: 0;
+    padding: 0;
     overflow: hidden;
     border: 1px solid var(--sirk-border, #dce3ec);
-    border-radius: var(--portal-surface-radius);
+    border-radius: var(--sirk-view-radius);
     background: var(--sirk-panel, #fff);
+    color: var(--sirk-text, #172033);
+    box-sizing: border-box;
 }
 
-#sirkPortalRoot .sirk-unified-content > .sirk-standalone-view-scroll {
-    padding: var(--portal-surface-padding);
+#sirkPortalRoot .sirk-tabs-host{
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 4px;
+    min-height: 42px;
+    padding: 5px 10px;
+    overflow-x: auto;
+    border-bottom: 1px solid var(--sirk-border, #dce3ec);
+    box-sizing: border-box;
+}
+
+#sirkPortalRoot .sirk-tabs-host:empty,
+#sirkPortalRoot .sirk-tabs-host[hidden]{
+    display: none !important;
+}
+
+#sirkPortalRoot .sirk-shared-tab{
+    min-height: 32px;
+    padding: 6px 11px;
+    border: 1px solid transparent;
+    border-radius: 7px;
+    background: transparent;
+    color: inherit;
+    font: 600 13px/1.2 "Segoe UI", Arial, sans-serif;
+    cursor: pointer;
+}
+
+#sirkPortalRoot .sirk-shared-tab:hover{
+    background: rgba(96, 165, 250, .09);
+}
+
+#sirkPortalRoot .sirk-shared-tab.active{
+    border-color: rgba(59, 130, 246, .22);
+    background: rgba(59, 130, 246, .14);
+    color: #2563eb;
+}
+
+#sirkPortalRoot .sirk-toolbar-host{
+    display: flex;
+    flex: 0 0 var(--sirk-view-toolbar-height);
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    min-width: 0;
+    min-height: var(--sirk-view-toolbar-height);
+    margin: 0;
+    padding: 7px 10px;
+    overflow: hidden;
+    border-bottom: 1px solid var(--sirk-border, #dce3ec);
+    background: transparent;
+    box-sizing: border-box;
+}
+
+#sirkPortalRoot .sirk-toolbar-host:empty,
+#sirkPortalRoot .sirk-toolbar-host[hidden]{
+    display: none !important;
+}
+
+#sirkPortalRoot .sirk-layout-host{
+    display: grid;
+    flex: 1 1 auto;
+    grid-template-columns: var(--sirk-view-primary-width) var(--sirk-view-secondary-width) minmax(0, 1fr);
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+    background: transparent;
+    box-sizing: border-box;
+}
+
+#sirkPortalRoot .sirk-layout-host[data-columns="details"]{
+    grid-template-columns: minmax(0, 1fr);
+}
+
+#sirkPortalRoot .sirk-layout-host.is-collapsed,
+#sirkPortalRoot .sirk-view-shell.is-collapsed > .sirk-layout-host{
+    grid-template-columns: var(--sirk-view-primary-collapsed-width) var(--sirk-view-secondary-width) minmax(0, 1fr);
+}
+
+#sirkPortalRoot .sirk-column-primary,
+#sirkPortalRoot .sirk-column-secondary,
+#sirkPortalRoot .sirk-column-details{
+    min-width: 0;
+    min-height: 0;
+    height: 100%;
+    overflow-x: hidden;
+    overflow-y: auto;
+    background: transparent;
+    box-sizing: border-box;
+}
+
+#sirkPortalRoot .sirk-column-primary,
+#sirkPortalRoot .sirk-column-secondary{
+    padding: 12px;
+    border-right: 1px solid var(--sirk-border, #dce3ec);
+}
+
+#sirkPortalRoot .sirk-column-details{
+    padding: 16px;
+    overscroll-behavior: contain;
+}
+
+#sirkPortalRoot .sirk-column-primary[hidden],
+#sirkPortalRoot .sirk-column-secondary[hidden],
+#sirkPortalRoot .sirk-column-details[hidden]{
+    display: none !important;
+}
+
+#sirkPortalRoot .sirk-layout-host[data-columns="details"] > .sirk-column-details{
+    grid-column: 1;
+}
+
+#sirkPortalRoot .sirk-layout-host.is-collapsed > .sirk-column-primary{
+    padding: 7px 5px;
+    overflow: hidden;
+}
+
+#sirkPortalRoot .sirk-layout-host.is-collapsed > .sirk-column-primary .sirk-nav-item{
+    justify-content: center;
+    gap: 0;
+    min-width: 46px;
+    padding: 7px 4px;
+    font-size: 0;
+}
+
+#sirkPortalRoot .sirk-layout-host.is-collapsed > .sirk-column-primary .sirk-nav-icon{
+    width: 28px;
+    min-width: 28px;
+    height: 28px;
+}
+
+#sirkPortalRoot .sirk-content{
+    min-height: 100%;
+    color: inherit;
+    box-sizing: border-box;
+}
+
+#sirkPortalRoot .sirk-nav-item{
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    width: 100%;
+    min-width: 0;
+    min-height: 40px;
+    margin: 0 0 4px;
+    padding: 8px 10px;
+    border: 1px solid transparent;
+    border-radius: 7px;
+    background: transparent;
+    color: inherit;
+    text-align: left;
+    font: 500 14px/1.25 "Segoe UI", Arial, sans-serif;
+    cursor: pointer;
+    box-sizing: border-box;
+}
+
+#sirkPortalRoot .sirk-nav-item:hover{
+    background: rgba(96, 165, 250, .09);
+}
+
+#sirkPortalRoot .sirk-nav-item.active,
+#sirkPortalRoot .sirk-nav-item.is-active{
+    background: rgba(96, 165, 250, .16);
+    box-shadow: inset 3px 0 0 var(--sirk-active-accent, #60a5fa);
+    font-weight: 700;
+}
+
+#sirkPortalRoot .sirk-nav-icon{
+    display: inline-grid;
+    place-items: center;
+    flex: 0 0 24px;
+    width: 24px;
+    height: 24px;
+}
+
+#sirkPortalRoot .sirk-card{
+    margin: 0 0 12px;
+    padding: 14px;
+    border: 1px solid var(--sirk-border, #dce3ec);
+    border-radius: 8px;
+    background: var(--sirk-panel, #fff);
+    color: inherit;
+    box-shadow: none;
+    box-sizing: border-box;
+}
+
+#sirkPortalRoot .sirk-card h2,
+#sirkPortalRoot .sirk-card h3{
+    margin: 0 0 8px;
+}
+
+#sirkPortalRoot .sirk-field{
+    display: grid;
+    gap: 6px;
+    min-width: 0;
+    margin: 0;
+}
+
+#sirkPortalRoot .sirk-field > strong{
+    font-size: 13px;
+}
+
+#sirkPortalRoot .sirk-field input,
+#sirkPortalRoot .sirk-field select,
+#sirkPortalRoot .sirk-field textarea,
+#sirkPortalRoot .sirk-filter{
+    width: 100%;
+    min-width: 0;
+    min-height: 34px;
+    padding: 7px 9px;
+    border: 1px solid var(--sirk-border, #dce3ec);
+    border-radius: 7px;
+    background: var(--sirk-input, #fff);
+    color: inherit;
+    box-sizing: border-box;
+}
+
+#sirkPortalRoot .sirk-settings-grid{
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+    gap: 12px;
+}
+
+#sirkPortalRoot .sirk-action-row,
+#sirkPortalRoot .sirk-backup-row{
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
+
+#sirkPortalRoot .sirk-backup-row{
+    justify-content: space-between;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--sirk-border, #dce3ec);
+}
+
+#sirkPortalRoot .sirk-table-wrap{
+    width: 100%;
     overflow: auto;
 }
 
-#sirkPortalRoot .sirk-standalone-view-scroll,
-#sirkPortalRoot .sirk-standalone-view-scroll,
-#sirkPortalRoot .sirk-admin-management-shell {
-    width: 100% !important;
-    max-width: none !important;
-    height: 100% !important;
-    min-height: 0 !important;
-    margin: 0 !important;
-    border: 0 !important;
-    border-radius: 0 !important;
-    overflow: hidden !important;
-    background: var(--sirk-panel, #fff) !important;
+#sirkPortalRoot .sirk-settings-table{
+    width: 100%;
+    border-collapse: collapse;
 }
 
-#sirkPortalRoot .sirk-layout,
-#sirkPortalRoot .sirk-layout,
-#sirkPortalRoot .sirk-admin-management-layout {
-    display: grid !important;
-    grid-template-columns: var(--portal-primary-width) var(--portal-secondary-width) minmax(0, 1fr) !important;
-    width: 100% !important;
-    max-width: none !important;
-    height: 100% !important;
-    min-width: 0 !important;
-    min-height: 0 !important;
-    overflow: hidden !important;
-    resize: none !important;
+#sirkPortalRoot .sirk-settings-table th,
+#sirkPortalRoot .sirk-settings-table td{
+    padding: 8px;
+    text-align: left;
+    vertical-align: middle;
+    border-bottom: 1px solid var(--sirk-border, #dce3ec);
 }
 
-#sirkPortalRoot .is-edit-mode.sirk-layout,
-#sirkPortalRoot .is-management-edit-mode .sirk-layout,
-#sirkPortalRoot .is-management-edit-mode .sirk-layout,
-#sirkPortalRoot .sirk-layout:has(.sirk-tree-script-actions:not(:empty)),
-#sirkPortalRoot .sirk-layout:has(.sirk-tree-script-actions:not(:empty)) {
-    grid-template-columns: var(--portal-primary-width) var(--portal-secondary-edit-width) minmax(0, 1fr) !important;
+#sirkPortalRoot .sirk-standalone-grid{
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+    width: 100%;
+    align-items: stretch;
 }
 
-#sirkPortalRoot .is-collapsed.sirk-layout,
-#sirkPortalRoot .is-collapsed .sirk-layout,
-#sirkPortalRoot .is-collapsed .sirk-layout {
-    grid-template-columns: var(--portal-primary-collapsed-width) var(--portal-secondary-width) minmax(0, 1fr) !important;
-}
-
-#sirkPortalRoot .is-collapsed.is-management-edit-mode .sirk-layout,
-#sirkPortalRoot .is-collapsed.is-management-edit-mode .sirk-layout,
-#sirkPortalRoot .is-collapsed.is-edit-mode.sirk-layout {
-    grid-template-columns: var(--portal-primary-collapsed-width) var(--portal-secondary-edit-width) minmax(0, 1fr) !important;
-}
-
-#sirkPortalRoot :is(.sirk-column-primary,.sirk-column-secondary,.sirk-column-details) sirk-column-primary,
-#sirkPortalRoot :is(.sirk-column-primary,.sirk-column-secondary,.sirk-column-details) sirk-column-secondary,
-#sirkPortalRoot :is(.sirk-column-primary,.sirk-column-secondary,.sirk-column-details) sirk-column-details,
-#sirkPortalRoot :is(.sirk-column-primary,.sirk-column-secondary,.sirk-column-details),
-#sirkPortalRoot .sirk-admin-management-column {
-    min-width: 0 !important;
-    max-width: none !important;
-    height: 100% !important;
-    min-height: 0 !important;
-    overflow-x: hidden !important;
-    overflow-y: auto !important;
-    box-sizing: border-box !important;
-}
-
-/* Device tabs: portal-standalone-nav converts the original class to compact-tabs. */
-#sirkPortalRoot .sirk-device-compact-tabs,
-#sirkPortalRoot .sirk-device-tabs {
-    display: flex !important;
-    align-items: center !important;
-    gap: 4px !important;
-    flex: 1 1 auto !important;
-    width: auto !important;
-    min-width: 0 !important;
-    min-height: 44px !important;
-    padding: 5px 8px !important;
-    overflow-x: auto !important;
-    border: 0 !important;
-    background: transparent !important;
-    scrollbar-width: thin;
-}
-
-/* Standalone device workspace: keep the tab rail compact instead of stretching it. */
-#sirkPortalRoot .sirk-device-tabs.sirk-device-tabs-standalone {
-    flex: 0 0 44px !important;
-    width: 100% !important;
-    height: 44px !important;
-    min-height: 44px !important;
-    max-height: 44px !important;
-    padding: 5px 8px !important;
-    box-sizing: border-box !important;
-    align-self: stretch !important;
-}
-
-#sirkPortalRoot .sirk-device-compact-tabs button,
-#sirkPortalRoot .sirk-device-tabs button {
-    appearance: none !important;
-    display: inline-flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    flex: 0 0 auto !important;
-    min-height: 34px !important;
-    padding: 6px 12px !important;
-    border: 1px solid transparent !important;
-    border-radius: 7px !important;
-    background: transparent !important;
-    color: var(--sirk-muted, #657187) !important;
-    font: 600 13px/1.2 "Segoe UI", Arial, sans-serif !important;
-    white-space: nowrap !important;
-    box-shadow: none !important;
-    cursor: pointer !important;
-}
-
-#sirkPortalRoot .sirk-device-compact-tabs button:hover,
-#sirkPortalRoot .sirk-device-tabs button:hover {
-    background: rgba(96, 165, 250, .09) !important;
-    color: var(--sirk-text, #172033) !important;
-}
-
-#sirkPortalRoot .sirk-device-compact-tabs button.is-active,
-#sirkPortalRoot .sirk-device-tabs button.is-active {
-    border-color: rgba(59, 130, 246, .22) !important;
-    background: rgba(59, 130, 246, .13) !important;
-    color: #2563eb !important;
-}
-
-#sirkPortalRoot .sirk-device-workspace {
-    grid-template-rows: auto minmax(0, 1fr) !important;
-    overflow: hidden !important;
+#sirkPortalRoot .sirk-standalone-card{
+    min-width: 0;
+    min-height: 210px;
+    margin: 0;
+    padding: 18px;
     border: 1px solid var(--sirk-border, #dce3ec);
-    border-radius: var(--portal-surface-radius);
+    border-radius: 10px;
     background: var(--sirk-panel, #fff);
+    color: inherit;
+    box-sizing: border-box;
 }
 
-#sirkPortalRoot .sirk-device-compact-header {
-    min-height: 56px !important;
-    border: 0 !important;
-    border-bottom: 1px solid var(--sirk-border, #dce3ec) !important;
-    border-radius: 0 !important;
-}
-
-#sirkPortalRoot .sirk-device-tab-body {
-    border: 0 !important;
-    border-radius: 0 !important;
-}
-
-/* Overview uses the same card metrics as module details. */
-#sirkPortalRoot .sirk-standalone-grid {
-    display: grid !important;
-    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
-    gap: 14px !important;
-    width: 100% !important;
-    align-items: stretch !important;
-}
-
-#sirkPortalRoot .sirk-standalone-card {
-    min-width: 0 !important;
-    min-height: 220px !important;
-    margin: 0 !important;
-    padding: 18px !important;
-    border: 1px solid var(--sirk-border, #dce3ec) !important;
-    border-radius: 10px !important;
-    background: var(--sirk-panel, #fff) !important;
-    color: var(--sirk-text, #172033) !important;
-    box-shadow: none !important;
-    text-align: left !important;
-}
-
-#sirkPortalRoot .sirk-standalone-card h2 {
-    margin: 0 0 8px !important;
-    font-size: 22px !important;
-    line-height: 1.25 !important;
-}
-
-/* Settings iframe always fills the same module surface. */
-#sirkPortalRoot .sirk-settings-module-shell,
-#sirkPortalRoot .sirk-settings-module-workspace,
-#sirkPortalRoot .sirk-standalone-settings-frame {
-    width: 100% !important;
-    max-width: none !important;
-    height: 100% !important;
-    min-width: 0 !important;
-    min-height: 0 !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    border: 0 !important;
-    overflow: hidden !important;
+#sirkPortalRoot .sirk-device-workspace{
+    width: 100%;
+    min-width: 0;
+    min-height: 0;
 }
 
 @media (max-width: 1180px) {
-    #sirkPortalRoot {
-        --portal-primary-width: 170px;
-        --portal-secondary-width: 220px;
-        --portal-secondary-edit-width: 380px;
+    #sirkPortalRoot{
+        --sirk-view-primary-width: 170px;
+        --sirk-view-secondary-width: 220px;
     }
-    #sirkPortalRoot .sirk-standalone-grid {
-        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+
+    #sirkPortalRoot .sirk-standalone-grid{
+        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 }
 
 @media (max-width: 840px) {
-    #sirkPortalRoot .sirk-standalone-grid {
-        grid-template-columns: minmax(0, 1fr) !important;
+    #sirkPortalRoot .sirk-standalone-content{
+        overflow: auto;
     }
-    #sirkPortalRoot .sirk-layout,
-    #sirkPortalRoot .sirk-layout,
-    #sirkPortalRoot .sirk-admin-management-layout {
-        grid-template-columns: minmax(0, 1fr) !important;
-        overflow: auto !important;
+
+    #sirkPortalRoot .sirk-view-shell{
+        height: auto;
+        min-height: 100%;
+        overflow: visible;
+    }
+
+    #sirkPortalRoot .sirk-layout-host,
+#sirkPortalRoot .sirk-layout-host.is-collapsed,
+#sirkPortalRoot .sirk-view-shell.is-collapsed > .sirk-layout-host{
+        display: block;
+        height: auto;
+        overflow: visible;
+    }
+
+    #sirkPortalRoot .sirk-column-primary,
+#sirkPortalRoot .sirk-column-secondary,
+#sirkPortalRoot .sirk-column-details{
+        height: auto;
+        max-height: none;
+        overflow: visible;
+        border-right: 0;
+        border-bottom: 1px solid var(--sirk-border, #dce3ec);
+    }
+
+    #sirkPortalRoot .sirk-column-details:last-child{
+        border-bottom: 0;
+    }
+
+    #sirkPortalRoot .sirk-standalone-grid{
+        grid-template-columns: minmax(0, 1fr);
     }
 }

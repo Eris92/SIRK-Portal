@@ -11,8 +11,8 @@
         en: { collapse: "Collapse", expand: "Expand", favorites: "Favorites", edit: "Edit mode", refresh: "Refresh", search: "Search", searchPlaceholder: "Search scripts...", results: "Results", all: "All", pending: "Pending", approved: "Approved", executingStatus: "Executing", completed: "Completed", failed: "Failed", rejected: "Rejected", scriptResults: "Script results", noScriptResults: "No script results match the selected status.", waitingApproval: "Waiting for approval.", noOutput: "No output.", emptyFavorites: "No favorite scripts.", emptyScripts: "No scripts.", credentials: "Credentials", favorite: "Favorite", copyLink: "Copy link", run: "Run", request: "Request", executing: "Executing script...", executionFailed: "Execution failed", required: "is required.", validation: "Validation", management: "Management", selectScript: "Select a script to run.", confirmPrefix: "Run script", result: "Result" }
     };
     var tools = window.SharedScriptTools.create({
-        storageKey: "sirkPlatform.myscripts.preferences",
-        deepLinkParameter: "myscript"
+        storageKey: "sirkPlatform.management.preferences",
+        deepLinkParameter: "script"
     });
     var state = {
         tree: null,
@@ -70,11 +70,11 @@
     };
 
     function api(asset, parameters) {
-        return core.api("myscripts", asset, null, parameters || {});
+        return core.api("management", asset, null, parameters || {});
     }
 
     function post(asset, values) {
-        return core.post("myscripts", asset, values || {});
+        return core.post("management", asset, values || {});
     }
 
     function bootstrap() {
@@ -125,9 +125,9 @@
     function consumeDeepLink() {
         try {
             var url = new URL(window.location.href);
-            var path = url.searchParams.get("myscript") || "";
+            var path = url.searchParams.get("script") || "";
             if (!path) return "";
-            url.searchParams.delete("myscript");
+            url.searchParams.delete("script");
             window.history.replaceState(window.history.state, document.title, url.href);
             return path;
         } catch (error) {
@@ -165,8 +165,8 @@
     function buildShell(host) {
         host.innerHTML = "";
 
-        var shell = el("div", "sirk-standalone-view-scroll");
-        var toolbar = el("div", "sirk-toolbar sirk-toolbar-host");
+        var shell = el("div", "sirk-view-shell");
+        var toolbar = el("div", "sirk-toolbar-host");
         toolbar.appendChild(toolButton("collapse", t("collapse"), icons.collapse));
         toolbar.appendChild(toolButton("favorites", t("favorites"), icons.star));
         toolbar.appendChild(toolButton("edit", t("edit"), icons.edit));
@@ -180,7 +180,7 @@
         toolbar.appendChild(search);
         toolbar.appendChild(el("span", "sirk-toolbar-status"));
 
-        var workspace = el("div", "sirk-layout sirk-layout-host");
+        var workspace = el("div", "sirk-layout-host");
         var categories = el("aside", "sirk-column-primary");
         categories.appendChild(el("div", "sirk-list"));
         var scripts = el("aside", "sirk-column-secondary");
@@ -211,7 +211,7 @@
     }
 
     function renderCategories() {
-        var host = state.host.querySelector(".sirk-layout > .sirk-column-primary .sirk-list");
+        var host = state.host.querySelector(".sirk-layout-host > .sirk-column-primary .sirk-list");
         host.innerHTML = "";
         var visibleRoots = roots().filter(function (root) {
             return !tools.state.favoritesOnly || containsVisibleScript(root);
@@ -292,7 +292,7 @@
     }
 
     function renderScripts() {
-        var host = state.host.querySelector(".sirk-layout > .sirk-column-secondary .sirk-list");
+        var host = state.host.querySelector(".sirk-layout-host > .sirk-column-secondary .sirk-list");
         host.innerHTML = "";
         if (state.results) {
             [
@@ -420,7 +420,7 @@
     function execute(script, values) {
         if (script.confirmExecution === true && !window.confirm(t("confirmPrefix") + ' "' + (localized(script, "label") || script.name || script.path) + '"?')) return;
         showMessage(localized(script, "label") || script.name, t("executing"));
-        post("request", {
+        post("execute", {
             scriptPath: script.path,
             variableValues: values || {},
             confirmedExecution: script.confirmExecution === true,
@@ -526,7 +526,7 @@
         if (!path) return;
         tools.copyText((function () {
             var url = new URL(window.location.href);
-            url.searchParams.set("myscript", path);
+            url.searchParams.set("script", path);
             return url.href;
         }())).then(function () { showMessage("Copy link", "Link skopiowany."); });
     }
@@ -546,7 +546,7 @@
                 }
                 if (action === "edit" && isAdmin()) state.editMode = !state.editMode;
                 if (action === "refresh") {
-                    post("refresh", {}).then(function (response) { state.tree = response.tree || state.tree; renderAll(); });
+                    api("tree").then(function (response) { state.tree = response.tree || state.tree; renderAll(); });
                 }
                 if (action === "search") {
                     var search = state.host.querySelector(".sirk-filter");
@@ -589,7 +589,7 @@
 
     function mount(host) {
         state.host = host;
-        return api("scripts").then(function (response) {
+        return api("tree").then(function (response) {
             state.tree = response.tree;
             var available = roots();
             var linkedPath = consumeDeepLink();
@@ -618,7 +618,7 @@
         mount: mount,
         refresh: function () {
             if (!state.host) return;
-            post("refresh", {}).then(function (response) {
+            api("tree").then(function (response) {
                 state.tree = response.tree || state.tree;
                 renderAll();
             });

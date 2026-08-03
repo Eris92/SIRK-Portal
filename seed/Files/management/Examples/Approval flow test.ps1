@@ -12,8 +12,8 @@ $result = [ordered]@{
 }
 
 if ([System.Convert]::ToBoolean($IncludeEnvironment)) {
-    $result.RequestId = [string]$env:MYSCRIPTS_REQUEST_ID
-    $result.Requester = [string]$env:MYSCRIPTS_REQUESTER
+    $result.RequestId = [string]$env:SIRK_MANAGEMENT_REQUEST_ID
+    $result.Requester = [string]$env:SIRK_MANAGEMENT_REQUESTER
     $result.ComputerName = [string]$env:COMPUTERNAME
 }
 

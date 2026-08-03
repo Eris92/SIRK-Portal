@@ -60,8 +60,8 @@
         try { return decodeURIComponent(encoded); } catch (error) { return binary; }
     }
 
-    function parseMyCommandsTable(raw) {
-        var match = String(raw || "").match(/__MYCOMMANDS_TABLE_B64__([A-Za-z0-9+/=]+)/);
+    function parseCommandsTable(raw) {
+        var match = String(raw || "").match(/__SIRK_COMMANDS_TABLE_B64__([A-Za-z0-9+/=]+)/);
         if (!match) return null;
         try {
             var parsed = JSON.parse(decodeBase64Utf8(match[1]));
@@ -97,7 +97,7 @@
         var raw = String(value == null ? "" : value).trim(), parsed = null, table = null, portal = null;
         if (!raw) return { raw: "", table: null, portal: null };
 
-        table = parseMyCommandsTable(raw);
+        table = parseCommandsTable(raw);
         if (!table) {
             parsed = parseJsonSuffix(raw);
             if (parsed) {
@@ -109,7 +109,7 @@
 
         if (!table && !portal) {
             var lines = raw.split(/\r?\n/).filter(function (line) {
-                return line.trim() && !/^__(?:MYCOMMANDS|COMMANDTABS)_PROGRESS__/i.test(line.trim());
+                return line.trim() && !/^__(?:SIRK_COMMANDS|COMMANDTABS)_PROGRESS__/i.test(line.trim());
             });
             if (lines.length > 1) {
                 var delimiter = lines[0].indexOf("\t") >= 0 ? "\t" : lines[0].indexOf(";") >= 0 ? ";" : lines[0].indexOf(",") >= 0 ? "," : "";

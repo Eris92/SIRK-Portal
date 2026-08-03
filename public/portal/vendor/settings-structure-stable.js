@@ -209,7 +209,7 @@
     function navigate(kind) {
         if (!mountedHost || navigationBusy) return;
         navigationBusy = true; activePrimary = kind;
-        var layout = mountedHost.querySelector("[data-portal-settings] .sirk-layout");
+        var layout = mountedHost.querySelector("[data-portal-settings] .sirk-layout-host");
         var primary = layout && layout.querySelector(":scope > .sirk-column-primary");
         if (!layout || !primary) { navigationBusy = false; return; }
         var native = nativeButtons(primary); updateActive(primary);
@@ -217,7 +217,7 @@
         if (target) target.click();
         if (kind === "modules" || kind === "portal") {
             waitFor(function () {
-                var currentLayout = mountedHost.querySelector("[data-portal-settings] .sirk-layout");
+                var currentLayout = mountedHost.querySelector("[data-portal-settings] .sirk-layout-host");
                 return currentLayout && showGroup(currentLayout, kind) ? currentLayout : null;
             }).then(function () { navigationBusy = false; });
         } else {
@@ -241,7 +241,7 @@
 
     function reconcile() {
         if (!mountedHost || navigationBusy) return;
-        var layout = mountedHost.querySelector("[data-portal-settings] .sirk-layout");
+        var layout = mountedHost.querySelector("[data-portal-settings] .sirk-layout-host");
         var primary = layout && layout.querySelector(":scope > .sirk-column-primary");
         if (!layout || !primary) return;
         nativeButtons(primary); addPrimary(primary); updateActive(primary);

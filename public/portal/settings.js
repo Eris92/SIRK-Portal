@@ -19,14 +19,14 @@
 
     var MODULES = [
         { key: "devices", label: "Urządzenia", view: "devices" },
-        { key: "commands", label: "Commands", modules: ["mycommands"] },
-        { key: "approvals", label: "Akceptacje", view: "approvals", modules: ["approvalcenter", "moverequests"] },
-        { key: "automation", label: "Automatyzacja", view: "automation", modules: ["myscripts"] },
+        { key: "commands", label: "Commands", modules: ["commands"] },
+        { key: "approvals", label: "Akceptacje", view: "approvals", modules: ["approvals", "move-requests"] },
+        { key: "automation", label: "Automatyzacja", view: "automation", modules: ["management"] },
         { key: "monitoring", label: "Monitoring", view: "monitoring", integrations: true },
-        { key: "assets", label: "Zasoby", view: "assets", modules: ["myjira"] },
+        { key: "assets", label: "Zasoby", view: "assets", modules: ["jira"] },
         { key: "management", label: "Zarządzanie", view: "management" },
         { key: "reports", label: "Raporty", view: "reports" },
-        { key: "security", label: "Bezpieczeństwo", view: "security", modules: ["defendertools"] }
+        { key: "security", label: "Bezpieczeństwo", view: "security", modules: ["security"] }
     ];
 
     var DEFAULT_VIEW_CHOICES = [
@@ -525,7 +525,7 @@
     }
 
     function renderPlugins(host) {
-        var controls = el("div", "sirk-toolbar");
+        var controls = el("div", "sirk-toolbar-host");
         var left = el("div", "sirk-toolbar-group sirk-toolbar-left");
         var installed = el("button", state.pluginView === "installed" ? "sirk-button active" : "sirk-button", "Zainstalowane");
         var available = el("button", state.pluginView === "available" ? "sirk-button active" : "sirk-button", "Dostępne");
@@ -787,7 +787,7 @@
         var groupCard = el("section", "sirk-card");
         groupCard.appendChild(el("h2", "", "Grupy"));
         (snapshot.groups || []).forEach(function (group) {
-            var row = el("div", "sirk-toolbar");
+            var row = el("div", "sirk-toolbar-host");
             row.appendChild(el("strong", "", group.name));
             row.appendChild(el("span", "", group.description || ""));
             var edit = el("button", "sirk-button", "Edytuj");
@@ -845,18 +845,18 @@
             state.resumeMessage = "Usługa została ponownie uruchomiona. Strona jest aktualna.";
         }
         clear(host);
-        host.innerHTML = '<section class="sirk-standalone-view-scroll" data-portal-settings>' +
-            '<div class="sirk-toolbar"><div class="sirk-toolbar-group sirk-toolbar-left">' +
+        host.innerHTML = '<section class="sirk-view-shell" data-portal-settings>' +
+            '<div class="sirk-toolbar-host"><div class="sirk-toolbar-group sirk-toolbar-left">' +
             '<button type="button" class="sirk-button" data-settings-collapse aria-label="Zwiń menu">☰</button>' +
             '<button type="button" class="sirk-button" data-settings-refresh>Odśwież</button>' +
             '<input type="search" data-settings-search placeholder="Szukaj…" aria-label="Szukaj"></div></div>' +
-            '<div class="sirk-layout-host"><div class="sirk-layout">' +
+            '<div class="sirk-layout-host"><div class="sirk-layout-host">' +
             '<aside class="sirk-column-primary" data-settings-primary></aside>' +
             '<aside class="sirk-column-secondary" data-settings-secondary></aside>' +
             '<div class="sirk-column-details" data-settings-details></div>' +
             '</div></div></section>';
 
-        var layout = host.querySelector(".sirk-layout");
+        var layout = host.querySelector(".sirk-layout-host");
         var primary = host.querySelector("[data-settings-primary]");
         var secondary = host.querySelector("[data-settings-secondary]");
         var details = host.querySelector("[data-settings-details]");

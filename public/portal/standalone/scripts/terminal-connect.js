@@ -9,15 +9,15 @@
     var permissionSaving = false;
     var PERMISSION_TARGETS = {
         "Urządzenia": { view: "devices" },
-        "Commands": { module: "mycommands" },
-        "Akceptacje": { module: "approvalcenter", view: "approvals" },
-        "Przenoszenie urządzeń": { module: "moverequests" },
-        "Automatyzacja": { module: "myscripts", view: "automation" },
+        "Commands": { module: "commands" },
+        "Akceptacje": { module: "approvals", view: "approvals" },
+        "Przenoszenie urządzeń": { module: "move-requests" },
+        "Automatyzacja": { module: "management", view: "automation" },
         "Monitoring": { view: "monitoring" },
-        "Zasoby": { module: "myjira", view: "assets" },
+        "Zasoby": { module: "jira", view: "assets" },
         "Zarządzanie": { view: "management" },
         "Raporty": { view: "reports" },
-        "Bezpieczeństwo": { module: "defendertools", view: "security" }
+        "Bezpieczeństwo": { module: "security", view: "security" }
     };
 
     function language() {
@@ -210,7 +210,7 @@
 
     function settingsWorkspace() {
         var content = document.getElementById("sirkStandaloneContent");
-        return content && content.querySelector("[data-portal-settings] .sirk-layout");
+        return content && content.querySelector("[data-portal-settings] .sirk-layout-host");
     }
 
     function permissionTarget(workspace) {

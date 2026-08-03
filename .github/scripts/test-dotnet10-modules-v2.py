@@ -13,7 +13,7 @@ module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(module)
 
 original_call = module.Browser.call
-optional_modules = {"myjira", "defendertools"}
+optional_modules = {"jira", "security"}
 
 
 def call_with_optional_module_enable(self, method, path, payload=None, expected=200):

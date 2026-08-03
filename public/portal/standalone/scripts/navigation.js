@@ -64,7 +64,7 @@
     function commandsEnabled() {
         var runtime = window.SirkPlatformRuntime;
         var modules = runtime && runtime.state && runtime.state.bootstrap && runtime.state.bootstrap.modules;
-        return !!(modules && modules.mycommands && modules.mycommands.enabled === true);
+        return !!(modules && modules.commands && modules.commands.enabled === true);
     }
 
     function csrfToken() {
@@ -318,7 +318,7 @@
 
     function normalizeSettingsNavigation() {
         var content = document.getElementById("sirkStandaloneContent");
-        var workspace = content && (content.querySelector("[data-portal-settings] .sirk-layout") || content.querySelector(".sirk-settings-module-workspace"));
+        var workspace = content && (content.querySelector("[data-portal-settings] .sirk-layout-host") || content.querySelector(".sirk-settings-module-workspace"));
         if (!workspace) return;
         var primary = workspace.querySelector(":scope > .sirk-column-primary");
         var activateSettings = false;

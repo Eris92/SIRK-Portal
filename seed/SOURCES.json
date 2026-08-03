@@ -1,19 +1,12 @@
 {
-  "schemaVersion": 1,
-  "sources": {
-    "MyScripts": {
-      "repository": "Eris92/MeshCentral-MyScripts",
-      "branch": "main",
-      "sourcePath": "scripts",
-      "destinationPath": "seed/MyScripts",
-      "commit": "23772b8261f6b7d1262939d15f1b58f0cb53779c"
+  "schemaVersion": 2,
+  "filesRoot": "seed/Files",
+  "libraries": {
+    "commands": {
+      "destinationPath": "seed/Files/commands"
     },
-    "MyCommands": {
-      "repository": "Eris92/MeshCentral-MyCommands",
-      "branch": "main",
-      "sourcePath": "scripts",
-      "destinationPath": "seed/MyCommands",
-      "commit": "a700f8254ad65c8059827cb8033397faceac2daf"
+    "management": {
+      "destinationPath": "seed/Files/management"
     }
   }
 }

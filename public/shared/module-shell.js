@@ -2,12 +2,12 @@
     "use strict";
     var core = window.SirkPlatformCore;
     var VIEW_MODES = {
-        myscripts: 101,
-        mycommands: 102,
-        myjira: 103,
-        defendertools: 104,
-        approvalcenter: 105,
-        moverequests: 106
+        management: 101,
+        commands: 102,
+        jira: 103,
+        security: 104,
+        approvals: 105,
+        "move-requests": 106
     };
 
     function buttonRow(host, items, selected, onSelect) {

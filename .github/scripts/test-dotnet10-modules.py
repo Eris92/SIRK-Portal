@@ -25,7 +25,7 @@ class Browser:
         self.csrf_token = ""
 
     def call(self, method: str, path: str, payload=None, expected: int = 200):
-        headers = {"Accept": "application/json"}
+        headers = {"Accept": "application/json", "Authorization": "Bearer " + ACCESS_CODE}
         body = None
         if payload is not None:
             body = json.dumps(payload, separators=(",", ":")).encode("utf-8")
@@ -82,7 +82,7 @@ def find_request(rows, request_id):
 
 
 def approve(browser: Browser, request_id: str):
-    value = browser.call("POST", "/api/v1/modules/approvalcenter/decide", {
+    value = browser.call("POST", "/api/v1/modules/approvals/decide", {
         "requestId": request_id,
         "approved": True,
         "note": "Native module E2E",
@@ -161,16 +161,16 @@ def main() -> int:
             if "pendingApprovals" not in overview or "integrations" not in overview:
                 raise RuntimeError("Portal overview payload is incomplete.")
 
-            providers = browser.call("GET", "/api/v1/modules/approvalcenter/providers")
+            providers = browser.call("GET", "/api/v1/modules/approvals/providers")
             provider_types = {value.get("type") for value in providers.get("providers", [])}
-            if provider_types != {"moverequests", "mycommands", "myscripts"}:
+            if provider_types != {"move-requests", "commands", "management"}:
                 raise RuntimeError(f"Approval providers are invalid: {provider_types}")
-            browser.call("GET", "/api/v1/modules/approvalcenter/overview")
-            browser.call("GET", "/api/v1/modules/approvalcenter/settings")
-            browser.call("GET", "/api/v1/modules/moverequests/groups")
-            browser.call("GET", "/api/v1/modules/moverequests/settings")
+            browser.call("GET", "/api/v1/modules/approvals/overview")
+            browser.call("GET", "/api/v1/modules/approvals/settings")
+            browser.call("GET", "/api/v1/modules/move-requests/groups")
+            browser.call("GET", "/api/v1/modules/move-requests/settings")
 
-            submitted_move = browser.call("POST", "/api/v1/modules/moverequests/submit", {
+            submitted_move = browser.call("POST", "/api/v1/modules/move-requests/submit", {
                 "deviceId": device_id,
                 "nodeId": device_id,
                 "nodeName": "Module Test Device",
@@ -184,7 +184,7 @@ def main() -> int:
             if submitted_move.get("status") != "pending":
                 raise RuntimeError("Move request is not pending.")
             move = approve(browser, submitted_move["id"])
-            browser.call("GET", "/api/v1/modules/approvalcenter/request?id=" + move["id"])
+            browser.call("GET", "/api/v1/modules/approvals/request?id=" + move["id"])
 
             script_payload = {
                 "originalPath": None,
@@ -199,15 +199,20 @@ def main() -> int:
                 "approvalLevels": [1],
                 "variables": [],
             }
-            saved = browser.call("POST", "/api/v1/modules/myscripts/save", script_payload)["script"]
+            saved = browser.call("POST", "/api/v1/modules/management/save", script_payload)["script"]
             if not saved.get("hash"):
                 raise RuntimeError("Saved script has no integrity hash.")
-            browser.call("GET", "/api/v1/modules/myscripts/tree")
-            loaded = browser.call("GET", "/api/v1/modules/myscripts/script?path=Tests%2Fnative-e2e.ps1")["script"]
+            browser.call("GET", "/api/v1/modules/management/tree")
+            loaded = browser.call("GET", "/api/v1/modules/management/script?path=Tests%2Fnative-e2e.ps1")["script"]
             if loaded.get("hash") != saved["hash"]:
                 raise RuntimeError("Loaded script hash differs from the saved hash.")
+            browser.call("GET", "/api/v1/modules/commands/script?path=Tests%2Fnative-e2e.ps1", expected=404)
+            if not (data_root / "Files" / "management" / "scripts.json").is_file():
+                raise RuntimeError("Management script library was not stored under Files/management.")
+            if not (data_root / "Files" / "commands").is_dir():
+                raise RuntimeError("Commands script library directory is missing under Files/commands.")
 
-            submitted_script = browser.call("POST", "/api/v1/modules/myscripts/execute", {
+            submitted_script = browser.call("POST", "/api/v1/modules/management/execute", {
                 "deviceId": device_id,
                 "nodeId": device_id,
                 "nodeName": "Module Test Device",
@@ -220,14 +225,14 @@ def main() -> int:
             })["request"]
             script_request = approve(browser, submitted_script["id"])
             script_command_id = script_request["executionResult"]["commandId"]
-            output = browser.call("GET", "/api/v1/modules/myscripts/output?id=" + script_command_id)
+            output = browser.call("GET", "/api/v1/modules/management/output?id=" + script_command_id)
             if output.get("status") != "queued" or output.get("ready") is not False:
                 raise RuntimeError("Queued script output state is invalid.")
 
-            catalog = browser.call("GET", "/api/v1/modules/mycommands/catalog")
+            catalog = browser.call("GET", "/api/v1/modules/commands/catalog")
             if not catalog.get("catalog"):
                 raise RuntimeError("Built-in command catalog is empty.")
-            submitted_command = browser.call("POST", "/api/v1/modules/mycommands/execute", {
+            submitted_command = browser.call("POST", "/api/v1/modules/commands/execute", {
                 "deviceId": device_id,
                 "nodeId": device_id,
                 "nodeName": "Module Test Device",
@@ -240,27 +245,27 @@ def main() -> int:
             command_request = approve(browser, submitted_command["id"])
             command_id = command_request["executionResult"]["commandId"]
 
-            results = browser.call("GET", "/api/v1/modules/mycommands/results?deviceId=" + device_id)
+            results = browser.call("GET", "/api/v1/modules/commands/results?deviceId=" + device_id)
             result_ids = {row.get("id") for row in results.get("rows", [])}
             if not {move["executionResult"]["commandId"], script_command_id, command_id}.issubset(result_ids):
                 raise RuntimeError("Module result history is missing queued workflows.")
 
-            requests = browser.call("GET", "/api/v1/modules/approvalcenter/requests?limit=100")
+            requests = browser.call("GET", "/api/v1/modules/approvals/requests?limit=100")
             for request_id in (move["id"], script_request["id"], command_request["id"]):
                 if find_request(requests.get("requests", []), request_id).get("status") != "completed":
                     raise RuntimeError("Approval center does not expose completed workflow.")
 
-            for module in ("myjira", "defendertools", "monitoring", "assets", "reports"):
+            for module in ("jira", "security", "monitoring", "assets", "reports"):
                 value = browser.call("GET", f"/api/v1/modules/{module}/status")
                 if value.get("module") != module or value.get("action") != "status":
                     raise RuntimeError(f"Integration module adapter failed: {module}")
 
-            browser.call("POST", "/api/v1/modules/myscripts/delete", {"path": saved["path"]})
-            browser.call("GET", "/api/v1/modules/myscripts/script?path=Tests%2Fnative-e2e.ps1", expected=404)
+            browser.call("POST", "/api/v1/modules/management/delete", {"path": saved["path"]})
+            browser.call("GET", "/api/v1/modules/management/script?path=Tests%2Fnative-e2e.ps1", expected=404)
 
             audit = browser.call("GET", "/api/v1/audit?limit=500")
             actions = {entry.get("event", {}).get("action") for entry in audit.get("entries", [])}
-            expected_actions = {"move-request.submit", "approval.decide", "automation.script.save", "automation.execute", "automation.script.delete"}
+            expected_actions = {"move-request.submit", "approval.decide", "script.save", "script.execute", "script.delete"}
             if not expected_actions.issubset(actions):
                 raise RuntimeError(f"Module audit is incomplete: {sorted(expected_actions - actions)}")
 

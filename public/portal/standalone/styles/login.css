@@ -12,13 +12,17 @@ body{margin:0;min-height:100vh}
 .sirk-login-card{width:min(440px,100%);padding:42px;border:1px solid #dce3ec;border-radius:22px;background:#fff;box-shadow:0 24px 80px #1d2c5218}
 .sirk-login-card header span{color:#7256e8;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.12em}
 .sirk-login-card h2{margin:10px 0 8px;font-size:34px}
-.sirk-login-card header p,.sirk-login-card footer{color:#667085;line-height:1.55}
-.sirk-login-provider,.sirk-login-card button{display:flex;align-items:center;justify-content:center;width:100%;margin-top:26px;padding:14px;border:0;border-radius:10px;background:#6947ed;color:#fff;font:700 15px Inter,"Segoe UI",Arial,sans-serif;text-decoration:none;cursor:pointer}
-.sirk-login-provider:hover,.sirk-login-card button:hover{filter:brightness(1.04)}
+.sirk-login-card header p,
+.sirk-login-card footer{color:#667085;line-height:1.55}
+.sirk-login-provider,
+.sirk-login-card button{display:flex;align-items:center;justify-content:center;width:100%;margin-top:26px;padding:14px;border:0;border-radius:10px;background:#6947ed;color:#fff;font:700 15px Inter,"Segoe UI",Arial,sans-serif;text-decoration:none;cursor:pointer}
+.sirk-login-provider:hover,
+.sirk-login-card button:hover{filter:brightness(1.04)}
 .sirk-login-card button:disabled{opacity:.6;cursor:wait}
 .sirk-local-login{margin-top:24px}
 .sirk-login-separator{display:flex;align-items:center;gap:12px;margin:4px 0 2px;color:#667085;font-size:11px;font-weight:750;letter-spacing:.12em;text-transform:uppercase}
-.sirk-login-separator:before,.sirk-login-separator:after{content:"";height:1px;flex:1;background:#dce3ec}
+.sirk-login-separator:before,
+.sirk-login-separator:after{content:"";height:1px;flex:1;background:#dce3ec}
 .sirk-login-card label{display:grid;gap:8px;margin-top:22px;font-size:14px;font-weight:650}
 .sirk-login-card input{width:100%;padding:13px 14px;border:1px solid #cfd8e6;border-radius:10px;background:#fff;color:#172033;font:inherit}
 .sirk-login-card input:focus{border-color:#7657ff;outline:3px solid #7657ff22}

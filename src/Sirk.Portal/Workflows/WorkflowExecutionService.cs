@@ -26,8 +26,8 @@ internal sealed class WorkflowExecutionService
         {
             var command = request.Type switch
             {
-                "mycommands" or "myscripts" => QueueScript(request.Payload, actorId, actorName),
-                "moverequests" => QueueMove(request.Payload, actorId, actorName),
+                "commands" or "management" => QueueScript(request.Payload, actorId, actorName),
+                "move-requests" => QueueMove(request.Payload, actorId, actorName),
                 _ => throw new InvalidOperationException(
                     $"Approval provider {request.Type} has no execution handler.")
             };

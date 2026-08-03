@@ -47,7 +47,7 @@
     var originalApi = core.api;
     core.api = function (moduleName, assetName, options, parameters) {
         return originalApi.call(core, moduleName, assetName, options, parameters).then(function (response) {
-            if (moduleName === "myscripts") normalizeResponse(response);
+            if (moduleName === "management") normalizeResponse(response);
             return response;
         });
     };
@@ -55,7 +55,7 @@
     var originalPost = core.post;
     core.post = function (moduleName, assetName, values) {
         return originalPost.call(core, moduleName, assetName, values).then(function (response) {
-            if (moduleName === "myscripts") normalizeResponse(response);
+            if (moduleName === "management") normalizeResponse(response);
             return response;
         });
     };

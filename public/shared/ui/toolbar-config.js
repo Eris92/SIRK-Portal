@@ -16,9 +16,9 @@
     };
 
     var presets = {
-        approvalcenter: { collapse: true, link: false, refresh: true, clear: false, favorites: false, search: true, manage: false, multi: false, settings: false },
-        myscripts: { collapse: true, favorites: true, link: false, manage: true, refresh: true, multi: false, search: true, clear: false, settings: false },
-        mycommands: { collapse: true, favorites: true, link: true, manage: true, refresh: true, multi: true, search: true, clear: false, settings: false },
+        approvals: { collapse: true, link: false, refresh: true, clear: false, favorites: false, search: true, manage: false, multi: false, settings: false },
+        management: { collapse: true, favorites: true, link: false, manage: true, refresh: true, multi: false, search: true, clear: false, settings: false },
+        commands: { collapse: true, favorites: true, link: true, manage: true, refresh: true, multi: true, search: true, clear: false, settings: false },
         standard: { collapse: false, link: true, manage: false, refresh: true, multi: false, search: true, clear: false, favorites: false, settings: true },
         minimal: { collapse: false, refresh: true, search: true }
     };

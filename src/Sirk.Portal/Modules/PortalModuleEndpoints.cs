@@ -83,22 +83,22 @@ internal static class PortalModuleEndpoints
         {
             return (module, action) switch
             {
-                ("approvalcenter", "providers") => Results.Ok(new
+                ("approvals", "providers") => Results.Ok(new
                 {
                     ok = true,
                     providers = new[]
                     {
-                        Provider("moverequests", "Move Requests"),
-                        Provider("mycommands", "Commands"),
-                        Provider("myscripts", "Automation")
+                        Provider("move-requests", "Move Requests"),
+                        Provider("commands", "Commands"),
+                        Provider("management", "Management")
                     }
                 }),
-                ("approvalcenter", "overview") => Results.Ok(new
+                ("approvals", "overview") => Results.Ok(new
                 {
                     ok = true,
                     cards = approvals.Overview(identity.Id)
                 }),
-                ("approvalcenter", "requests") => Results.Ok(new
+                ("approvals", "requests") => Results.Ok(new
                 {
                     ok = true,
                     requests = approvals.List(
@@ -107,65 +107,66 @@ internal static class PortalModuleEndpoints
                         CanReviewAll(identity.Role) ? null : identity.Id,
                         ParseLimit(context, 500))
                 }),
-                ("approvalcenter", "request") => ApprovalRequest(
+                ("approvals", "request") => ApprovalRequest(
                     approvals,
                     context.Request.Query["id"].ToString()),
-                ("approvalcenter", "settings") => Results.Ok(new
+                ("approvals", "settings") => Results.Ok(new
                 {
                     ok = true,
-                    settings = settings.Module("approvalcenter").Options
+                    settings = settings.Module("approvals").Options
                 }),
-                ("moverequests", "groups") => Results.Ok(new
+                ("move-requests", "groups") => Results.Ok(new
                 {
                     ok = true,
                     groups = JsonSerializer.SerializeToElement(agents.Snapshot())
                         .GetProperty("groups")
                 }),
-                ("moverequests", "requests") => Results.Ok(new
+                ("move-requests", "requests") => Results.Ok(new
                 {
                     ok = true,
                     requests = approvals.List(
-                        "moverequests",
+                        "move-requests",
                         context.Request.Query["status"].ToString(),
                         CanReviewAll(identity.Role) ? null : identity.Id,
                         ParseLimit(context, 500))
                 }),
-                ("moverequests", "settings") => RequireAdminResult(identity, () => Results.Ok(new
+                ("move-requests", "settings") => RequireAdminResult(identity, () => Results.Ok(new
                 {
                     ok = true,
-                    settings = settings.Module("moverequests").Options,
+                    settings = settings.Module("move-requests").Options,
                     groups = JsonSerializer.SerializeToElement(agents.Snapshot())
                         .GetProperty("groups")
                 })),
-                ("mycommands", "catalog") => Results.Ok(new
+                ("commands", "catalog") => Results.Ok(new
                 {
                     ok = true,
                     catalog = BuiltInCommandCatalog.All
                 }),
-                ("mycommands", "tree") or ("myscripts", "tree") => Results.Ok(new
+                ("commands", "tree") or ("management", "tree") => Results.Ok(new
                 {
                     ok = true,
-                    tree = scripts.Tree()
+                    tree = scripts.Tree(module)
                 }),
-                ("mycommands", "script") or ("myscripts", "script") => ScriptResult(
+                ("commands", "script") or ("management", "script") => ScriptResult(
                     scripts,
+                    module,
                     context.Request.Query["path"].ToString()),
-                ("mycommands", "output") or ("myscripts", "output") => OutputResult(
+                ("commands", "output") or ("management", "output") => OutputResult(
                     commands,
                     context.Request.Query["id"].ToString()),
-                ("mycommands", "results") or ("myscripts", "results") => Results.Ok(new
+                ("commands", "results") or ("management", "results") => Results.Ok(new
                 {
                     ok = true,
                     rows = commands.List(
                         context.Request.Query["deviceId"].ToString(),
                         ParseLimit(context, 500))
                 }),
-                ("mycommands", "settings") or ("myscripts", "settings") => Results.Ok(new
+                ("commands", "settings") or ("management", "settings") => Results.Ok(new
                 {
                     ok = true,
                     settings = settings.Module(module).Options
                 }),
-                ("myjira", _) or ("defendertools", _) or ("monitoring", _) or
+                ("jira", _) or ("security", _) or ("monitoring", _) or
                 ("assets", _) or ("reports", _) => Results.Ok(new
                 {
                     ok = true,
@@ -216,7 +217,7 @@ internal static class PortalModuleEndpoints
         try
         {
             IResult result;
-            if (module == "approvalcenter" && action == "decide")
+            if (module == "approvals" && action == "decide")
             {
                 var request = await ReadJsonAsync<ApprovalDecisionRequest>(context);
                 var decided = approvals.Decide(
@@ -229,12 +230,12 @@ internal static class PortalModuleEndpoints
                 Audit(audit, context, identity, "approval.decide", "approval", decided.Id, request.Approved);
                 result = Results.Ok(new { ok = true, request = decided });
             }
-            else if (module == "moverequests" && action == "submit")
+            else if (module == "move-requests" && action == "submit")
             {
                 var payload = await ReadJsonElementAsync(context);
                 var request = approvals.Submit(
                     new ApprovalSubmitRequest(
-                        "moverequests",
+                        "move-requests",
                         "Move " + ReadString(payload, "nodeName", "device"),
                         ReadString(payload, "sourceGroupName", "Current group") + " -> " +
                         ReadString(payload, "targetGroupName", ReadString(payload, "targetGroupId", string.Empty)),
@@ -243,12 +244,12 @@ internal static class PortalModuleEndpoints
                         ReadString(payload, "note", string.Empty)),
                     identity.Id,
                     identity.UserName,
-                    AllowNoApproval(settings.Module("moverequests")));
+                    AllowNoApproval(settings.Module("move-requests")));
                 request = workflow.ExecuteIfApproved(request, identity.Id, identity.UserName);
                 Audit(audit, context, identity, "move-request.submit", "approval", request.Id, true);
                 result = Results.Ok(new { ok = true, request });
             }
-            else if (module is "mycommands" or "myscripts" && action == "execute")
+            else if (module is "commands" or "management" && action == "execute")
             {
                 var request = await ReadJsonAsync<ModuleExecutionRequest>(context);
                 var approval = SubmitExecution(
@@ -259,24 +260,24 @@ internal static class PortalModuleEndpoints
                     scripts,
                     approvals);
                 approval = workflow.ExecuteIfApproved(approval, identity.Id, identity.UserName);
-                Audit(audit, context, identity, "automation.execute", "approval", approval.Id, true);
+                Audit(audit, context, identity, "script.execute", "approval", approval.Id, true);
                 result = Results.Ok(new { ok = true, request = approval });
             }
-            else if (module is "mycommands" or "myscripts" && action == "save")
+            else if (module is "commands" or "management" && action == "save")
             {
                 RequireSettingsManage(identity);
                 var request = await ReadJsonAsync<ScriptSaveRequest>(context);
-                var script = scripts.Save(request);
-                Audit(audit, context, identity, "automation.script.save", "script", script.Path, true);
-                result = Results.Ok(new { ok = true, script, tree = scripts.Tree() });
+                var script = scripts.Save(module, request);
+                Audit(audit, context, identity, "script.save", "script", script.Path, true);
+                result = Results.Ok(new { ok = true, script, tree = scripts.Tree(module) });
             }
-            else if (module is "mycommands" or "myscripts" && action == "delete")
+            else if (module is "commands" or "management" && action == "delete")
             {
                 RequireSettingsManage(identity);
                 var request = await ReadJsonAsync<ScriptDeleteRequest>(context);
-                scripts.Delete(request.Path);
-                Audit(audit, context, identity, "automation.script.delete", "script", request.Path, true);
-                result = Results.Ok(new { ok = true, tree = scripts.Tree() });
+                scripts.Delete(module, request.Path);
+                Audit(audit, context, identity, "script.delete", "script", request.Path, true);
+                result = Results.Ok(new { ok = true, tree = scripts.Tree(module) });
             }
             else if (action == "settings")
             {
@@ -338,7 +339,7 @@ internal static class PortalModuleEndpoints
 
         if (!string.IsNullOrWhiteSpace(request.ScriptPath))
         {
-            var script = scripts.Get(request.ScriptPath)
+            var script = scripts.Get(module, request.ScriptPath)
                          ?? throw new KeyNotFoundException("Script was not found.");
             if (!string.IsNullOrWhiteSpace(request.ScriptHash) &&
                 !string.Equals(request.ScriptHash, script.Hash, StringComparison.Ordinal))
@@ -483,9 +484,9 @@ internal static class PortalModuleEndpoints
             : Results.Ok(new { ok = true, request = value });
     }
 
-    private static IResult ScriptResult(ScriptStore scripts, string path)
+    private static IResult ScriptResult(ScriptStore scripts, string library, string path)
     {
-        var value = scripts.Get(path);
+        var value = scripts.Get(library, path);
         return value is null
             ? PortalAuthenticationEndpoints.Error(404, "SCRIPT_NOT_FOUND", "Script was not found.")
             : Results.Ok(new { ok = true, script = value });

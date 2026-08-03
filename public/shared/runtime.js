@@ -6,15 +6,15 @@
     var core = window.SirkPlatformCore;
     runtime.state = runtime.state || { bootstrap: null, initializePromise: null, nodeId: "" };
     var files = {
-        approvalcenter: "approvalcenter.js",
-        moverequests: "moverequests.js",
-        mycommands: "mycommands.js",
-        myjira: "myjira.js",
-        defendertools: "defendertools.js",
-        myscripts: "myscripts.js"
+        approvals: "approvals.js",
+        "move-requests": "move-requests.js",
+        commands: "commands.js",
+        jira: "jira.js",
+        security: "security.js",
+        management: "management.js"
     };
-    var order = ["approvalcenter", "moverequests", "mycommands", "myjira", "defendertools", "myscripts"];
-    var viewModes = { myscripts: 101, mycommands: 102, myjira: 103, defendertools: 104, approvalcenter: 105, moverequests: 106 };
+    var order = ["approvals", "move-requests", "commands", "jira", "security", "management"];
+    var viewModes = { management: 101, commands: 102, jira: 103, security: 104, approvals: 105, "move-requests": 106 };
 
     function isCustomView(view) {
         view = Number(view);
@@ -50,14 +50,14 @@
         };
     }
 
-    function installMyCommandsFix(module) {
+    function installCommandsFix(module) {
         if (!module || !module.api || window.__sirkPlatformCommandsUiFix) return;
         window.__sirkPlatformCommandsUiFix = true;
 
         var commandByLabel = Object.create(null);
         var commandById = Object.create(null);
         var catalogLoaded = false;
-        var STORAGE = "sirkPlatform.mycommands.preferences";
+        var STORAGE = "sirkPlatform.commands.preferences";
         var TEXT = {
             pl: {
                 Results: "Wyniki", Scripts: "Skrypty", Network: "Sieć", System: "System", Other: "Inne",
@@ -185,7 +185,7 @@
             return button;
         }
         function decorate() {
-            var page = document.querySelector('[data-module-preset="mycommands"]');
+            var page = document.querySelector('[data-module-preset="commands"]');
             if (!page || !module.api.state.page) return;
             ensureCatalog().then(function () {
                 var toolbar = module.api.state.page.toolbar;
@@ -257,7 +257,7 @@
                     configureModule(key, module);
                     if (!module || typeof module.initialize !== "function") return null;
                     return Promise.resolve(module.initialize(state)).then(function () {
-                        if (key === "mycommands") installMyCommandsFix(module);
+                        if (key === "commands") installCommandsFix(module);
                         if (runtime.state.nodeId && typeof module.onDeviceRefreshEnd === "function") module.onDeviceRefreshEnd(runtime.state.nodeId);
                     });
                 });

@@ -10,8 +10,10 @@
     window.SharedLayout = {
         mount: function (options) {
             options = options || {};
-            var host = typeof options.container === "string" ? document.querySelector(options.container) : options.container;
-            var root = div("sirk-layout");
+            var root = typeof options.container === "string" ? document.querySelector(options.container) : options.container;
+            if (!root) throw new Error("Layout container not found.");
+            root.innerHTML = "";
+            root.className = "sirk-layout-host";
             var primary = div("sirk-column-primary");
             var secondary = div("sirk-column-secondary");
             var details = div("sirk-column-details");
@@ -31,7 +33,6 @@
             root.appendChild(primary);
             root.appendChild(secondary);
             root.appendChild(details);
-            host.appendChild(root);
             setCollapsed(collapsed);
 
             return {

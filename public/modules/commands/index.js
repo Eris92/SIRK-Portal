@@ -9,7 +9,7 @@
     var treeState = { selectedRoot: "", selectedScript: "", expanded: {} };
     var outputs = Object.create(null);
     var pollSequence = 0;
-    var tools = window.SharedScriptTools.create({ storageKey: "sirkPlatform.mycommands.preferences", deepLinkParameter: "mycommand" });
+    var tools = window.SharedScriptTools.create({ storageKey: "sirkPlatform.commands.preferences", deepLinkParameter: "command" });
     tools.restoreTreeState(treeState);
 
     var PL = {
@@ -192,8 +192,8 @@
     function refresh(shell) { var toolbar = shell.state.page && shell.state.page.toolbar; if (toolbar) toolbar.setEnabled("refresh", false); shell.post("refresh", {}).then(function (response) { sourceTree = response.tree || sourceTree; catalog = response.catalog || catalog; tree = buildTree(); if (treeState.selectedScript && !window.SharedDirectoryTree.find(tree, treeState.selectedScript)) treeState.selectedScript = ""; shell.render(); }).catch(function (error) { note(shell, msg("Odświeżanie nie powiodło się", "Refresh failed"), error.message || String(error), true); }).then(function () { if (toolbar) toolbar.setEnabled("refresh", true); }); }
 
     var module = window.SirkPlatformModuleShell.create({
-        key: "mycommands", title: "Commands", menuTitle: "Commands", showInMenu: false, order: 150, preset: "mycommands",
-        deviceTab: { title: "Commands", pageId: "sirk-platform-mycommands-device-page", topTabId: "MainDevSirkPlatform-Commands" },
+        key: "commands", title: "Commands", menuTitle: "Commands", showInMenu: false, order: 150, preset: "commands",
+        deviceTab: { title: "Commands", pageId: "sirk-platform-commands-device-page", topTabId: "MainDevSirkPlatform-Commands" },
         buttons: {
             collapse: { side: "left", order: 10 },
             favorites: { side: "left", order: 20, onClick: function (toolbar) { tools.toggleFavorites(toolbar, function () { treeState.selectedScript = ""; module.api.render(); }); } },
@@ -209,5 +209,5 @@
 
     module.mountDeviceCommands = function (host, nodeId) { mode = "commands"; status = ""; if (typeof module.onDeviceRefreshEnd === "function") module.onDeviceRefreshEnd(String(nodeId || "")); return module.mount(host, "sirk-device-commands"); };
     window.addEventListener("storage", function (event) { if (event.key === "sirkPortal.language" && module && module.api) module.api.render(); });
-    window.SirkPlatformModules.mycommands = module;
+    window.SirkPlatformModules.commands = module;
 }());

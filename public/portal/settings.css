@@ -1,36 +1,36 @@
 [data-portal-settings] .sirk-column-primary > .sirk-nav-item,
-[data-portal-settings] .sirk-column-secondary > .sirk-nav-item {
+[data-portal-settings] .sirk-column-secondary > .sirk-nav-item{
     width: 100%;
 }
 
-[data-portal-settings] [data-card-grid] {
+[data-portal-settings] [data-card-grid]{
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
     gap: 12px;
 }
 
-[data-portal-settings] .sirk-card h3 {
+[data-portal-settings] .sirk-card h3{
     margin: 0 0 8px;
 }
 
-[data-portal-settings] .sirk-card p {
+[data-portal-settings] .sirk-card p{
     margin: 8px 0;
 }
 
-[data-portal-settings] .sirk-card small {
+[data-portal-settings] .sirk-card small{
     display: block;
     margin: 4px 0 8px;
     opacity: .72;
 }
 
-[data-portal-settings] [data-settings-form] {
+[data-portal-settings] [data-settings-form]{
     display: flex;
     flex-direction: column;
     gap: 12px;
     max-width: 980px;
 }
 
-[data-portal-settings] [data-settings-field] {
+[data-portal-settings] [data-settings-field]{
     display: grid;
     grid-template-columns: minmax(220px, 1fr) minmax(260px, 1.35fr);
     align-items: center;
@@ -39,24 +39,24 @@
     border-bottom: 1px solid rgba(127, 127, 127, .25);
 }
 
-[data-portal-settings] [data-settings-field="boolean"] {
+[data-portal-settings] [data-settings-field="boolean"]{
     grid-template-columns: minmax(220px, 1fr) auto;
 }
 
-[data-portal-settings] [data-settings-field-copy] {
+[data-portal-settings] [data-settings-field-copy]{
     display: flex;
     flex-direction: column;
     gap: 3px;
     min-width: 0;
 }
 
-[data-portal-settings] [data-settings-field-copy] small {
+[data-portal-settings] [data-settings-field-copy] small{
     margin: 0;
     opacity: .7;
     font-size: 12px;
 }
 
-[data-portal-settings] [data-settings-input] {
+[data-portal-settings] [data-settings-input]{
     box-sizing: border-box;
     width: 100%;
     min-height: 36px;
@@ -67,21 +67,21 @@
     border-radius: 4px;
 }
 
-[data-portal-settings] [data-settings-field="boolean"] > [data-settings-input] {
+[data-portal-settings] [data-settings-field="boolean"] > [data-settings-input]{
     width: 18px;
     height: 18px;
     min-height: 0;
     padding: 0;
 }
 
-[data-portal-settings] [data-settings-section] {
+[data-portal-settings] [data-settings-section]{
     padding: 0;
     margin: 0;
     border-radius: 6px;
     overflow: hidden;
 }
 
-[data-portal-settings] [data-settings-section] > summary {
+[data-portal-settings] [data-settings-section] > summary{
     list-style: none;
     font-weight: 700;
     padding: 11px 14px;
@@ -90,12 +90,12 @@
 }
 
 [data-portal-settings] [data-settings-section] > summary::-webkit-details-marker,
-[data-portal-settings] .sirk-settings-nav-group > summary::-webkit-details-marker {
+[data-portal-settings] .sirk-settings-nav-group > summary::-webkit-details-marker{
     display: none;
 }
 
 [data-portal-settings] [data-settings-section] > summary::before,
-[data-portal-settings] .sirk-settings-nav-group > summary::before {
+[data-portal-settings] .sirk-settings-nav-group > summary::before{
     content: "▸";
     display: inline-block;
     width: 16px;
@@ -103,43 +103,43 @@
 }
 
 [data-portal-settings] [data-settings-section][open] > summary::before,
-[data-portal-settings] .sirk-settings-nav-group[open] > summary::before {
+[data-portal-settings] .sirk-settings-nav-group[open] > summary::before{
     transform: rotate(90deg);
 }
 
-[data-portal-settings] [data-settings-section][open] > summary {
+[data-portal-settings] [data-settings-section][open] > summary{
     border-bottom-color: rgba(127, 127, 127, .25);
 }
 
-[data-portal-settings] [data-settings-section-body] {
+[data-portal-settings] [data-settings-section-body]{
     padding: 4px 12px 12px;
 }
 
-[data-portal-settings] [data-settings-section-body] > [data-settings-section] {
+[data-portal-settings] [data-settings-section-body] > [data-settings-section]{
     margin-top: 10px;
 }
 
-[data-portal-settings] [data-settings-section-body] > [data-settings-field]:last-child {
+[data-portal-settings] [data-settings-section-body] > [data-settings-field]:last-child{
     border-bottom: 0;
 }
 
 /* Top-level General/Permissions content is always visible. The selected module name
    already exists in navigation, so do not repeat it as an accordion header. */
-[data-portal-settings] [data-settings-form] > [data-settings-section] {
+[data-portal-settings] [data-settings-form] > [data-settings-section]{
     overflow: visible;
     border: 0;
     border-radius: 0;
 }
 
-[data-portal-settings] [data-settings-form] > [data-settings-section] > summary {
+[data-portal-settings] [data-settings-form] > [data-settings-section] > summary{
     display: none;
 }
 
-[data-portal-settings] [data-settings-form] > [data-settings-section] > [data-settings-section-body] {
+[data-portal-settings] [data-settings-form] > [data-settings-section] > [data-settings-section-body]{
     padding: 0;
 }
 
-[data-portal-settings] [data-settings-search] {
+[data-portal-settings] [data-settings-search]{
     min-width: 220px;
     width: min(420px, 34vw);
     box-sizing: border-box;
@@ -150,29 +150,29 @@
     border-radius: 4px;
 }
 
-[data-portal-settings] [data-settings-table] {
+[data-portal-settings] [data-settings-table]{
     width: 100%;
     border-collapse: collapse;
 }
 
 [data-portal-settings] [data-settings-table] th,
-[data-portal-settings] [data-settings-table] td {
+[data-portal-settings] [data-settings-table] td{
     padding: 8px;
     text-align: left;
     vertical-align: top;
     border-bottom: 1px solid rgba(127, 127, 127, .3);
 }
 
-[data-portal-settings] [data-settings-table] td small {
+[data-portal-settings] [data-settings-table] td small{
     display: block;
     opacity: .7;
 }
 
-[data-portal-settings] [data-settings-table] .sirk-button {
+[data-portal-settings] [data-settings-table] .sirk-button{
     margin: 0 5px 5px 0;
 }
 
-[data-portal-settings] [data-debug-output] {
+[data-portal-settings] [data-debug-output]{
     min-height: 420px;
     overflow: auto;
     white-space: pre-wrap;
@@ -180,26 +180,26 @@
     font: 13px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace;
 }
 
-[data-portal-settings] [data-error="1"] {
+[data-portal-settings] [data-error="1"]{
     font-weight: 700;
 }
 
-[data-portal-settings] .sirk-toolbar + .sirk-layout-host {
+[data-portal-settings] .sirk-toolbar-host + .sirk-layout-host{
     margin-top: 0;
 }
 
-[data-portal-settings] .sirk-column-secondary {
+[data-portal-settings] .sirk-column-secondary{
     padding: 8px;
 }
 
-[data-portal-settings] .sirk-settings-nav-group {
+[data-portal-settings] .sirk-settings-nav-group{
     width: 100%;
     margin: 0 0 4px;
     border: 0;
     background: transparent;
 }
 
-[data-portal-settings] .sirk-settings-nav-group > summary {
+[data-portal-settings] .sirk-settings-nav-group > summary{
     min-height: 38px;
     box-sizing: border-box;
     padding: 9px 8px;
@@ -209,33 +209,33 @@
     font: 600 14px "Segoe UI", Arial, sans-serif;
 }
 
-[data-portal-settings] .sirk-settings-nav-group > summary:hover {
+[data-portal-settings] .sirk-settings-nav-group > summary:hover{
     background: rgba(96, 165, 250, .09);
 }
 
-[data-portal-settings] .sirk-settings-nav-group-body {
+[data-portal-settings] .sirk-settings-nav-group-body{
     display: grid;
     gap: 2px;
     padding: 2px 0 4px 12px;
 }
 
-[data-portal-settings] .sirk-settings-nav-group-body .sirk-settings-nav-group > summary {
+[data-portal-settings] .sirk-settings-nav-group-body .sirk-settings-nav-group > summary{
     min-height: 34px;
     padding: 7px 8px;
     font-weight: 500;
 }
 
-[data-portal-settings] .sirk-settings-nav-group-body .sirk-settings-nav-group-body {
+[data-portal-settings] .sirk-settings-nav-group-body .sirk-settings-nav-group-body{
     padding-left: 12px;
 }
 
-[data-portal-settings] .sirk-settings-nav-leaf {
+[data-portal-settings] .sirk-settings-nav-leaf{
     min-height: 32px;
     padding: 6px 8px;
     font-size: 13px;
 }
 
-[data-portal-settings] .sirk-nav-item.active {
+[data-portal-settings] .sirk-nav-item.active{
     background: rgba(96, 165, 250, .16);
     box-shadow: inset 3px 0 0 var(--portal-accent, #60a5fa);
     font-weight: 700;
@@ -243,25 +243,25 @@
 
 @media (max-width: 900px) {
     [data-portal-settings] [data-settings-field],
-    [data-portal-settings] [data-settings-field="boolean"] {
+[data-portal-settings] [data-settings-field="boolean"]{
         grid-template-columns: 1fr;
         gap: 8px;
     }
 
-    [data-portal-settings] [data-settings-field="boolean"] > [data-settings-input] {
+    [data-portal-settings] [data-settings-field="boolean"] > [data-settings-input]{
         justify-self: start;
     }
 
-    [data-portal-settings] [data-settings-search] {
+    [data-portal-settings] [data-settings-search]{
         width: 100%;
         min-width: 140px;
     }
 
-    [data-portal-settings] [data-settings-table] {
+    [data-portal-settings] [data-settings-table]{
         min-width: 760px;
     }
 
-    [data-portal-settings] .sirk-column-details {
+    [data-portal-settings] .sirk-column-details{
         overflow: auto;
     }
 }

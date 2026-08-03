@@ -32,7 +32,7 @@
     function managementActive(root) {
         if (!root) return false;
         var host = root.querySelector('[data-="1"],.');
-        if (host && !host.hidden && host.style.display !== "none" && host.querySelector(".sirk-standalone-view-scroll")) return true;
+        if (host && !host.hidden && host.style.display !== "none" && host.querySelector(".sirk-view-shell")) return true;
         var button = root.querySelector('[data-sirk-platform-management-nav="1"].is-active,[data-sirk-view="management"].is-active');
         return !!button;
     }

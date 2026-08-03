@@ -2,8 +2,8 @@
     "use strict";
     var view = "my";
     var module = window.SirkPlatformModuleShell.create({
-        key: "myjira",
-        title: "My Jira",
+        key: "jira",
+        title: "Jira",
         menuTitle: "Jira",
         order: 130,
         preset: "standard",
@@ -21,7 +21,7 @@
                 return shell.api("assets", { q: shell.state.search }).then(function (result) { shell.json(shell.state.page.details, result.assets || result); });
             }
             var navigation = [
-                { key: "my", title: "My Tickets", icon: "●" },
+                { key: "my", title: "Assigned to me", icon: "●" },
                 { key: "all", title: "All Tickets", icon: "▤" },
                 { key: "new", title: "New Ticket", icon: "+" }
             ];
@@ -42,5 +42,5 @@
             });
         }
     });
-    window.SirkPlatformModules.myjira = module;
+    window.SirkPlatformModules.jira = module;
 }());

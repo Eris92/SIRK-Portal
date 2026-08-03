@@ -1,5 +1,5 @@
 /* Standalone SIRK Portal Overview and Devices. */
-.sirk-standalone-view-scroll {
+.sirk-view-shell{
     width: 100%;
     height: 100%;
     min-width: 0;
@@ -7,7 +7,7 @@
     overflow: auto;
 }
 
-.sirk-overview-link {
+.sirk-overview-link{
     appearance: none;
     -webkit-appearance: none;
     display: block;
@@ -19,14 +19,14 @@
 }
 
 .sirk-overview-link:hover,
-.sirk-overview-link:focus-visible {
+.sirk-overview-link:focus-visible{
     border-color: #60a5fa;
     transform: translateY(-1px);
     box-shadow: 0 8px 24px rgba(15, 23, 42, .12);
     outline: none;
 }
 
-.sirk-device-toolbar {
+.sirk-device-toolbar{
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -35,14 +35,14 @@
 }
 
 .sirk-device-summary,
-.sirk-device-controls {
+.sirk-device-controls{
     display: flex;
     align-items: center;
     gap: 10px;
     flex-wrap: wrap;
 }
 
-.sirk-device-summary span {
+.sirk-device-summary span{
     display: inline-flex;
     align-items: center;
     gap: 5px;
@@ -54,7 +54,7 @@
     color: var(--sirk-muted, #657187);
 }
 
-.sirk-device-summary strong {
+.sirk-device-summary strong{
     color: var(--sirk-text, #172033);
 }
 
@@ -62,7 +62,7 @@
 .sirk-device-select,
 .sirk-device-refresh,
 .sirk-device-back,
-.sirk-device-native-button {
+.sirk-device-native-button{
     min-height: 38px;
     border: 1px solid var(--sirk-border, #dce3ec);
     border-radius: 8px;
@@ -71,19 +71,19 @@
     font: inherit;
 }
 
-.sirk-device-input {
+.sirk-device-input{
     width: min(380px, 42vw);
     min-width: 240px;
     padding: 0 11px;
 }
 
-.sirk-device-select {
+.sirk-device-select{
     padding: 0 30px 0 11px;
 }
 
 .sirk-device-refresh,
 .sirk-device-back,
-.sirk-device-native-button {
+.sirk-device-native-button{
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -94,12 +94,12 @@
 
 .sirk-device-refresh:hover,
 .sirk-device-back:hover,
-.sirk-device-native-button:hover {
+.sirk-device-native-button:hover{
     border-color: #9fb0c5;
     background: var(--sirk-hover, #f8fafc);
 }
 
-.sirk-device-status {
+.sirk-device-status{
     padding: 18px;
     border: 1px dashed var(--sirk-border, #c7d0dd);
     border-radius: 10px;
@@ -107,12 +107,12 @@
     color: var(--sirk-muted, #657187);
 }
 
-.sirk-device-groups {
+.sirk-device-groups{
     display: grid;
     gap: 14px;
 }
 
-.sirk-device-group {
+.sirk-device-group{
     min-width: 0;
     overflow: hidden;
     border: 1px solid var(--sirk-border, #dce3ec);
@@ -121,7 +121,7 @@
     box-shadow: 0 4px 14px rgba(20, 32, 54, .04);
 }
 
-.sirk-device-group-header {
+.sirk-device-group-header{
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -131,30 +131,30 @@
     background: var(--sirk-subtle, #f8fafc);
 }
 
-.sirk-device-group-header > div {
+.sirk-device-group-header > div{
     display: flex;
     align-items: baseline;
     gap: 8px;
     min-width: 0;
 }
 
-.sirk-device-group-header strong {
+.sirk-device-group-header strong{
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
 .sirk-device-group-header small,
-.sirk-device-group-header > span {
+.sirk-device-group-header > span{
     color: var(--sirk-muted, #657187);
     white-space: nowrap;
 }
 
-.sirk-device-list {
+.sirk-device-list{
     display: grid;
 }
 
-.sirk-device-row {
+.sirk-device-row{
     appearance: none;
     -webkit-appearance: none;
     display: grid;
@@ -173,31 +173,31 @@
     cursor: pointer;
 }
 
-.sirk-device-row:last-child {
+.sirk-device-row:last-child{
     border-bottom: 0;
 }
 
 .sirk-device-row:hover,
-.sirk-device-row:focus-visible {
+.sirk-device-row:focus-visible{
     background: var(--sirk-hover, #f7faff);
     outline: none;
 }
 
 .sirk-device-icon,
-.sirk-device-hero-icon {
+.sirk-device-hero-icon{
     display: grid;
     place-items: center;
     background: rgba(59, 130, 246, .12);
     color: #3b82f6;
 }
 
-.sirk-device-icon {
+.sirk-device-icon{
     width: 30px;
     height: 30px;
     border-radius: 8px;
 }
 
-.sirk-device-primary {
+.sirk-device-primary{
     display: grid;
     gap: 3px;
     min-width: 0;
@@ -207,7 +207,7 @@
 .sirk-device-primary small,
 .sirk-device-os,
 .sirk-device-network,
-.sirk-device-seen {
+.sirk-device-seen{
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -216,11 +216,11 @@
 .sirk-device-primary small,
 .sirk-device-os,
 .sirk-device-network,
-.sirk-device-seen {
+.sirk-device-seen{
     color: var(--sirk-muted, #657187);
 }
 
-.sirk-device-connection {
+.sirk-device-connection{
     display: inline-flex;
     align-items: center;
     gap: 6px;
@@ -228,37 +228,37 @@
     white-space: nowrap;
 }
 
-.sirk-device-connection i {
+.sirk-device-connection i{
     width: 8px;
     height: 8px;
     border-radius: 50%;
     background: #94a3b8;
 }
 
-.sirk-device-connection.is-online {
+.sirk-device-connection.is-online{
     color: #16a34a;
 }
 
-.sirk-device-connection.is-online i {
+.sirk-device-connection.is-online i{
     background: #16a34a;
     box-shadow: 0 0 0 3px rgba(22, 163, 74, .12);
 }
 
-.sirk-device-connection.is-offline {
+.sirk-device-connection.is-offline{
     color: #64748b;
 }
 
-.sirk-device-open {
+.sirk-device-open{
     color: #2563eb;
     font-weight: 600;
     text-align: right;
 }
 
-.sirk-device-detail-head {
+.sirk-device-detail-head{
     margin-bottom: 12px;
 }
 
-.sirk-device-hero {
+.sirk-device-hero{
     display: flex;
     align-items: center;
     gap: 15px;
@@ -269,7 +269,7 @@
     box-shadow: 0 5px 18px rgba(20, 32, 54, .05);
 }
 
-.sirk-device-hero-icon {
+.sirk-device-hero-icon{
     flex: 0 0 48px;
     width: 48px;
     height: 48px;
@@ -277,17 +277,17 @@
     font-size: 24px;
 }
 
-.sirk-device-hero > div {
+.sirk-device-hero > div{
     min-width: 0;
     flex: 1;
 }
 
-.sirk-device-hero h2 {
+.sirk-device-hero h2{
     margin: 0 0 5px;
     font-size: 22px;
 }
 
-.sirk-device-hero p {
+.sirk-device-hero p{
     margin: 0;
     overflow: hidden;
     color: var(--sirk-muted, #657187);
@@ -295,14 +295,14 @@
     white-space: nowrap;
 }
 
-.sirk-device-detail-grid {
+.sirk-device-detail-grid{
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
     gap: 12px;
     margin: 16px 0;
 }
 
-.sirk-device-detail-item {
+.sirk-device-detail-item{
     display: grid;
     gap: 7px;
     min-width: 0;
@@ -312,88 +312,88 @@
     background: var(--sirk-panel, #fff);
 }
 
-.sirk-device-detail-item span {
+.sirk-device-detail-item span{
     color: var(--sirk-muted, #657187);
     font-size: 12px;
     letter-spacing: .04em;
     text-transform: uppercase;
 }
 
-.sirk-device-detail-item strong {
+.sirk-device-detail-item strong{
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
-.sirk-device-native-card {
+.sirk-device-native-card{
     margin-bottom: 2px;
 }
 
-.sirk-device-native-button {
+.sirk-device-native-button{
     margin-top: 10px;
     border-color: #3867d6;
     background: #3867d6;
     color: #fff;
 }
 
-.sirk-device-native-button:hover {
+.sirk-device-native-button:hover{
     border-color: #2f5cc3;
     background: #2f5cc3;
 }
 
-#sirkPortalRoot.sirk-theme-dark {
+#sirkPortalRoot.sirk-theme-dark{
     --sirk-hover: #17243a;
     --sirk-subtle: #111d30;
     --sirk-row-border: #223047;
 }
 
 #sirkPortalRoot.sirk-theme-dark .sirk-overview-link:hover,
-#sirkPortalRoot.sirk-theme-dark .sirk-overview-link:focus-visible {
+#sirkPortalRoot.sirk-theme-dark .sirk-overview-link:focus-visible{
     box-shadow: 0 8px 24px rgba(0, 0, 0, .28);
 }
 
 @media (max-width: 1100px) {
-    .sirk-device-toolbar {
+    .sirk-device-toolbar{
         align-items: stretch;
         flex-direction: column;
     }
 
-    .sirk-device-input {
+    .sirk-device-input{
         width: min(520px, 100%);
     }
 }
 
 @media (max-width: 800px) {
     .sirk-device-summary,
-    .sirk-device-controls {
+.sirk-device-controls{
         align-items: stretch;
         flex-direction: column;
     }
 
     .sirk-device-summary span,
-    .sirk-device-input,
-    .sirk-device-select,
-    .sirk-device-refresh {
+.sirk-device-input,
+.sirk-device-select,
+.sirk-device-refresh{
         width: 100%;
         min-width: 0;
     }
 
-    .sirk-device-group {
+    .sirk-device-group{
         overflow-x: auto;
     }
 
-    .sirk-device-hero {
+    .sirk-device-hero{
         align-items: flex-start;
         flex-wrap: wrap;
     }
 
-    .sirk-device-hero .sirk-device-connection {
+    .sirk-device-hero .sirk-device-connection{
         width: 100%;
         margin-left: 63px;
     }
 }
 .sirk-device-icon .sirk-device-computer-svg,
-.sirk-device-hero-icon .sirk-device-computer-svg {
+.sirk-device-hero-icon .sirk-device-computer-svg{
     width: 24px;
     height: 24px;
     fill: none;
@@ -404,7 +404,7 @@
 }
 
 .sirk-device-icon .sirk-device-computer-screen,
-.sirk-device-hero-icon .sirk-device-computer-screen {
+.sirk-device-hero-icon .sirk-device-computer-screen{
     fill: currentColor;
     opacity: .12;
 }

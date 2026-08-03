@@ -15,16 +15,16 @@
         loading: false
     };
 
-    var providerOrder = ["moverequests", "mycommands", "myscripts"];
+    var providerOrder = ["move-requests", "commands", "management"];
     var providerTitles = {
-        moverequests: "Move Requests",
-        mycommands: "Commands",
-        myscripts: "My Scripts"
+        "move-requests": "Move Requests",
+        commands: "Commands",
+        management: "Management"
     };
     var providerIcons = {
-        moverequests: "swap",
-        mycommands: "terminal",
-        myscripts: "script"
+        "move-requests": "swap",
+        commands: "terminal",
+        management: "script"
     };
     var statuses = ["", "pending", "approved", "executing", "completed", "failed", "rejected"];
 
@@ -55,11 +55,11 @@
     }
 
     function api(asset, params) {
-        return core.api("approvalcenter", asset, {}, params || {});
+        return core.api("approvals", asset, {}, params || {});
     }
 
     function post(asset, value) {
-        return core.post("approvalcenter", asset, value || {});
+        return core.post("approvals", asset, value || {});
     }
 
     function titleForProvider(value) {

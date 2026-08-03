@@ -336,7 +336,7 @@
     }
 
     var module = window.SirkPlatformModuleShell.create({
-        key: "moverequests",
+        key: "move-requests",
         title: "Move Requests",
         menuTitle: "Move Requests",
         showInMenu: false,
@@ -354,8 +354,8 @@
         render: function (shell) {
             shell.nav(
                 shell.state.page.primary,
-                [{ key: "moverequests", title: "Move Requests", icon: "⇄" }],
-                "moverequests",
+                [{ key: "move-requests", title: "Move Requests", icon: "⇄" }],
+                "move-requests",
                 function () {}
             );
             window.SharedStatusNav.mount(shell.state.page.secondary, {
@@ -381,5 +381,5 @@
         scheduleHostButton();
     };
 
-    window.SirkPlatformModules.moverequests = module;
+    window.SirkPlatformModules["move-requests"] = module;
 }());

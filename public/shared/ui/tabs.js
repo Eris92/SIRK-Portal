@@ -3,8 +3,10 @@
     window.SharedTabs = {
         mount: function (options) {
             options = options || {};
-            var host = typeof options.container === "string" ? document.querySelector(options.container) : options.container;
-            var root = document.createElement("div"); root.className = "sirk-tabs";
+            var root = typeof options.container === "string" ? document.querySelector(options.container) : options.container;
+            if (!root) throw new Error("Tabs container not found.");
+            root.innerHTML = "";
+            root.className = "sirk-tabs-host";
             var state = { active: options.active || "" }, buttons = {};
             function select(key, notify) {
                 state.active = key;
@@ -13,12 +15,18 @@
             }
             (options.tabs || []).forEach(function (tab) {
                 if (tab.visible === false) return;
-                var item = document.createElement("button"); item.type = "button"; item.className = "btn btn-secondary btn-sm sirk-shared-tab"; item.textContent = tab.title || tab.key;
-                item.onclick = function () { select(tab.key, true); }; buttons[tab.key] = item; root.appendChild(item);
+                var item = document.createElement("button");
+                item.type = "button";
+                item.className = "sirk-shared-tab";
+                item.textContent = tab.title || tab.key;
+                item.onclick = function () { select(tab.key, true); };
+                buttons[tab.key] = item;
+                root.appendChild(item);
             });
-            host.appendChild(root);
+            root.hidden = Object.keys(buttons).length === 0;
             var api = { root: root, buttons: buttons, state: state, select: select, setVisible: function (key, value) { if (buttons[key]) buttons[key].hidden = value === false; } };
-            select(state.active || Object.keys(buttons)[0] || "", false); return api;
+            select(state.active || Object.keys(buttons)[0] || "", false);
+            return api;
         }
     };
 }());
