@@ -6,7 +6,7 @@ namespace Sirk.Portal.Ui;
 
 internal static class PortalUiEndpoints
 {
-    private const string AssetRevision = "test-blockers-management-settings-breakglass-20260803-1";
+    private const string AssetRevision = "group-bound-agent-installer-20260803-1";
     private static readonly IReadOnlyDictionary<string, string> Assets = BuildAssets();
 
     public static IEndpointRouteBuilder MapPortalUi(this IEndpointRouteBuilder endpoints)
@@ -50,6 +50,10 @@ internal static class PortalUiEndpoints
         html = html.Replace(
             "</head>",
             $"<link rel=\"stylesheet\" href=\"/assets/portal-management-frame.css?v={Uri.EscapeDataString(assetVersion)}\"></head>",
+            StringComparison.Ordinal);
+        html = html.Replace(
+            "</body>",
+            $"<script src=\"/assets/agent-installer-ui.js?v={Uri.EscapeDataString(assetVersion)}\"></script></body>",
             StringComparison.Ordinal);
         return Results.Content(html, "text/html; charset=utf-8", Encoding.UTF8);
     }
@@ -128,6 +132,7 @@ internal static class PortalUiEndpoints
             ["settings.css"] = "portal/settings.css",
             ["system-updates.css"] = "portal/system-updates.css",
             ["system-updates.js"] = "portal/system-updates.js",
+            ["agent-installer-ui.js"] = "portal/standalone/scripts/agent-installer-ui.js",
             ["portal-standalone-devices.css"] = "portal/standalone/styles/devices.css",
             ["portal-device-workspace.css"] = "portal/standalone/styles/device-workspace.css",
             ["portal-device-tabs.css"] = "portal/standalone/styles/device-tabs.css",
