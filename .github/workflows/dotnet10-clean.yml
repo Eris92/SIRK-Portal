@@ -43,6 +43,30 @@ jobs:
               raise SystemExit('Unsupported target framework reference: ' + ', '.join(failures))
           PY
 
+      - name: Native installer contract
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('install-dotnet10.ps1')
+          text = path.read_text(encoding='utf-8')
+          required = (
+              'New-SelfSignedCertificate',
+              "Cert:\\LocalMachine\\Root",
+              'New-Service',
+              'Kestrel',
+              'portal/standalone/index.html',
+              'portal/standalone/login.html',
+              'New-NetFirewallRule',
+          )
+          missing = [value for value in required if value not in text]
+          forbidden = ('Ensure Node.js', 'node.exe', 'npm.cmd', 'sc.exe create')
+          present = [value for value in forbidden if value in text]
+          if missing:
+              raise SystemExit('Installer contract is missing: ' + ', '.join(missing))
+          if present:
+              raise SystemExit('Legacy runtime found in native installer: ' + ', '.join(present))
+          PY
+
       - name: Restore
         run: dotnet restore tests/Sirk.Portal.ProtocolTests/Sirk.Portal.ProtocolTests.csproj
 
@@ -58,11 +82,33 @@ jobs:
       - name: Publish Linux x64
         run: dotnet publish src/Sirk.Portal/Sirk.Portal.csproj --configuration Release --runtime linux-x64 --self-contained false --output artifacts/linux-x64
 
+      - name: Published frontend contract
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          roots = [Path('artifacts/win-x64'), Path('artifacts/linux-x64')]
+          required = (
+              'public/portal/standalone/index.html',
+              'public/portal/standalone/login.html',
+              'public/portal/standalone/scripts/core.js',
+              'public/portal/standalone/scripts/app.js',
+              'public/portal/standalone/styles/base.css',
+              'public/portal/settings.js',
+              'public/shared/ui/shared-ui.css',
+          )
+          missing = [str(root / item) for root in roots for item in required if not (root / item).is_file()]
+          if missing:
+              raise SystemExit('Published frontend is incomplete: ' + ', '.join(missing))
+          PY
+
       - name: Live Central heartbeat smoke
         run: python3 .github/scripts/test-dotnet10-central-heartbeat.py artifacts/linux-x64/Sirk.Portal.dll
 
       - name: Native API end-to-end smoke
         run: python3 .github/scripts/test-dotnet10-native-api.py artifacts/linux-x64/Sirk.Portal.dll
+
+      - name: Complete native UI smoke
+        run: python3 .github/scripts/test-dotnet10-full-ui.py artifacts/linux-x64/Sirk.Portal.dll
 
       - name: Container build
         run: docker build --file Dockerfile.dotnet10 --tag sirk-portal:dotnet10-clean .
