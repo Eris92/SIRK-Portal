@@ -66,7 +66,9 @@ internal sealed class CentralTunnelService : BackgroundService
         _concurrency = new SemaphoreSlim(
             Math.Clamp(_options.MaximumConcurrency, 1, 32),
             Math.Clamp(_options.MaximumConcurrency, 1, 32));
-        _localOrigin = ValidateLocalOrigin(_options.LocalOrigin);
+        _localOrigin = _options.Enabled
+            ? ValidateLocalOrigin(_options.LocalOrigin)
+            : new Uri("http://127.0.0.1/", UriKind.Absolute);
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
