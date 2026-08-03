@@ -136,6 +136,24 @@ try {
 
     Invoke-Utf8Script -Path $installerPath -Parameters $parameters
 
+    $accessFile = Join-Path $DataRoot 'security\break-glass-access-code.txt'
+    if (-not (Test-Path -LiteralPath $accessFile -PathType Leaf)) {
+        throw "Brak wygenerowanego Access Code: $accessFile"
+    }
+    $accessCode = (Get-Content -LiteralPath $accessFile -Raw -Encoding ASCII).Trim()
+    if ($accessCode -notmatch '^[A-Za-z0-9_-]{32,256}$') {
+        throw 'Wygenerowany Access Code jest nieprawidłowy.'
+    }
+    $publicUrl = if ($HttpsPort -eq 443) {
+        "https://$effectiveFqdn"
+    } else {
+        "https://$effectiveFqdn`:$HttpsPort"
+    }
+    $accessUrl = "$publicUrl/login#access=$accessCode"
+
+    Write-Host ''
+    Write-Host "Access URL: $accessUrl" -ForegroundColor Yellow
+
     if (-not $SkipUpdater) {
         $updaterInstaller = Join-Path $sourceRoot.FullName 'tools\installer\Ensure-SirkUpdater.ps1'
         if (-not (Test-Path -LiteralPath $updaterInstaller)) {
@@ -157,22 +175,6 @@ try {
         throw "Nieprawidłowy stan SirkPortal: $($portal.Status) / $($portal.StartType)"
     }
 
-    $accessFile = Join-Path $DataRoot 'security\break-glass-access-code.txt'
-    if (-not (Test-Path -LiteralPath $accessFile -PathType Leaf)) {
-        throw "Brak wygenerowanego Access Code: $accessFile"
-    }
-    $accessCode = (Get-Content -LiteralPath $accessFile -Raw -Encoding ASCII).Trim()
-    if ($accessCode -notmatch '^[A-Za-z0-9_-]{32,256}$') {
-        throw 'Wygenerowany Access Code jest nieprawidłowy.'
-    }
-    $publicUrl = if ($HttpsPort -eq 443) {
-        "https://$effectiveFqdn"
-    } else {
-        "https://$effectiveFqdn`:$HttpsPort"
-    }
-    $accessUrl = "$publicUrl/login#access=$accessCode"
-
-    Write-Host "`nAccess URL: $accessUrl" -ForegroundColor Yellow
     Write-Host "Access URL zapisano również w: $accessFile" -ForegroundColor DarkYellow
     Write-Host 'SIRK_PORTAL_DOTNET10_INSTALL_OK' -ForegroundColor Green
     if (-not $NonInteractive) { Start-Process $accessUrl }
