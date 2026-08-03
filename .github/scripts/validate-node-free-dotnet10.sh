@@ -27,6 +27,13 @@ foreach ($path in @("install.ps1","install-dotnet10.ps1","tools/installer/Ensure
     $errors | ForEach-Object { Write-Error ("{0}: {1}" -f $path,$_.Message) }
     throw "PowerShell syntax validation failed: $path"
   }
+}
+$updater = Get-Content "tools/installer/Ensure-SirkUpdater.ps1" -Raw -Encoding UTF8
+if ($updater -match "Get-CimInstance\s+Win32_Service") {
+  throw "SIRK Updater integration must not depend on the Win32_Service CIM provider."
+}
+if ($updater -notmatch "Get-Service\s+-Name\s+\$PortalServiceName") {
+  throw "Sandbox-safe SirkPortal service detection is missing."
 }'
 
 dotnet restore tests/Sirk.Portal.ProtocolTests/Sirk.Portal.ProtocolTests.csproj
@@ -47,7 +54,7 @@ required = (
     'public/portal/standalone/scripts/app.js',
     'public/portal/standalone/scripts/settings-native-v2.js',
     'public/portal/standalone/styles/base.css',
-    'public/portal/standalone/styles/management-frame.css',
+    'public/portal/standalone/styles/module-shell.css',
     'public/portal/settings.js',
     'public/portal/subfolder-icons.js',
     'public/shared/ui/shared-ui.css',
@@ -71,15 +78,20 @@ bundled = [str(root / item) for root in roots for item in forbidden_runtime_file
 if bundled:
     raise SystemExit('Framework-dependent publish contains private runtime files: ' + ', '.join(bundled))
 
-shell_css = Path('public/portal/standalone/styles/management-frame.css').read_text(encoding='utf-8')
+index_html = Path('public/portal/standalone/index.html').read_text(encoding='utf-8')
+if 'portal-module-shell.css' not in index_html:
+    raise SystemExit('The loaded Portal shell stylesheet is missing from index.html.')
+
+shell_css = Path('public/portal/standalone/styles/module-shell.css').read_text(encoding='utf-8')
 for marker in (
     '[data-action="sidebar"] svg',
     '.sirk-standalone-nav button > span > svg',
     'stroke: currentColor !important',
     'visibility: visible !important',
+    'svg :is(path,rect,circle,line,polyline,polygon,ellipse)',
 ):
     if marker not in shell_css:
-        raise SystemExit('Sidebar icon rendering contract is missing: ' + marker)
+        raise SystemExit('Loaded sidebar icon rendering contract is missing: ' + marker)
 PY
 
 portal_dll='artifacts/linux-x64/Sirk.Portal.dll'
