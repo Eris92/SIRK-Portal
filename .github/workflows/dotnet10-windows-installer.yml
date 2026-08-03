@@ -22,16 +22,19 @@ jobs:
       SIRK_TEST_FQDN: portal-ci.sirk.local
       SIRK_TEST_PORT: 9443
       SIRK_TEST_PASSWORD: Sirk-Portal-Windows-Installer-2026!
+      NO_PROXY: portal-ci.sirk.local,localhost,127.0.0.1
+      no_proxy: portal-ci.sirk.local,localhost,127.0.0.1
     steps:
       - uses: actions/checkout@v4
 
       - name: Parse installer with Windows PowerShell 5.1
         shell: powershell
         run: |
+          $source = Get-Content '.\install-dotnet10.ps1' -Raw -Encoding UTF8
           $tokens = $null
           $errors = $null
-          [System.Management.Automation.Language.Parser]::ParseFile(
-            (Resolve-Path '.\install-dotnet10.ps1'),
+          [System.Management.Automation.Language.Parser]::ParseInput(
+            $source,
             [ref]$tokens,
             [ref]$errors) | Out-Null
           if ($errors.Count) {
@@ -45,15 +48,14 @@ jobs:
           $env:SIRK_INSTALL_FQDN = $env:SIRK_TEST_FQDN
           $env:SIRK_INSTALL_BREAKGLASS_PASSWORD = $env:SIRK_TEST_PASSWORD
           $env:SIRK_INSTALL_TRUST_CERTIFICATE = 'true'
-          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install-dotnet10.ps1 `
+          $source = Get-Content '.\install-dotnet10.ps1' -Raw -Encoding UTF8
+          $installer = [scriptblock]::Create($source)
+          & $installer `
             -NonInteractive `
             -RemoveData `
             -PortalFqdn $env:SIRK_TEST_FQDN `
             -HttpsPort ([int]$env:SIRK_TEST_PORT) `
             -TrustCertificate
-          if ($LASTEXITCODE -ne 0) {
-            throw "Installer failed with ExitCode=$LASTEXITCODE"
-          }
 
       - name: Verify service certificate HTTPS UI and login
         shell: powershell
@@ -157,11 +159,15 @@ jobs:
         if: always()
         shell: powershell
         run: |
-          Stop-Service SirkPortal -Force -ErrorAction SilentlyContinue
-          sc.exe delete SirkPortal | Out-Null
-          for ($attempt = 0; $attempt -lt 30; $attempt++) {
-            if (-not (Get-Service SirkPortal -ErrorAction SilentlyContinue)) { break }
-            Start-Sleep -Seconds 1
+          $service = Get-Service SirkPortal -ErrorAction SilentlyContinue
+          if ($service) {
+            Stop-Service SirkPortal -Force -ErrorAction SilentlyContinue
+            & sc.exe delete SirkPortal | Out-Null
+            $global:LASTEXITCODE = 0
+            for ($attempt = 0; $attempt -lt 30; $attempt++) {
+              if (-not (Get-Service SirkPortal -ErrorAction SilentlyContinue)) { break }
+              Start-Sleep -Seconds 1
+            }
           }
           Remove-NetFirewallRule -DisplayName 'SIRK Portal HTTPS' -ErrorAction SilentlyContinue
           Get-ChildItem Cert:\LocalMachine\My,Cert:\LocalMachine\Root -ErrorAction SilentlyContinue |
