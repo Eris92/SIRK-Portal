@@ -6,7 +6,7 @@ namespace Sirk.Portal.Ui;
 
 internal static class PortalUiEndpoints
 {
-    private const string AssetRevision = "admin-settings-central-groups-icons-20260803-2";
+    private const string AssetRevision = "test-blockers-management-settings-breakglass-20260803-1";
     private static readonly IReadOnlyDictionary<string, string> Assets = BuildAssets();
 
     public static IEndpointRouteBuilder MapPortalUi(this IEndpointRouteBuilder endpoints)
@@ -16,6 +16,12 @@ internal static class PortalUiEndpoints
         endpoints.MapGet("/login", LoginAsync).AllowAnonymous();
         endpoints.MapGet("/assets/{**asset}", AssetAsync).AllowAnonymous();
         endpoints.MapGet("/auth/logout", (Delegate)LogoutAsync).AllowAnonymous();
+        endpoints.MapGet("/maintenance.json", () => Results.Json(new
+        {
+            enabled = false,
+            native = true,
+            api = "/api/v1/admin/maintenance/status"
+        })).AllowAnonymous();
         return endpoints;
     }
 
@@ -120,6 +126,8 @@ internal static class PortalUiEndpoints
             ["portal-standalone.css"] = "portal/standalone/styles/base.css",
             ["portal.css"] = "portal/portal.css",
             ["settings.css"] = "portal/settings.css",
+            ["system-updates.css"] = "portal/system-updates.css",
+            ["system-updates.js"] = "portal/system-updates.js",
             ["portal-standalone-devices.css"] = "portal/standalone/styles/devices.css",
             ["portal-device-workspace.css"] = "portal/standalone/styles/device-workspace.css",
             ["portal-device-tabs.css"] = "portal/standalone/styles/device-tabs.css",

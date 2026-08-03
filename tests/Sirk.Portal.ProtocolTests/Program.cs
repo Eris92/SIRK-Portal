@@ -6,6 +6,8 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Sirk.Portal.Central;
+using Sirk.Portal.Automation;
+using Microsoft.Extensions.Configuration;
 
 const string portalId = "portal-test";
 const string portalToken = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
@@ -145,7 +147,37 @@ finally
     Directory.Delete(configurationRoot, recursive: true);
 }
 
-Console.WriteLine("SIRK Portal signed heartbeat and protected config contracts: OK");
+
+var scriptsRoot = Path.Combine(Path.GetTempPath(), $"sirk-portal-script-files-{Guid.NewGuid():N}");
+try
+{
+    var managementRoot = Path.Combine(scriptsRoot, "Files", "management", "Examples");
+    Directory.CreateDirectory(managementRoot);
+    File.WriteAllText(
+        Path.Combine(managementRoot, "Filesystem test.ps1"),
+        "#PL Test z dysku | Skrypt wykryty bez scripts.json.\n# VariableRequiredPL: $Message, Wiadomość | Test\n$Message",
+        new UTF8Encoding(false));
+    var configuration = new ConfigurationBuilder()
+        .AddInMemoryCollection(new Dictionary<string, string?> { ["Sirk:DataRoot"] = scriptsRoot })
+        .Build();
+    var paths = new Sirk.Portal.Infrastructure.PortalPaths(configuration);
+    var scriptStore = new ScriptStore(paths);
+    var discovered = scriptStore.Get("management", "Examples/Filesystem test.ps1");
+    Assert(discovered is not null, "Management must discover PowerShell files from Files/management.");
+    Assert(discovered!.Label == "Test z dysku", "Localized filesystem script label was not parsed.");
+    Assert(discovered.Variables.Count == 1 && discovered.Variables[0].Name == "Message",
+        "Filesystem script variables were not parsed.");
+    var treeJson = JsonSerializer.Serialize(scriptStore.Tree("management"));
+    Assert(treeJson.Contains("Examples", StringComparison.Ordinal) &&
+           treeJson.Contains("Filesystem test.ps1", StringComparison.Ordinal),
+        "Management tree does not contain the filesystem directory/script.");
+}
+finally
+{
+    if (Directory.Exists(scriptsRoot)) Directory.Delete(scriptsRoot, recursive: true);
+}
+
+Console.WriteLine("SIRK Portal signed heartbeat, protected config and filesystem script contracts: OK");
 
 static byte[] Base64UrlDecode(string value)
 {

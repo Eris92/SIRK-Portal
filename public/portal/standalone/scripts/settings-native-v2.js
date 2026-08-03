@@ -11,6 +11,7 @@
         central: null,
         computerGroups: null,
         issuedEnrollment: null,
+        issuedAccessCode: null,
         csrf: "",
         host: null,
         page: null
@@ -197,6 +198,7 @@
             return { key: key, label: key };
         });
         if (state.tab === "identity") return [
+            { key: "break-glass", label: "Break-Glass" },
             { key: "users", label: "Użytkownicy lokalni" },
             { key: "groups", label: "Grupy dostępu" },
             { key: "computer-groups", label: "Grupy komputerów" }
@@ -218,6 +220,9 @@
     }
 
     function renderNavigation() {
+        state.page.toolbar.querySelectorAll("[data-settings-toolbar-tab]").forEach(function (node) {
+            node.classList.toggle("is-active", node.getAttribute("data-settings-toolbar-tab") === state.tab);
+        });
         clear(state.page.primary);
         tabDefinitions().forEach(function (item) {
             state.page.primary.appendChild(navButton(item.label, item.key === state.tab, function () {
@@ -345,6 +350,72 @@
             select.appendChild(option);
         });
         return select;
+    }
+
+
+    function renderBreakGlass(host) {
+        var account = (state.identity.users || []).find(function (user) { return user.role === "Break-Glass"; });
+        var node = card("Break-Glass", "Awaryjne logowanie lokalne jest dostępne wyłącznie przez prawidłowy Access URL. Kod nie jest przechowywany w postaci możliwej do odczytania.");
+        var status = el("div", "sirk-status-grid");
+        status.appendChild(el("span", "", "Konto: " + (account ? (account.userName + " · " + (account.enabled ? "aktywne" : "wyłączone")) : "brak")));
+        status.appendChild(el("span", "", "Ścieżka logowania: /login#access=..."));
+        status.appendChild(el("span", "", "Rotacja Access Code natychmiast unieważnia poprzedni adres."));
+        node.appendChild(status);
+
+        if (state.issuedAccessCode) {
+            var issued = el("section", "sirk-card sirk-one-time-token");
+            issued.appendChild(el("strong", "", "Nowy Access Code — wyświetlany tylko teraz"));
+            issued.appendChild(el("code", "", state.issuedAccessCode));
+            var accessUrl = location.origin + "/login#access=" + state.issuedAccessCode;
+            issued.appendChild(el("code", "", accessUrl));
+            var issuedActions = actionRow();
+            issuedActions.appendChild(button("Kopiuj Access URL", function () { copyText(accessUrl); }));
+            issuedActions.appendChild(button("Ukryj", function () { state.issuedAccessCode = null; renderAll(); }));
+            issued.appendChild(issuedActions);
+            node.appendChild(issued);
+        }
+
+        var passwordCard = el("section", "sirk-card");
+        passwordCard.appendChild(el("h3", "", "Zmień hasło Break-Glass"));
+        passwordCard.appendChild(el("p", "sirk-muted", "Po zmianie hasła bieżąca sesja zostanie zakończona."));
+        var current = field("Aktualne hasło", "", "password");
+        var next = field("Nowe hasło", "", "password");
+        var confirm = field("Powtórz nowe hasło", "", "password");
+        [current, next, confirm].forEach(function (item) { passwordCard.appendChild(item.wrapper); });
+        var passwordActions = actionRow();
+        passwordActions.appendChild(button("Zmień hasło", function () {
+            if (next.input.value.length < 14) { showError(new Error("Nowe hasło musi mieć minimum 14 znaków.")); return; }
+            if (next.input.value !== confirm.input.value) { showError(new Error("Nowe hasła nie są identyczne.")); return; }
+            api("/api/v1/auth/password", "POST", {
+                currentPassword: current.input.value,
+                newPassword: next.input.value
+            }).then(function () {
+                window.alert("Hasło zostało zmienione. Zaloguj się ponownie.");
+                location.replace("/login");
+            }).catch(showError);
+        }));
+        passwordCard.appendChild(passwordActions);
+        node.appendChild(passwordCard);
+
+        var rotateCard = el("section", "sirk-card");
+        rotateCard.appendChild(el("h3", "", "Rotuj Access Code"));
+        rotateCard.appendChild(el("p", "sirk-muted", "Nowy kod zostanie pokazany tylko raz. Zapisz pełny Access URL w bezpiecznym miejscu."));
+        var rotatePassword = field("Aktualne hasło", "", "password");
+        rotateCard.appendChild(rotatePassword.wrapper);
+        var rotateActions = actionRow();
+        rotateActions.appendChild(button("Wygeneruj nowy Access Code", function () {
+            if (!window.confirm("Unieważnić obecny Access Code i wygenerować nowy?")) return;
+            api("/api/v1/auth/break-glass/access-code/rotate", "POST", {
+                currentPassword: rotatePassword.input.value
+            }).then(function (result) {
+                state.issuedAccessCode = String(result.accessCode || "");
+                if (!state.issuedAccessCode) throw new Error("Portal nie zwrócił nowego Access Code.");
+                renderAll();
+            }).catch(showError);
+        }, true));
+        rotateCard.appendChild(rotateActions);
+        node.appendChild(rotateCard);
+        host.appendChild(node);
     }
 
     function renderUsers(host) {
@@ -702,7 +773,8 @@
         } else if (state.tab === "modules") {
             renderModule(state.page.details, state.section);
         } else if (state.tab === "identity") {
-            if (state.section === "groups") renderGroups(state.page.details);
+            if (state.section === "break-glass") renderBreakGlass(state.page.details);
+            else if (state.section === "groups") renderGroups(state.page.details);
             else if (state.section === "computer-groups") renderComputerGroups(state.page.details);
             else renderUsers(state.page.details);
         } else if (state.section === "updates") {
@@ -730,6 +802,12 @@
         var toolbar = el("div", "sirk-toolbar-host");
         var left = el("div", "sirk-group sirk-left");
         left.appendChild(el("strong", "", "Ustawienia"));
+        tabDefinitions().forEach(function (item) {
+            var tab = button(item.label, function () { state.tab = item.key; state.section = ""; renderAll(); });
+            tab.classList.add("sirk-settings-toolbar-tab");
+            tab.setAttribute("data-settings-toolbar-tab", item.key);
+            left.appendChild(tab);
+        });
         var right = el("div", "sirk-group sirk-right");
         right.appendChild(button("Odśwież", function () {
             state.page.details.innerHTML = "";
