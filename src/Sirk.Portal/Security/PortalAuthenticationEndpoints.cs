@@ -1,4 +1,7 @@
 using System.Security.Claims;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Options;
@@ -18,11 +21,19 @@ internal sealed record PortalAccessRotateRequest(string CurrentPassword);
 
 internal static class PortalAuthenticationEndpoints
 {
+    private static readonly JsonSerializerOptions IdentityJsonOptions = new(JsonSerializerDefaults.Web)
+    {
+        PropertyNameCaseInsensitive = true
+    };
+
     public static IEndpointRouteBuilder MapPortalAuthentication(
         this IEndpointRouteBuilder endpoints)
     {
         var auth = endpoints.MapGroup("/api/v1/auth");
 
+        auth.MapGet("/local-access", ValidateLocalAccessAsync)
+            .AllowAnonymous()
+            .RequireRateLimiting(PortalEndpointNames.LoginRateLimit);
         auth.MapPost("/login", LoginAsync)
             .AllowAnonymous()
             .DisableAntiforgery()
@@ -49,10 +60,29 @@ internal static class PortalAuthenticationEndpoints
         return endpoints;
     }
 
+    private static async Task<IResult> ValidateLocalAccessAsync(
+        HttpContext context,
+        PortalPaths paths)
+    {
+        NoStore(context);
+        var accessCode = BearerCredential(context);
+        if (!await VerifyLocalAccessCodeAsync(
+                paths.IdentityFile,
+                accessCode,
+                context.RequestAborted))
+        {
+            await ApplyFailureDelayAsync(context.RequestAborted);
+            return Error(404, "NOT_FOUND", "Not found.");
+        }
+
+        return Results.Ok(new { ok = true });
+    }
+
     private static async Task<IResult> LoginAsync(
         PortalLoginRequest request,
         HttpContext context,
         PortalIdentityStore identities,
+        PortalPaths paths,
         PortalAuditLog audit,
         IOptions<PortalSecurityOptions> options)
     {
@@ -62,10 +92,20 @@ internal static class PortalAuthenticationEndpoints
         if (!identities.IsInitialized)
             return Error(503, "PORTAL_NOT_INITIALIZED", "Portal identity is not initialized.");
 
+        var accessCode = BearerCredential(context);
+        if (!await VerifyLocalAccessCodeAsync(
+                paths.IdentityFile,
+                accessCode,
+                context.RequestAborted))
+        {
+            await ApplyFailureDelayAsync(context.RequestAborted);
+            return Error(404, "NOT_FOUND", "Not found.");
+        }
+
         var identity = identities.Authenticate(
             request.UserName,
             request.Password,
-            request.AccessCode);
+            accessCode);
         if (identity is null)
         {
             audit.Write(new PortalAuditEvent(
@@ -319,6 +359,63 @@ internal static class PortalAuthenticationEndpoints
     {
         context.Response.Headers.CacheControl = "no-store";
         context.Response.Headers.Pragma = "no-cache";
+    }
+
+    private static string BearerCredential(HttpContext context)
+    {
+        const string prefix = "Bearer ";
+        var authorization = context.Request.Headers.Authorization.ToString();
+        if (!authorization.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            return string.Empty;
+
+        var value = authorization[prefix.Length..].Trim();
+        return value.Length is >= 32 and <= 256 &&
+               value.All(character =>
+                   char.IsAsciiLetterOrDigit(character) || character is '-' or '_')
+            ? value
+            : string.Empty;
+    }
+
+    private static async Task<bool> VerifyLocalAccessCodeAsync(
+        string identityFile,
+        string accessCode,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrEmpty(accessCode) || !File.Exists(identityFile))
+            return false;
+
+        byte[]? expected = null;
+        byte[]? actual = null;
+        try
+        {
+            var json = await File.ReadAllTextAsync(
+                identityFile,
+                Encoding.UTF8,
+                cancellationToken);
+            var document = JsonSerializer.Deserialize<PortalIdentityDocument>(
+                json,
+                IdentityJsonOptions);
+            if (document is null || string.IsNullOrWhiteSpace(document.AccessCodeHashBase64))
+                return false;
+
+            expected = Convert.FromBase64String(document.AccessCodeHashBase64);
+            actual = SHA256.HashData(Encoding.UTF8.GetBytes(accessCode));
+            return expected.Length == actual.Length &&
+                   CryptographicOperations.FixedTimeEquals(expected, actual);
+        }
+        catch (Exception exception) when (
+            exception is IOException or
+            UnauthorizedAccessException or
+            JsonException or
+            FormatException)
+        {
+            return false;
+        }
+        finally
+        {
+            if (actual is not null) CryptographicOperations.ZeroMemory(actual);
+            if (expected is not null) CryptographicOperations.ZeroMemory(expected);
+        }
     }
 
     private static string NormalizeAuditName(string? value)
