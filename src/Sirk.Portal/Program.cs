@@ -265,6 +265,7 @@ app.Use(async (context, next) =>
 });
 
 app.UseRateLimiter();
+app.UseMiddleware<AgentInstallerTicketMiddleware>();
 app.UseWebSockets(new WebSocketOptions
 {
     KeepAliveInterval = TimeSpan.FromSeconds(20)
@@ -314,6 +315,7 @@ app.MapPortalIdentity();
 app.MapAgentEndpoints();
 app.MapLegacyAgentCompatibility();
 app.MapAgentInstallScript();
+app.MapAgentInstallerPackages();
 app.MapPortalModules();
 app.MapPortalAdministration();
 app.MapPortalMaintenance();
