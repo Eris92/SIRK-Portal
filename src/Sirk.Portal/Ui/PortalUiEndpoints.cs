@@ -10,6 +10,7 @@ internal static class PortalUiEndpoints
 
     public static IEndpointRouteBuilder MapPortalUi(this IEndpointRouteBuilder endpoints)
     {
+        endpoints.MapPortalUiCompatibility();
         endpoints.MapGet("/", PortalAsync).AllowAnonymous();
         endpoints.MapGet("/login", LoginAsync).AllowAnonymous();
         endpoints.MapGet("/assets/{**asset}", AssetAsync).AllowAnonymous();
