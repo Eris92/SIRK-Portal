@@ -1,0 +1,86 @@
+name: Apply canonical module and shell refactor
+
+on:
+  push:
+    branches:
+      - fix/unified-view-shell-management-settings
+  pull_request:
+    branches:
+      - main
+    types: [opened, reopened, synchronize]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apply-canonical-module-shell-refactor
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    if: ${{ !contains(github.event.head_commit.message, 'Apply canonical module and shell refactor') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/unified-view-shell-management-settings
+          fetch-depth: 0
+
+      - name: Verify payload and apply refactor
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          cat > /tmp/chunks.sha256 <<'EOF'
+          3aba91652aa77b6dfca969ae8bbeb3cd388ab9269902c066889ef5ecc5e424c7  .github/refactor-patch/00
+          91d574607ed40bb4db26442e387066919751d7bc2c525874f46119f53a39dee4  .github/refactor-patch/01
+          347a380c1b6f25a14ecad7b5f53dfaed8e06a21d9eb94534c6a18eaa5fff9fef  .github/refactor-patch/02
+          a8d785b4a876d851e25e9153c62049d48559eab38b31813bafab13a8b5e19636  .github/refactor-patch/03
+          dbb87fc18dc4b69c46ca321e8d03eebefc8e28e00edf714e4658276b211e7640  .github/refactor-patch/04
+          9f950cfa7128f29beaeae434226d00320b879e0e3b92fc73ca4d247ea3506ebc  .github/refactor-patch/05
+          900c4eade8ee71eaf8ce6dadaccfd61d40c526d9b06aad075b2677e7aabdbc39  .github/refactor-patch/06
+          e7ab6b13661cb1ace9a51b8f4f35b51582f9bfbb53d29a59ca6cce47e57f390c  .github/refactor-patch/07
+          7a94ca55dfac6ca956592e9c25119a005b16987516b6e8171e650ba730a7b077  .github/refactor-patch/08
+          EOF
+          sha256sum -c /tmp/chunks.sha256
+
+          cat .github/refactor-patch/{00,01,02,03,04,05,06,07,08} > /tmp/refactor.b64
+          echo '31560d45fbf549ca1cd44e8b4cab020328aa074fe8ef9a1471d5be374e8e41ec  /tmp/refactor.b64' | sha256sum -c -
+          base64 --decode /tmp/refactor.b64 | gzip --decompress > /tmp/refactor.patch
+          echo 'c54f9ba1fb147baf642d5b5e2c8af43ac92f566324f3440f708c0af66001e6af  /tmp/refactor.patch' | sha256sum -c -
+
+          git apply --index /tmp/refactor.patch
+          rm -rf .github/refactor-patch
+          rm -f .github/workflows/apply-canonical-refactor.yml
+          git add -A
+
+          git diff --cached --check
+          find public -type f -name '*.js' -print0 | xargs -0 -n1 node --check
+          bash -n .github/scripts/validate-node-free-dotnet10.sh
+
+          if grep -RInE --exclude-dir=.git --exclude='*.patch' \
+            'myscripts|mycommands|approvalcenter|moverequests|myjira|defendertools' \
+            src public tests seed .github/scripts; then
+            echo 'Historical module identifiers remain in active code.' >&2
+            exit 1
+          fi
+
+          if grep -RInE --exclude-dir=.git \
+            'sirk-standalone-view-scroll|sirk-toolbar sirk-toolbar-host|sirk-layout sirk-layout-host|sirk-tabs sirk-tabs-host' \
+            src public tests .github/scripts; then
+            echo 'Legacy or duplicated shell classes remain in active code.' >&2
+            exit 1
+          fi
+
+          grep -Fq 'FilesDirectory' src/Sirk.Portal/Infrastructure/PortalPaths.cs
+          grep -Fq 'CommandsDirectory' src/Sirk.Portal/Infrastructure/PortalPaths.cs
+          grep -Fq 'ManagementDirectory' src/Sirk.Portal/Infrastructure/PortalPaths.cs
+          grep -Fq 'sirk-toolbar-host' public/shared/ui/toolbar.js
+          grep -Fq 'sirk-layout-host' public/shared/ui/layout.js
+          grep -Fq 'sirk-view-shell' public/shared/ui/page.js
+
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'Apply canonical module and shell refactor'
+          git push origin HEAD:fix/unified-view-shell-management-settings
