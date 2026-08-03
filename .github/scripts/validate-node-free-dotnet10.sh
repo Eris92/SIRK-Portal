@@ -149,7 +149,7 @@ if 'api("scripts")' in management or 'post("refresh")' in management:
     raise SystemExit('Management still calls a removed module action.')
 
 settings_ui = Path('public/portal/standalone/scripts/settings-native-v2.js').read_text(encoding='utf-8')
-for marker in ('sirk-column-primary', 'sirk-column-secondary', 'sirk-column-details', 'data-portal-settings-native", "3'):
+for marker in ('sirk-column-primary', 'sirk-column-secondary', 'sirk-column-details', 'data-portal-settings-native", "3', 'renderBreakGlass', 'break-glass/access-code/rotate', 'data-settings-toolbar-tab'):
     if marker not in settings_ui:
         raise SystemExit('Native Settings three-column contract is missing: ' + marker)
 
@@ -157,6 +157,22 @@ agent_installer = Path('src/Sirk.Portal/Agent/AgentInstallScriptEndpoint.cs').re
 for marker in ('SIRK-Agent-Setup.exe.sha256', 'Get-FileHash', "'$GroupId + '.' + $EnrollmentToken'"):
     if marker.replace("'", "") not in agent_installer.replace("'", ""):
         raise SystemExit('Verified Agent install script contract is missing: ' + marker)
+
+index_html = Path('public/portal/standalone/index.html').read_text(encoding='utf-8')
+if '/portal/vendor/sirk-portal.css' in index_html or '/vendor/sirk-portal/sirk-portal.css' not in index_html:
+    raise SystemExit('Canonical vendor stylesheet URL is invalid.')
+portal_ui = Path('src/Sirk.Portal/Ui/PortalUiEndpoints.cs').read_text(encoding='utf-8')
+for marker in ('system-updates.css', 'system-updates.js', '/maintenance.json'):
+    if marker not in portal_ui:
+        raise SystemExit('Native UI asset/maintenance bridge is missing: ' + marker)
+script_store = Path('src/Sirk.Portal/Automation/ScriptStore.cs').read_text(encoding='utf-8')
+filesystem_store = Path('src/Sirk.Portal/Automation/FileSystemScriptLibrary.cs').read_text(encoding='utf-8')
+for marker in ('FileSystemScriptLibrary.Scan', 'FileSystemScriptLibrary.Write', 'FileSystemScriptLibrary.Delete'):
+    if marker not in script_store:
+        raise SystemExit('Filesystem script synchronization is missing: ' + marker)
+for marker in ('VariableRequired', 'Files', 'ScriptStore.HashDefinition'):
+    if marker not in filesystem_store:
+        raise SystemExit('Filesystem script parser contract is missing: ' + marker)
 PY
 
 portal_dll='artifacts/linux-x64/Sirk.Portal.dll'

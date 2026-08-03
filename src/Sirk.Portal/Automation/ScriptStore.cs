@@ -78,11 +78,18 @@ internal sealed class ScriptStore
         {
             [ScriptLibraries.Commands] = Load(
                 ScriptLibraries.Commands,
+                paths.CommandsDirectory,
                 Path.Combine(paths.CommandsDirectory, "scripts.json")),
             [ScriptLibraries.Management] = Load(
                 ScriptLibraries.Management,
+                paths.ManagementDirectory,
                 Path.Combine(paths.ManagementDirectory, "scripts.json"))
         };
+        foreach (var state in _libraries.Values)
+        {
+            FileSystemScriptLibrary.EnsureFiles(state.Root, state.Document.Scripts);
+            Synchronize(state);
+        }
     }
 
     public ScriptDefinition Save(string library, ScriptSaveRequest request)
@@ -131,6 +138,7 @@ internal sealed class ScriptStore
             else scripts.Add(value);
             if (scripts.Count > MaximumScripts)
                 throw new InvalidOperationException("Maximum script count was reached.");
+            FileSystemScriptLibrary.Write(state.Root, value);
             Save(state, new ScriptDocument(SchemaVersion, scripts, now));
             return value;
         }
@@ -142,8 +150,10 @@ internal sealed class ScriptStore
         var normalized = NormalizePath(path);
         lock (_sync)
         {
+            Synchronize(state);
             if (!state.Document.Scripts.Any(value => value.Path == normalized))
                 throw new KeyNotFoundException("Script was not found.");
+            FileSystemScriptLibrary.Delete(state.Root, normalized);
             Save(state, new ScriptDocument(
                 SchemaVersion,
                 state.Document.Scripts.Where(value => value.Path != normalized).ToArray(),
@@ -157,6 +167,7 @@ internal sealed class ScriptStore
         var normalized = NormalizePath(path);
         lock (_sync)
         {
+            Synchronize(state);
             return state.Document.Scripts.FirstOrDefault(value => value.Path == normalized);
         }
     }
@@ -166,6 +177,7 @@ internal sealed class ScriptStore
         var state = Library(library);
         lock (_sync)
         {
+            Synchronize(state);
             return state.Document.Scripts
                 .OrderBy(value => value.Path, StringComparer.OrdinalIgnoreCase)
                 .ToArray();
@@ -178,6 +190,7 @@ internal sealed class ScriptStore
         var state = Library(key);
         lock (_sync)
         {
+            Synchronize(state);
             var root = new TreeDirectory(string.Empty, string.Empty);
             foreach (var script in state.Document.Scripts.OrderBy(value => value.Path, StringComparer.OrdinalIgnoreCase))
             {
@@ -203,13 +216,26 @@ internal sealed class ScriptStore
         return _libraries[key];
     }
 
-    private static LibraryState Load(string key, string path)
+    private static LibraryState Load(string key, string root, string path)
     {
+        Directory.CreateDirectory(root);
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         var document = File.Exists(path)
             ? Validate(AtomicJsonFile.Read<ScriptDocument>(path))
             : new ScriptDocument(SchemaVersion, [], DateTimeOffset.UtcNow);
-        return new LibraryState(key, path, document);
+        return new LibraryState(key, root, path, document);
+    }
+
+    private static void Synchronize(LibraryState state)
+    {
+        var scanned = FileSystemScriptLibrary.Scan(state.Root);
+        var current = state.Document.Scripts;
+        var unchanged = current.Count == scanned.Count && current
+            .OrderBy(value => value.Path, StringComparer.Ordinal)
+            .Zip(scanned.OrderBy(value => value.Path, StringComparer.Ordinal))
+            .All(pair => pair.First.Path == pair.Second.Path && pair.First.Hash == pair.Second.Hash);
+        if (!unchanged)
+            Save(state, new ScriptDocument(SchemaVersion, scanned, DateTimeOffset.UtcNow));
     }
 
     public static IReadOnlyDictionary<string, string> ValidateValues(
@@ -341,7 +367,7 @@ internal sealed class ScriptStore
         return normalized;
     }
 
-    private static string HashDefinition(
+    internal static string HashDefinition(
         string path,
         string shell,
         string body,
@@ -379,9 +405,10 @@ internal sealed class ScriptStore
                 .ToArray()
         };
 
-    private sealed class LibraryState(string key, string path, ScriptDocument document)
+    private sealed class LibraryState(string key, string root, string path, ScriptDocument document)
     {
         public string Key { get; } = key;
+        public string Root { get; } = root;
         public string Path { get; } = path;
         public ScriptDocument Document { get; set; } = document;
     }
