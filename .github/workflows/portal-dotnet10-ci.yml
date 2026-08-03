@@ -31,25 +31,20 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          helper='.github/workflows/apply-admin-settings-central-groups-icons.yml'
-          if [[ ! -f "$helper" ]]; then
+          backend='.github/scripts/apply-admin-backend.py'
+          frontend='.github/scripts/apply-admin-frontend.py'
+          tests='.github/scripts/apply-admin-tests.py'
+          if [[ ! -f "$backend" || ! -f "$frontend" || ! -f "$tests" ]]; then
             echo 'applied=false' >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
-          python3 - <<'PY'
-          from pathlib import Path
-          source = Path('.github/workflows/apply-admin-settings-central-groups-icons.yml').read_text(encoding='utf-8')
-          start_marker = "          python3 - <<'PY'\n"
-          end_marker = "\n          PY\n\n          git diff --check"
-          start = source.index(start_marker) + len(start_marker)
-          end = source.index(end_marker, start)
-          lines = source[start:end].splitlines()
-          script = '\n'.join(line[10:] if line.startswith('          ') else line for line in lines) + '\n'
-          Path('/tmp/apply-admin-settings.py').write_text(script, encoding='utf-8')
-          PY
+          python3 "$backend"
+          python3 "$frontend"
+          python3 "$tests"
 
-          python3 /tmp/apply-admin-settings.py
+          rm -f "$backend" "$frontend" "$tests"
+          rm -f .github/workflows/apply-admin-settings-central-groups-icons.yml
           rm -f .github/workflows/run-admin-settings-applicator.yml
           git checkout origin/main -- .github/workflows/portal-dotnet10-ci.yml
 
