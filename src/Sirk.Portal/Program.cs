@@ -106,7 +106,9 @@ builder.Services.AddAuthentication(options =>
     {
         OnRedirectToLogin = context =>
         {
-            context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+            context.Response.StatusCode = context.Request.Path.Equals("/api/bootstrap")
+                ? StatusCodes.Status404NotFound
+                : StatusCodes.Status401Unauthorized;
             return Task.CompletedTask;
         },
         OnRedirectToAccessDenied = context =>
