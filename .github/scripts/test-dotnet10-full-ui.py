@@ -10,6 +10,7 @@ import tempfile
 import time
 import urllib.error
 import urllib.request
+import zipfile
 from pathlib import Path
 
 BASE_URL = "http://127.0.0.1:18083"
@@ -31,9 +32,11 @@ class Browser:
         payload: object | None = None,
         expected: int = 200,
         accept: str = "application/json",
+        extra_headers: dict[str, str] | None = None,
     ) -> tuple[bytes, dict[str, str]]:
         body = None
         headers = {"Accept": accept}
+        headers.update(extra_headers or {})
         if payload is not None:
             body = json.dumps(payload, separators=(",", ":")).encode("utf-8")
             headers["Content-Type"] = "application/json; charset=utf-8"
@@ -59,8 +62,21 @@ class Browser:
             )
         return raw, response_headers
 
-    def json(self, method: str, path: str, payload: object | None = None, expected: int = 200) -> dict:
-        raw, _ = self.request(method, path, payload, expected)
+    def json(
+        self,
+        method: str,
+        path: str,
+        payload: object | None = None,
+        expected: int = 200,
+        extra_headers: dict[str, str] | None = None,
+    ) -> dict:
+        raw, _ = self.request(
+            method,
+            path,
+            payload,
+            expected,
+            extra_headers=extra_headers,
+        )
         return json.loads(raw.decode("utf-8")) if raw else {}
 
 
@@ -136,8 +152,10 @@ def main() -> int:
                 "/assets/shared-ui/shared-ui.css": "text/css",
                 "/assets/icons/sirk-ui.svg": "image/svg+xml",
             }
+            asset_values: dict[str, bytes] = {}
             for path, expected_type in critical_assets.items():
                 raw, headers = browser.request("GET", path, accept="*/*")
+                asset_values[path] = raw
                 if not raw:
                     raise RuntimeError(f"Frontend asset is empty: {path}")
                 if expected_type not in headers.get("content-type", ""):
@@ -145,6 +163,13 @@ def main() -> int:
                         f"Frontend asset has invalid content type: {path}: "
                         f"{headers.get('content-type', '')}"
                     )
+
+            native_settings = asset_values["/assets/settings.js"].decode("utf-8")
+            require(native_settings, "data-portal-settings-native", "Native settings UI")
+            require(native_settings, "/api/v1/admin/maintenance/status", "Native settings UI")
+            require(native_settings, '"BreakGlass"', "Native settings RBAC")
+            if "/api/admin/settings" in native_settings or "plugin-operation" in native_settings:
+                raise RuntimeError("Legacy settings API is still exposed by the active settings asset.")
 
             browser.request("GET", "/", expected=200, accept="text/html")
             login_result = browser.json(
@@ -193,16 +218,84 @@ def main() -> int:
             if "pendingApprovals" not in overview or "integrations" not in overview:
                 raise RuntimeError("Portal overview adapter returned an invalid payload.")
 
-            settings = browser.json("GET", "/api/admin/settings")
+            settings = browser.json("GET", "/api/v1/admin/settings")
             snapshot = settings.get("value", {})
-            if not snapshot.get("modules") or "moduleSettings" not in snapshot:
-                raise RuntimeError("Settings adapter returned an incomplete snapshot.")
+            if not snapshot.get("modules") or not snapshot.get("identity"):
+                raise RuntimeError("Native settings API returned an incomplete snapshot.")
 
-            updates = browser.json("GET", "/api/system/updates/status")
-            if updates.get("value", {}).get("current", {}).get("version") is None:
-                raise RuntimeError("System update status adapter is incomplete.")
+            identity = browser.json("GET", "/api/v1/admin/identity/")
+            if identity.get("value", {}).get("users", [])[0].get("role") != "BreakGlass":
+                raise RuntimeError("Native identity API returned an invalid Break-Glass role.")
 
-            print("SIRK Portal complete native UI smoke: OK")
+            csrf_value = browser.json("GET", "/api/v1/auth/csrf").get("requestToken")
+            if not csrf_value:
+                raise RuntimeError("Native CSRF endpoint did not return a request token.")
+            csrf_headers = {"X-SIRK-CSRF": str(csrf_value)}
+
+            maintenance = browser.json("GET", "/api/v1/admin/maintenance/status").get("value", {})
+            if maintenance.get("current", {}).get("version") is None:
+                raise RuntimeError("Native maintenance status is incomplete.")
+            if maintenance.get("capabilities", {}).get("backup") is not True:
+                raise RuntimeError("Native maintenance backup capability is unavailable.")
+
+            checked = browser.json(
+                "POST",
+                "/api/v1/admin/maintenance/check",
+                {},
+                extra_headers=csrf_headers,
+            ).get("value", {})
+            if not checked.get("history"):
+                raise RuntimeError("Maintenance check did not record history.")
+
+            channel = browser.json(
+                "POST",
+                "/api/v1/admin/maintenance/channel",
+                {"channel": "beta"},
+                extra_headers=csrf_headers,
+            ).get("value", {})
+            if channel.get("current", {}).get("channel") != "beta":
+                raise RuntimeError("Maintenance channel was not persisted.")
+
+            backup_value = browser.json(
+                "POST",
+                "/api/v1/admin/maintenance/backup",
+                {"reason": "complete-ui-smoke"},
+                extra_headers=csrf_headers,
+            ).get("value", {})
+            backups = backup_value.get("backups", [])
+            if len(backups) != 1:
+                raise RuntimeError("Maintenance backup was not registered.")
+            backup_id = backups[0].get("id")
+            archive_path = data_root / "backups" / f"{backup_id}.zip"
+            if not archive_path.is_file() or archive_path.stat().st_size <= 0:
+                raise RuntimeError("Maintenance backup archive was not created.")
+            with zipfile.ZipFile(archive_path) as archive:
+                names = archive.namelist()
+                if not names or any(name.startswith("backups/") for name in names):
+                    raise RuntimeError("Maintenance backup is empty or recursively contains backups.")
+                if "identity.json" not in names or "settings.json" not in names:
+                    raise RuntimeError("Maintenance backup is missing critical Portal data.")
+
+            deleted = browser.json(
+                "POST",
+                "/api/v1/admin/maintenance/delete-backup",
+                {"id": backup_id},
+                extra_headers=csrf_headers,
+            ).get("value", {})
+            if deleted.get("backups") or archive_path.exists():
+                raise RuntimeError("Maintenance backup was not deleted.")
+
+            unsupported = browser.json(
+                "POST",
+                "/api/v1/admin/maintenance/restart",
+                {},
+                expected=409,
+                extra_headers=csrf_headers,
+            )
+            if unsupported.get("code") != "MAINTENANCE_PLATFORM_UNSUPPORTED":
+                raise RuntimeError("Linux restart guard returned an invalid error contract.")
+
+            print("SIRK Portal complete native UI and maintenance smoke: OK")
             return 0
         finally:
             if process.poll() is None:
