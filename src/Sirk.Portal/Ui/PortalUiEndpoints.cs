@@ -13,7 +13,7 @@ internal static class PortalUiEndpoints
         endpoints.MapGet("/", PortalAsync).AllowAnonymous();
         endpoints.MapGet("/login", LoginAsync).AllowAnonymous();
         endpoints.MapGet("/assets/{**asset}", AssetAsync).AllowAnonymous();
-        endpoints.MapGet("/auth/logout", LogoutAsync).AllowAnonymous();
+        endpoints.MapGet("/auth/logout", (Delegate)LogoutAsync).AllowAnonymous();
         return endpoints;
     }
 
