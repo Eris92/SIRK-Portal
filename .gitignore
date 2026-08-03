@@ -1,7 +1,10 @@
-node_modules/
+**/bin/
+**/obj/
+artifacts/
+TestResults/
+*.user
+*.suo
 *.log
-mycompany-data/
 .DS_Store
 Thumbs.db
-
 .codex-local/

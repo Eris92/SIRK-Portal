@@ -2,11 +2,13 @@
   <PropertyGroup>
     <AssemblyName>Sirk.Portal</AssemblyName>
     <RootNamespace>Sirk.Portal</RootNamespace>
-    <Version>3.0.0-dev.1</Version>
-    <FileVersion>3.0.0.1</FileVersion>
-    <InformationalVersion>3.0.0-dev.1</InformationalVersion>
+    <Version>3.0.0-dev.2</Version>
+    <FileVersion>3.0.0.2</FileVersion>
+    <InformationalVersion>3.0.0-dev.2</InformationalVersion>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
     <InvariantGlobalization>false</InvariantGlobalization>
+    <PublishReadyToRun>true</PublishReadyToRun>
+    <TieredPGO>true</TieredPGO>
   </PropertyGroup>
 
   <ItemGroup>

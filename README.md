@@ -1,208 +1,30 @@
-# SIRK Management Platform 2.0.0-dev.22
+# SIRK Portal
 
-**Repozytorium:** `SIRK-Portal`  
-**Techniczny identyfikator pluginu MeshCentral:** `SIRKPortal`  
-**Nazwa wyświetlana:** `SIRK Management Platform`  
-**Nazwa skrócona w interfejsie:** `SIRK Platform`
+SIRK Portal 3.0 jest natywną aplikacją **ASP.NET Core / .NET 10 LTS**. Backend, API, WebSocket, Windows Service, Central tunnel, Agent control plane i obsługa danych działają bez Node.js. JavaScript pozostaje wyłącznie jako kod wykonywany w przeglądarce dla pełnego frontendu.
 
-SIRK Management Platform zawiera niezależny Portal, backend, automatyzację, akceptacje, integracje, zarządzanie urządzeniami oraz opcjonalny adapter MeshCentral.
+## Wymagania
 
-Repozytorium nie utrzymuje kompatybilności z testową nazwą ani strukturą `MyCompany`. Nie ładuje starych entrypointów, nie migruje dawnych ustawień i nie korzysta z `mycompany-data`.
+- Windows Server 2019–2025 lub Windows 10/11 x64
+- PowerShell 5.1+
+- uprawnienia lokalnego Administratora
+- dostęp HTTPS do GitHub, Microsoft .NET i repozytorium SIRK Updater
 
-## Gałąź robocza i kanały aktualizacji
+## Instalacja jednolinijkowa
 
-Domyślną gałęzią roboczą projektu jest od teraz:
-
-```text
-develop
-```
-
-Kanały aktualizacji w Portalu:
-
-| Tryb | Gałąź |
-|---|---|
-| Normalny / Stable | `main` |
-| Beta | `beta` |
-| Developerski / Dev | `develop` |
-
-Każdą nową funkcję, poprawkę i branch funkcjonalny rozpoczynaj od `develop`. Promocja wydań przebiega w kolejności:
-
-```text
-develop -> beta -> main
-```
-
-Szczegóły: [Kanały aktualizacji i lifecycle](docs/UPDATE-CHANNELS.md).
-
-## Agent, Portal i Central
-
-Agent łączy się wyłącznie z lokalnym SIRK Portal. Portal agreguje stan Agentów i utrzymuje podpisany kanał control-plane do SIRK Central.
-
-```text
-SIRK Agent -> SIRK Portal -> SIRK Central
-```
-
-Wersja `2.0.0-dev.22` dodaje:
-
-- podpisany heartbeat Portal -> Central z liczbą wszystkich i aktywnych Agentów;
-- trwały routing komend Central -> Portal -> Agent;
-- idempotentne mapowanie Central command ID na lokalną komendę Agenta;
-- raportowanie `running`, `completed` i `failed` z powrotem do Central;
-- brak bezpośredniego połączenia lub poświadczenia Central w Agencie.
-
-## Instalacja i dalsze aktualizacje
-
-Pipeline `SIRK Portal Windows Release` przygotowuje instalator
-`SIRK-Portal-<wersja>-Windows-x64-Setup.exe`. Instalator zawiera runtime Node,
-rejestruje automatycznie odzyskiwaną usługę Windows i zachowuje dane,
-certyfikat TLS, użytkowników oraz konfigurację w `C:\ProgramData\SIRK\Portal`
-podczas aktualizacji. Portal nie wymaga MeshCentral.
-
-Po instalacji dalszy lifecycle SIRK Portal jest obsługiwany z poziomu widoku
-**Aktualizacje** w nowym Portalu.
-
-Widok umożliwia:
-
-- sprawdzenie wersji na kanale Stable, Beta lub Dev;
-- zmianę kanału;
-- ręczny backup;
-- automatyczny backup przed aktualizacją;
-- staging i health-check pobranej wersji;
-- aktualizację wykonywaną przez osobny helper po zatrzymaniu hosta;
-- restore i cofnięcie do wcześniejszego backupu;
-- historię operacji.
-
-## Zacznij od indeksów
-
-Przed odczytem kodu:
-
-1. przeczytaj [`AGENTS.md`](AGENTS.md);
-2. otwórz [`docs/INDEX.md`](docs/INDEX.md);
-3. wybierz indeks warstwy odpowiadającej zadaniu;
-4. czytaj wyłącznie wskazaną część repozytorium i jej bezpośrednie zależności.
-
-Nie skanuj całego repozytorium, jeżeli indeks wskazuje konkretny entrypoint, moduł, loader, test lub dokument.
-
-## Dokumentacja
-
-- [Indeks dokumentacji i obszarów](docs/INDEX.md)
-- [Kanały aktualizacji i lifecycle](docs/UPDATE-CHANNELS.md)
-- [Struktura repozytorium](docs/REPOSITORY-LAYOUT.md)
-- [Aktualny stan projektu](docs/PROJECT-STATE.md)
-- [Integracja SIRK Platform i SIRK Portal](docs/portal-integration.md)
-- [Router instrukcji](AGENTS.md)
-- [Reguły projektu](docs/agent/11-Agent-SIRK-Portal.md)
-- [Prompt startowy nowej rozmowy](docs/agent/Prompt-Start-SIRK-Portal-Conversation.md)
-
-## Warstwy projektu
-
-```text
-backend Node / host-neutral core -> server/
-samodzielny SIRK Portal         -> public/portal/
-adapter natywnego MeshCentral   -> public/native/
-frontend współdzielony          -> public/shared/
-renderery modułów               -> public/modules/
-panel administracyjny           -> web/admin/
-widok panelu                     -> views/SIRK-Portal.handlebars
-ikony                            -> assets/icons/
-narzędzia instalacyjne          -> tools/install/
-```
-
-Szczegółowe mapy znajdują się w lokalnych plikach `INDEX.md` poszczególnych warstw.
-
-## Moduły funkcjonalne
-
-- Automation;
-- Commands;
-- Approvals;
-- Device Transfers;
-- Jira Integration;
-- Security;
-- Portal;
-- System Updates.
-
-Backend modułów znajduje się w `server/modules/`, a pojedyncze renderery frontendowe w `public/modules/`.
-
-## Wspólny kontrakt UI Portalu
-
-Wszystkie widoki SIRK Portal korzystają ze wspólnego systemu klas `sirk-*` dla powierzchni, kart, toolbarów, przycisków, pól formularzy, statusów, list i typografii.
-
-Widok Devices zachowuje własną geometrię listy urządzeń, szczegółów hosta i workspace aktywnej sesji, ale korzysta z tych samych komponentów wizualnych co Overview oraz pozostałe zakładki.
-
-## Entry pointy i loadery
-
-Kanoniczne entrypointy MeshCentral:
-
-```text
-SIRKPortal.js
-SIRKPortalAdmin.js
-```
-
-Identyfikator `SIRKPortal` celowo nie zawiera myślnika. MeshCentral wykorzystuje `shortName` jako nazwę właściwości w generowanym JavaScript głównego interfejsu, dlatego musi to być poprawny identyfikator JavaScript.
-
-Łańcuch adaptera MeshCentral:
-
-```text
-SIRKPortal.js
-  -> plugin-main-standalone.js
-    -> plugin-main.js
-      -> server/core/runtime-portal.js
-        -> server/core/runtime.js
-          -> server/modules/*
-```
-
-Samodzielny proces:
-
-```text
-server/standalone.js
-  -> server/standalone-runtime.js
-  -> server/http/api-router.js
-  -> server/system-update-manager.js
-```
-
-## Dane trwałe
-
-Dane runtime znajdują się w `sirk-platform-data` poza katalogiem kodu aplikacji. W adapterze MeshCentral jest to:
-
-```text
-meshcentral-data/sirk-platform-data
-```
-
-Dla procesu standalone lokalizację można ustawić przez:
-
-```text
-SIRK_DATA_ROOT
-```
-
-## Instalacja z Git
-
-Uruchom jako Administrator:
+Uruchom Windows PowerShell jako Administrator:
 
 ```powershell
-.\Install-SIRK-Portal-FromGit_RUN.ps1
+Set-ExecutionPolicy Bypass -Scope Process -Force; iex ((Invoke-WebRequest -UseBasicParsing ('https://raw.githubusercontent.com/Eris92/SIRK-Portal/main/install.ps1?nocache=' + [guid]::NewGuid())).Content)
 ```
 
-Źródłowa implementacja instalatora:
+Instalator pyta o FQDN, hasło Break-Glass i zaufanie certyfikatu. Następnie publikuje self-contained `Sirk.Portal.exe`, instaluje usługę `SirkPortal`, generuje TLS, uruchamia pełny frontend, instaluje `SirkUpdater` i wykonuje health/readiness test.
 
-```text
-tools/install/Install-SIRK-Portal-FromGit.ps1
-```
+## Runtime
 
-Repozytorium źródłowe:
+- `SirkPortal` — natywna usługa ASP.NET Core .NET 10
+- `SirkUpdater` — współdzielony updater
+- Kestrel HTTPS
+- trwałe dane: `C:\ProgramData\SIRK\Portal`
+- pliki programu: `C:\Program Files\SIRK\Portal`
 
-```text
-https://github.com/Eris92/SIRK-Portal
-```
-
-Instalator umieszcza plugin w:
-
-```text
-meshcentral-data/plugins/SIRKPortal
-```
-
-## Testy
-
-```bash
-npm test
-```
-
-Walidator struktury blokuje niebezpieczny identyfikator z myślnikiem, stare entrypointy i widoki `MyCompany`, backend poza `server/`, płaskie assety aplikacyjne w `public/`, `public/shared-ui/`, podwójne renderery i niekanoniczne ścieżki loaderów.
+Repozytorium nie zawiera `package.json`, backendu `server/`, `npm`, `node.exe`, `node-windows` ani serwerowych testów JavaScript.
