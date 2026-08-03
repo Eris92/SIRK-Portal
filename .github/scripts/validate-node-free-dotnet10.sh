@@ -152,6 +152,11 @@ settings_ui = Path('public/portal/standalone/scripts/settings-native-v2.js').rea
 for marker in ('sirk-column-primary', 'sirk-column-secondary', 'sirk-column-details', 'data-portal-settings-native", "3'):
     if marker not in settings_ui:
         raise SystemExit('Native Settings three-column contract is missing: ' + marker)
+
+agent_installer = Path('src/Sirk.Portal/Agent/AgentInstallScriptEndpoint.cs').read_text(encoding='utf-8')
+for marker in ('SIRK-Agent-Setup.exe.sha256', 'Get-FileHash', "'$GroupId + '.' + $EnrollmentToken'"):
+    if marker.replace("'", "") not in agent_installer.replace("'", ""):
+        raise SystemExit('Verified Agent install script contract is missing: ' + marker)
 PY
 
 portal_dll='artifacts/linux-x64/Sirk.Portal.dll'
@@ -161,6 +166,7 @@ python3 .github/scripts/test-dotnet10-native-api.py "$portal_dll"
 python3 .github/scripts/test-dotnet10-native-settings-v2.py "$portal_dll"
 python3 .github/scripts/test-dotnet10-full-ui.py "$portal_dll"
 python3 .github/scripts/test-dotnet10-modules-v2.py "$portal_dll"
+python3 .github/scripts/test-dotnet10-agent-v1-compat.py "$portal_dll"
 
 docker build --tag sirk-portal:dotnet10 .
 docker run --detach --name sirk-portal-smoke \
