@@ -54,6 +54,8 @@ function Invoke-Utf8Script {
 }
 
 $defaultFqdn = ($env:COMPUTERNAME + '.local').ToLowerInvariant()
+$existingIdentityFile = Join-Path $DataRoot 'identity.json'
+$preserveExistingData = -not $RemoveData -and (Test-Path -LiteralPath $existingIdentityFile -PathType Leaf)
 $effectiveFqdn = $PortalFqdn.Trim().ToLowerInvariant()
 if ([string]::IsNullOrWhiteSpace($effectiveFqdn)) {
     if (-not [string]::IsNullOrWhiteSpace($env:SIRK_INSTALL_FQDN)) {
@@ -72,7 +74,7 @@ if ([string]::IsNullOrWhiteSpace($effectiveFqdn)) {
     }
 }
 
-if (-not $NonInteractive -and [string]::IsNullOrWhiteSpace($env:SIRK_INSTALL_BREAKGLASS_PASSWORD)) {
+if (-not $preserveExistingData -and -not $NonInteractive -and [string]::IsNullOrWhiteSpace($env:SIRK_INSTALL_BREAKGLASS_PASSWORD)) {
     $password1 = Read-Host 'Hasło administratora Break-Glass (minimum 14 znaków)' -AsSecureString
     $password2 = Read-Host 'Powtórz hasło' -AsSecureString
     $plain1 = ConvertFrom-SecureStringPlain $password1
@@ -106,6 +108,9 @@ New-Item -ItemType Directory -Path $workRoot,$extractRoot -Force | Out-Null
 try {
     Write-Host "=== SIRK Portal .NET 10 clean installation ===" -ForegroundColor Cyan
     Write-Host "Źródło: Eris92/SIRK-Portal@$Branch" -ForegroundColor DarkCyan
+    if ($preserveExistingData) {
+        Write-Host "Tryb: aktualizacja programu z zachowaniem $DataRoot" -ForegroundColor DarkGreen
+    }
 
     $encodedBranch = [Uri]::EscapeDataString($Branch)
     Invoke-WebRequest `

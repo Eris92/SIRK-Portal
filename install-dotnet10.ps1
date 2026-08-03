@@ -201,9 +201,20 @@ $portalFqdn = $PortalFqdn.Trim().ToLowerInvariant()
 if ([string]::IsNullOrWhiteSpace($portalFqdn)) { $portalFqdn = $defaultFqdn }
 if (-not (Test-DnsName $portalFqdn)) { throw 'Nazwa DNS Portalu jest nieprawidłowa.' }
 
+$existingIdentityFile = Join-Path $DataRoot 'identity.json'
+$existingAccessFile = Join-Path $DataRoot 'security\break-glass-access-code.txt'
+$preserveExistingData = -not $RemoveData -and (Test-Path -LiteralPath $existingIdentityFile -PathType Leaf)
+if ($preserveExistingData -and -not (Test-Path -LiteralPath $existingAccessFile -PathType Leaf)) {
+    throw 'Nie można zachować istniejących danych: brakuje pliku security\break-glass-access-code.txt. Zaloguj się istniejącą sesją i wykonaj rotację Access Code albo użyj -RemoveData.'
+}
+
 $plain1 = $null
 $plain2 = $null
-if (-not [string]::IsNullOrWhiteSpace($env:SIRK_INSTALL_BREAKGLASS_PASSWORD)) {
+if ($preserveExistingData) {
+    Remove-Item Env:SIRK_INSTALL_BREAKGLASS_PASSWORD -ErrorAction SilentlyContinue
+    Write-Host 'Wykryto istniejącą tożsamość Portalu — hasło i Access Code zostaną zachowane.' -ForegroundColor DarkGreen
+}
+elseif (-not [string]::IsNullOrWhiteSpace($env:SIRK_INSTALL_BREAKGLASS_PASSWORD)) {
     $plain1 = $env:SIRK_INSTALL_BREAKGLASS_PASSWORD
     $plain2 = $plain1
     Remove-Item Env:SIRK_INSTALL_BREAKGLASS_PASSWORD -ErrorAction SilentlyContinue
@@ -217,8 +228,10 @@ else {
     $plain1 = ConvertFrom-SecureStringPlain $password1
     $plain2 = ConvertFrom-SecureStringPlain $password2
 }
-if ([string]::IsNullOrWhiteSpace($plain1) -or $plain1.Length -lt 14) { throw 'Hasło musi mieć minimum 14 znaków.' }
-if ($plain1 -cne $plain2) { throw 'Hasła nie są identyczne.' }
+if (-not $preserveExistingData) {
+    if ([string]::IsNullOrWhiteSpace($plain1) -or $plain1.Length -lt 14) { throw 'Hasło musi mieć minimum 14 znaków.' }
+    if ($plain1 -cne $plain2) { throw 'Hasła nie są identyczne.' }
+}
 
 if ($TrustCertificate) {
     $trustCertificateValue = $true
@@ -301,13 +314,17 @@ try {
     foreach ($name in @('SirkPortal','SirkPortalStandalone','sirkportal.exe','SirkPortalWatchdog','sirkportalwatchdog.exe')) {
         Remove-ServiceCompletely $name
     }
-    if ((Test-Path -LiteralPath $InstallRoot) -or (Test-Path -LiteralPath $DataRoot)) {
+    if (Test-Path -LiteralPath $InstallRoot) {
         $backup = Join-Path $backupRoot ('Portal-' + (Get-Date -Format 'yyyyMMdd-HHmmss'))
         New-Item -ItemType Directory -Path $backup -Force | Out-Null
-        if (Test-Path -LiteralPath $InstallRoot) { Move-Item -LiteralPath $InstallRoot -Destination (Join-Path $backup 'Program') -Force }
-        if ((Test-Path -LiteralPath $DataRoot) -and -not $RemoveData) { Move-Item -LiteralPath $DataRoot -Destination (Join-Path $backup 'Data') -Force }
+        Move-Item -LiteralPath $InstallRoot -Destination (Join-Path $backup 'Program') -Force
     }
-    if ($RemoveData -and (Test-Path -LiteralPath $DataRoot)) { Remove-Item -LiteralPath $DataRoot -Recurse -Force }
+    if ($RemoveData -and (Test-Path -LiteralPath $DataRoot)) {
+        Remove-Item -LiteralPath $DataRoot -Recurse -Force
+    }
+    elseif (Test-Path -LiteralPath $DataRoot) {
+        Write-Host "Zachowano dane Portalu: $DataRoot" -ForegroundColor DarkGreen
+    }
     New-Item -ItemType Directory -Path $InstallRoot,$DataRoot -Force | Out-Null
     Copy-Item (Join-Path $publishRoot '*') $InstallRoot -Recurse -Force
 
@@ -316,9 +333,18 @@ try {
     New-Item -ItemType Directory -Path $securityRoot -Force | Out-Null
     $passwordFile = Join-Path $securityRoot 'break-glass-password.bootstrap'
     $accessFile = Join-Path $securityRoot 'break-glass-access-code.txt'
-    Set-Content -LiteralPath $passwordFile -Value $plain1 -Encoding UTF8 -NoNewline
-    $accessCode = New-UrlSafeToken 48
-    Set-Content -LiteralPath $accessFile -Value $accessCode -Encoding ASCII -NoNewline
+    if ($preserveExistingData) {
+        Remove-Item -LiteralPath $passwordFile -Force -ErrorAction SilentlyContinue
+        $accessCode = (Get-Content -LiteralPath $accessFile -Raw -Encoding ASCII).Trim()
+        if ($accessCode -notmatch '^[A-Za-z0-9_-]{32,256}$') {
+            throw 'Zachowany Access Code ma nieprawidłowy format.'
+        }
+    }
+    else {
+        Set-Content -LiteralPath $passwordFile -Value $plain1 -Encoding UTF8 -NoNewline
+        $accessCode = New-UrlSafeToken 48
+        Set-Content -LiteralPath $accessFile -Value $accessCode -Encoding ASCII -NoNewline
+    }
 
     Write-Step 'Generowanie certyfikatu HTTPS'
     $tlsRoot = Join-Path $DataRoot 'TLS'
@@ -459,6 +485,7 @@ try {
 
     Write-Host "`nSIRK Portal .NET 10 został zainstalowany i przeszedł testy." -ForegroundColor Green
     Write-Host 'Model wdrożenia: framework-dependent (współdzielony, aktualizowany Runtime 10)' -ForegroundColor Green
+    Write-Host ('Dane: ' + $(if ($preserveExistingData) { 'zachowane' } else { 'zainicjalizowane od nowa' })) -ForegroundColor Green
     Write-Host "URL: $publicUrl/login" -ForegroundColor Cyan
     Write-Host "Login: $BootstrapUserName" -ForegroundColor Cyan
     Write-Host "Access Code: $accessCode" -ForegroundColor Yellow
