@@ -1,10 +1,10 @@
 {
   "repository": "Eris92/SIRK-Portal",
-  "commit": "08131a83cb2cc33352d8c12ad1facf1be5b78aa6",
+  "commit": "4993b6a7f79601916d97dc6a40a9fd082fc3db53",
   "summary": {
-    "files": 244,
-    "textFiles": 181,
-    "lines": 33603,
+    "files": 245,
+    "textFiles": 182,
+    "lines": 33635,
     "extensions": {
       ".1-trigger": 1,
       ".2-pr-trigger": 1,
@@ -23,7 +23,7 @@
       ".sh": 1,
       ".svg": 25,
       ".yaml": 5,
-      ".yml": 1,
+      ".yml": 2,
       "<none>": 7
     },
     "projects": 2,
@@ -1152,6 +1152,10 @@
         "count": 2
       },
       {
+        "path": ".github/workflows/full-product-audit-pr.yml",
+        "count": 1
+      },
+      {
         "path": "public/portal/standalone/styles/native-login.css",
         "count": 1
       }
@@ -1308,6 +1312,13 @@
     ]
   },
   "workflows": [
+    {
+      "path": ".github/workflows/full-product-audit-pr.yml",
+      "name": "Full Product Audit PR",
+      "has_pull_request": true,
+      "has_push": false,
+      "permissions_write": true
+    },
     {
       "path": ".github/workflows/portal-dotnet10-ci.yml",
       "name": "SIRK Portal .NET 10 CI",

@@ -1,15 +1,15 @@
 # Full product audit
 
 Repository: `Eris92/SIRK-Portal`
-Commit: `08131a83cb2cc33352d8c12ad1facf1be5b78aa6`
+Commit: `4993b6a7f79601916d97dc6a40a9fd082fc3db53`
 
 ## Summary
 
 ```json
 {
-  "files": 244,
-  "textFiles": 181,
-  "lines": 33603,
+  "files": 245,
+  "textFiles": 182,
+  "lines": 33635,
   "extensions": {
     ".1-trigger": 1,
     ".2-pr-trigger": 1,
@@ -28,7 +28,7 @@ Commit: `08131a83cb2cc33352d8c12ad1facf1be5b78aa6`
     ".sh": 1,
     ".svg": 25,
     ".yaml": 5,
-    ".yml": 1,
+    ".yml": 2,
     "<none>": 7
   },
   "projects": 2,
