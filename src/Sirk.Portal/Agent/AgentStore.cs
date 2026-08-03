@@ -65,7 +65,7 @@ internal sealed record AgentHeartbeatRequest(
     string Status,
     IReadOnlyDictionary<string, string>? Metadata);
 
-internal sealed class AgentStore
+internal sealed partial class AgentStore
 {
     private const int SchemaVersion = 1;
     private static readonly Regex IdPattern = new(
@@ -189,7 +189,8 @@ internal sealed class AgentStore
 
     public AgentDeviceIssue Enroll(
         AgentEnrollmentRequest request,
-        string remoteAddress)
+        string remoteAddress,
+        bool enrollmentTokenPrevalidated)
     {
         ArgumentNullException.ThrowIfNull(request);
         var groupId = NormalizeId(request.GroupId, "Group ID");
@@ -203,8 +204,11 @@ internal sealed class AgentStore
             var group = _document.Groups.FirstOrDefault(value => value.Id == groupId)
                         ?? throw new KeyNotFoundException("Agent group was not found.");
             if (!group.Enabled) throw new UnauthorizedAccessException("Agent group is disabled.");
-            if (!VerifyToken(request.EnrollmentToken, group.EnrollmentTokenHashBase64))
+            if (!enrollmentTokenPrevalidated &&
+                !VerifyToken(request.EnrollmentToken, group.EnrollmentTokenHashBase64))
+            {
                 throw new UnauthorizedAccessException("Enrollment token is invalid.");
+            }
             if (_document.Devices.Any(value => value.Id == requestedDeviceId))
                 throw new InvalidOperationException("Device is already enrolled.");
 

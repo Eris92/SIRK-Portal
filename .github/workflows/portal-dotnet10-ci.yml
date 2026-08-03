@@ -20,23 +20,33 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
           cache: true
           cache-dependency-path: '**/*.csproj'
-
       - name: Build test publish API UI and container
         shell: bash
         run: bash .github/scripts/validate-node-free-dotnet10.sh
 
   windows-clean-install:
     runs-on: windows-latest
-    timeout-minutes: 50
+    timeout-minutes: 55
     steps:
       - uses: actions/checkout@v4
-
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Validate protected Central tunnel installer contract
+        shell: pwsh
+        run: |
+          $installer = Get-Content install-dotnet10.ps1 -Raw -Encoding UTF8
+          if ($installer -notmatch 'CentralTunnel\s*=\s*@\{\s*Enabled\s*=\s*\$true') {
+            throw 'Portal installer does not enable the protected Central reverse tunnel.'
+          }
+      - name: Validate single-use ticket and IExpress EXE contracts
+        shell: pwsh
+        run: dotnet run --project tests/Sirk.Portal.ProtocolTests/Sirk.Portal.ProtocolTests.csproj --configuration Release
       - name: Install and verify from zero
         shell: powershell
         run: .\.github\scripts\Test-NodeFreeWindowsInstall.ps1 -Branch '${{ github.head_ref || github.ref_name }}'

@@ -1,12 +1,15 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
-using Sirk.Portal.Central;
+using Sirk.Portal.Agent;
 using Sirk.Portal.Automation;
+using Sirk.Portal.Central;
+using Sirk.Portal.Infrastructure;
 using Microsoft.Extensions.Configuration;
 
 const string portalId = "portal-test";
@@ -147,7 +150,6 @@ finally
     Directory.Delete(configurationRoot, recursive: true);
 }
 
-
 var scriptsRoot = Path.Combine(Path.GetTempPath(), $"sirk-portal-script-files-{Guid.NewGuid():N}");
 try
 {
@@ -160,7 +162,7 @@ try
     var configuration = new ConfigurationBuilder()
         .AddInMemoryCollection(new Dictionary<string, string?> { ["Sirk:DataRoot"] = scriptsRoot })
         .Build();
-    var paths = new Sirk.Portal.Infrastructure.PortalPaths(configuration);
+    var paths = new PortalPaths(configuration);
     var scriptStore = new ScriptStore(paths);
     var discovered = scriptStore.Get("management", "Examples/Filesystem test.ps1");
     Assert(discovered is not null, "Management must discover PowerShell files from Files/management.");
@@ -177,7 +179,67 @@ finally
     if (Directory.Exists(scriptsRoot)) Directory.Delete(scriptsRoot, recursive: true);
 }
 
-Console.WriteLine("SIRK Portal signed heartbeat, protected config and filesystem script contracts: OK");
+var agentRoot = Path.Combine(Path.GetTempPath(), $"sirk-portal-agent-installer-{Guid.NewGuid():N}");
+try
+{
+    var configuration = new ConfigurationBuilder()
+        .AddInMemoryCollection(new Dictionary<string, string?> { ["Sirk:DataRoot"] = agentRoot })
+        .Build();
+    var paths = new PortalPaths(configuration);
+    var protector = DataProtectionProvider.Create(
+        new DirectoryInfo(paths.DataProtectionDirectory));
+    var agents = new AgentStore(paths, protector);
+    var group = agents.CreateGroup(
+        "installer-group",
+        "Installer Group",
+        "Single-use Agent installer tests");
+    var tickets = new AgentInstallerTicketStore(paths);
+    var ticket = tickets.Issue("installer-group", TimeSpan.FromHours(1));
+
+    Assert(ticket.EnrollmentTicket.StartsWith("install-", StringComparison.Ordinal),
+        "Installer ticket prefix is invalid.");
+    Assert(tickets.TryConsume("installer-group", ticket.EnrollmentTicket),
+        "Fresh installer ticket was rejected.");
+    Assert(!tickets.TryConsume("installer-group", ticket.EnrollmentTicket),
+        "Installer ticket replay was accepted.");
+
+    var firstRequest = new AgentEnrollmentRequest(
+        "installer-group",
+        ticket.EnrollmentTicket,
+        "device-installer-one",
+        "tenant-test",
+        "Device Installer One",
+        "device-installer-one",
+        "windows",
+        "1.0.16",
+        new Dictionary<string, string>());
+    var first = agents.Enroll(firstRequest, "127.0.0.1", enrollmentTokenPrevalidated: true);
+    Assert(first.Device.GroupId == "installer-group",
+        "Prevalidated installer enrollment used the wrong group.");
+
+    var permanentRequest = firstRequest with
+    {
+        EnrollmentToken = group.EnrollmentToken,
+        DeviceId = "device-permanent-token",
+        Name = "Device Permanent Token",
+        HostName = "device-permanent-token"
+    };
+    var permanent = agents.Enroll(permanentRequest, "127.0.0.1");
+    Assert(permanent.Device.GroupId == "installer-group",
+        "Existing permanent group-token enrollment regressed.");
+
+    var ticketStoreText = File.ReadAllText(paths.AgentInstallerTicketsFile, Encoding.UTF8);
+    Assert(!ticketStoreText.Contains(ticket.EnrollmentTicket, StringComparison.Ordinal),
+        "Installer ticket store exposes the plaintext ticket.");
+    Assert(ticketStoreText.Contains("tokenHashBase64", StringComparison.OrdinalIgnoreCase),
+        "Installer ticket store does not persist a token hash.");
+}
+finally
+{
+    if (Directory.Exists(agentRoot)) Directory.Delete(agentRoot, recursive: true);
+}
+
+Console.WriteLine("SIRK Portal signed heartbeat, protected config, filesystem script and single-use Agent installer contracts: OK");
 
 static byte[] Base64UrlDecode(string value)
 {
