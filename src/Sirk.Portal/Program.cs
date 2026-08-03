@@ -11,6 +11,7 @@ using Sirk.Portal.Administration;
 using Sirk.Portal.Agent;
 using Sirk.Portal.Automation;
 using Sirk.Portal.Central;
+using Sirk.Portal.Maintenance;
 using Sirk.Portal.Modules;
 using Sirk.Portal.Security;
 using Sirk.Portal.Settings;
@@ -54,6 +55,7 @@ builder.Services.AddSingleton<PortalRuntimeState>();
 builder.Services.AddSingleton<PortalIdentityStore>();
 builder.Services.AddSingleton<PortalAuditLog>();
 builder.Services.AddSingleton<PortalSettingsStore>();
+builder.Services.AddSingleton<PortalMaintenanceStore>();
 builder.Services.AddSingleton<AgentStore>();
 builder.Services.AddSingleton<AgentRequestAuthenticator>();
 builder.Services.AddSingleton<AgentCommandStore>();
@@ -226,6 +228,7 @@ var centralConnectionState = app.Services.GetRequiredService<CentralConnectionSt
 
 _ = app.Services.GetRequiredService<PortalIdentityStore>();
 _ = app.Services.GetRequiredService<PortalSettingsStore>();
+_ = app.Services.GetRequiredService<PortalMaintenanceStore>();
 _ = app.Services.GetRequiredService<AgentStore>();
 _ = app.Services.GetRequiredService<AgentCommandStore>();
 _ = app.Services.GetRequiredService<AgentPolicyStore>();
@@ -309,6 +312,7 @@ app.MapPortalIdentity();
 app.MapAgentEndpoints();
 app.MapPortalModules();
 app.MapPortalAdministration();
+app.MapPortalMaintenance();
 
 app.MapFallback(() => Results.Problem(
     statusCode: StatusCodes.Status404NotFound,
