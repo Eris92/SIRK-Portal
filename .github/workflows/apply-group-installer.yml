@@ -1,0 +1,550 @@
+name: Apply Group-Bound Agent Installer
+
+on:
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/group-bound-agent-installer
+      - name: Apply Portal store, API, UI and tests
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          store = Path('src/Sirk.Portal/Agent/AgentStore.cs')
+          text = store.read_text(encoding='utf-8')
+          old = '''internal sealed record AgentDocument(
+    int SchemaVersion,
+    IReadOnlyList<AgentGroupRecord> Groups,
+    IReadOnlyList<AgentDeviceRecord> Devices,
+    DateTimeOffset UpdatedAtUtc);'''
+          new = '''internal sealed record AgentDocument(
+    int SchemaVersion,
+    IReadOnlyList<AgentGroupRecord> Groups,
+    IReadOnlyList<AgentDeviceRecord> Devices,
+    IReadOnlyList<AgentInstallerTicketRecord>? InstallerTickets,
+    DateTimeOffset UpdatedAtUtc);'''
+          if text.count(old) != 1: raise SystemExit('AgentDocument marker mismatch.')
+          text = text.replace(old, new)
+
+          marker = '''internal sealed record AgentGroupIssue(
+    AgentGroupRecord Group,
+    string EnrollmentToken);
+'''
+          insert = marker + '''
+internal sealed record AgentInstallerTicketRecord(
+    string Id,
+    string GroupId,
+    string TokenHashBase64,
+    DateTimeOffset CreatedAtUtc,
+    DateTimeOffset ExpiresAtUtc,
+    DateTimeOffset? UsedAtUtc);
+
+internal sealed record AgentInstallerTicketIssue(
+    AgentInstallerTicketRecord Ticket,
+    string EnrollmentTicket);
+'''
+          if text.count(marker) != 1: raise SystemExit('AgentGroupIssue marker mismatch.')
+          text = text.replace(marker, insert)
+
+          old = ''': new AgentDocument(SchemaVersion, [], [], DateTimeOffset.UtcNow);'''
+          new = ''': new AgentDocument(SchemaVersion, [], [], [], DateTimeOffset.UtcNow);'''
+          if text.count(old) != 1: raise SystemExit('AgentDocument constructor marker mismatch.')
+          text = text.replace(old, new)
+
+          update_marker = '''    public AgentGroupRecord UpdateGroup(
+'''
+          ticket_methods = '''    public AgentInstallerTicketIssue IssueInstallerTicket(
+        string groupId,
+        TimeSpan lifetime)
+    {
+        var normalized = NormalizeId(groupId, "Group ID");
+        var boundedLifetime = TimeSpan.FromMinutes(Math.Clamp(
+            lifetime.TotalMinutes,
+            5,
+            7 * 24 * 60));
+        lock (_sync)
+        {
+            var group = _document.Groups.FirstOrDefault(value => value.Id == normalized)
+                        ?? throw new KeyNotFoundException("Agent group was not found.");
+            if (!group.Enabled) throw new InvalidOperationException("Agent group is disabled.");
+
+            var now = DateTimeOffset.UtcNow;
+            var id = "install-" + Guid.NewGuid().ToString("N")[..20];
+            var secret = Base64Url(RandomNumberGenerator.GetBytes(32));
+            var token = id + "." + secret;
+            var ticket = new AgentInstallerTicketRecord(
+                id,
+                normalized,
+                HashToken(token),
+                now,
+                now.Add(boundedLifetime),
+                null);
+            Save(_document with
+            {
+                InstallerTickets = PruneInstallerTickets(
+                        _document.InstallerTickets,
+                        now)
+                    .Append(ticket)
+                    .ToArray(),
+                UpdatedAtUtc = now
+            });
+            return new AgentInstallerTicketIssue(ticket, token);
+        }
+    }
+
+    public void RevokeInstallerTicket(string ticketId)
+    {
+        var normalized = (ticketId ?? string.Empty).Trim().ToLowerInvariant();
+        lock (_sync)
+        {
+            var tickets = (_document.InstallerTickets ?? [])
+                .Where(value => value.Id != normalized)
+                .ToArray();
+            Save(_document with
+            {
+                InstallerTickets = tickets,
+                UpdatedAtUtc = DateTimeOffset.UtcNow
+            });
+        }
+    }
+
+'''+update_marker
+          if text.count(update_marker) != 1: raise SystemExit('UpdateGroup marker mismatch.')
+          text = text.replace(update_marker, ticket_methods)
+
+          start = text.index('    public AgentDeviceIssue Enroll(')
+          end = text.index('    public AgentDeviceRecord Heartbeat(', start)
+          new_enroll = '''    public AgentDeviceIssue Enroll(
+        AgentEnrollmentRequest request,
+        string remoteAddress)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        var groupId = NormalizeId(request.GroupId, "Group ID");
+        var tenantId = NormalizeId(request.TenantId, "Tenant ID");
+        var requestedDeviceId = string.IsNullOrWhiteSpace(request.DeviceId)
+            ? "dev-" + Guid.NewGuid().ToString("N")
+            : NormalizeId(request.DeviceId, "Device ID");
+
+        lock (_sync)
+        {
+            var group = _document.Groups.FirstOrDefault(value => value.Id == groupId)
+                        ?? throw new KeyNotFoundException("Agent group was not found.");
+            if (!group.Enabled) throw new UnauthorizedAccessException("Agent group is disabled.");
+
+            var now = DateTimeOffset.UtcNow;
+            var tickets = PruneInstallerTickets(_document.InstallerTickets, now).ToArray();
+            var ticketIndex = FindInstallerTicket(
+                tickets,
+                groupId,
+                request.EnrollmentToken,
+                now);
+            var permanentTokenValid = VerifyToken(
+                request.EnrollmentToken,
+                group.EnrollmentTokenHashBase64);
+            if (!permanentTokenValid && ticketIndex < 0)
+                throw new UnauthorizedAccessException("Enrollment token is invalid, expired or already used.");
+            if (_document.Devices.Any(value => value.Id == requestedDeviceId))
+                throw new InvalidOperationException("Device is already enrolled.");
+
+            var deviceToken = Base64Url(RandomNumberGenerator.GetBytes(32));
+            var signingKey = SHA256.HashData(Encoding.UTF8.GetBytes(deviceToken));
+            string protectedKey;
+            try
+            {
+                protectedKey = _protector.Protect(Convert.ToBase64String(signingKey));
+            }
+            finally
+            {
+                CryptographicOperations.ZeroMemory(signingKey);
+            }
+
+            var device = new AgentDeviceRecord(
+                requestedDeviceId,
+                groupId,
+                tenantId,
+                NormalizeText(request.Name, "Device name", 128),
+                NormalizeText(request.HostName, "Host name", 255),
+                NormalizeText(request.Platform, "Platform", 128),
+                NormalizeText(request.AgentVersion, "Agent version", 64),
+                protectedKey,
+                true,
+                "enrolled",
+                NormalizeOptionalText(remoteAddress, "Remote address", 128),
+                now,
+                null,
+                now,
+                NormalizeMetadata(request.Metadata));
+
+            if (ticketIndex >= 0)
+                tickets[ticketIndex] = tickets[ticketIndex] with { UsedAtUtc = now };
+
+            Save(_document with
+            {
+                Devices = _document.Devices.Append(device).ToArray(),
+                InstallerTickets = tickets,
+                UpdatedAtUtc = now
+            });
+            return new AgentDeviceIssue(device, deviceToken);
+        }
+    }
+
+'''
+          text = text[:start] + new_enroll + text[end:]
+
+          old = '''                        deviceCount = _document.Devices.Count(device => device.GroupId == value.Id),
+                        value.CreatedAtUtc,'''
+          new = '''                        deviceCount = _document.Devices.Count(device => device.GroupId == value.Id),
+                        activeInstallerCount = (_document.InstallerTickets ?? []).Count(ticket =>
+                            ticket.GroupId == value.Id &&
+                            ticket.UsedAtUtc is null &&
+                            ticket.ExpiresAtUtc > now),
+                        value.CreatedAtUtc,'''
+          if text.count(old) != 1: raise SystemExit('Snapshot group marker mismatch.')
+          text = text.replace(old, new)
+
+          old = '''    private void Save(AgentDocument value)
+    {
+        _document = Validate(value);
+        AtomicJsonFile.Write(_paths.AgentsFile, _document);
+    }
+
+    private static AgentDocument Validate(AgentDocument value)
+    {
+        if (value.SchemaVersion != SchemaVersion)
+            throw new InvalidDataException("Agent store schema is unsupported.");
+        if (value.Groups.GroupBy(group => group.Id, StringComparer.Ordinal).Any(group => group.Count() > 1) ||
+            value.Devices.GroupBy(device => device.Id, StringComparer.Ordinal).Any(group => group.Count() > 1))
+        {
+            throw new InvalidDataException("Agent store contains duplicate identifiers.");
+        }
+        return value;
+    }
+'''
+          new = '''    private void Save(AgentDocument value)
+    {
+        var normalized = value with
+        {
+            InstallerTickets = PruneInstallerTickets(
+                value.InstallerTickets,
+                DateTimeOffset.UtcNow)
+        };
+        _document = Validate(normalized);
+        AtomicJsonFile.Write(_paths.AgentsFile, _document);
+    }
+
+    private static AgentDocument Validate(AgentDocument value)
+    {
+        if (value.SchemaVersion != SchemaVersion)
+            throw new InvalidDataException("Agent store schema is unsupported.");
+        var tickets = value.InstallerTickets ?? [];
+        if (value.Groups.GroupBy(group => group.Id, StringComparer.Ordinal).Any(group => group.Count() > 1) ||
+            value.Devices.GroupBy(device => device.Id, StringComparer.Ordinal).Any(group => group.Count() > 1) ||
+            tickets.GroupBy(ticket => ticket.Id, StringComparer.Ordinal).Any(group => group.Count() > 1))
+        {
+            throw new InvalidDataException("Agent store contains duplicate identifiers.");
+        }
+        if (tickets.Any(ticket =>
+                !value.Groups.Any(group => group.Id == ticket.GroupId) ||
+                ticket.ExpiresAtUtc <= ticket.CreatedAtUtc))
+        {
+            throw new InvalidDataException("Agent installer ticket store is invalid.");
+        }
+        return value with { InstallerTickets = tickets };
+    }
+'''
+          if text.count(old) != 1: raise SystemExit('Save/Validate marker mismatch.')
+          text = text.replace(old, new)
+
+          helper_marker = '''    private static string NormalizeId(string? value, string field)
+'''
+          helpers = '''    private static IReadOnlyList<AgentInstallerTicketRecord> PruneInstallerTickets(
+        IReadOnlyList<AgentInstallerTicketRecord>? source,
+        DateTimeOffset now) =>
+        (source ?? [])
+        .Where(ticket =>
+            ticket.ExpiresAtUtc > now ||
+            (ticket.UsedAtUtc is { } used && used > now.AddDays(-7)))
+        .TakeLast(2048)
+        .ToArray();
+
+    private static int FindInstallerTicket(
+        IReadOnlyList<AgentInstallerTicketRecord> tickets,
+        string groupId,
+        string token,
+        DateTimeOffset now)
+    {
+        var normalized = (token ?? string.Empty).Trim();
+        var separator = normalized.IndexOf('.');
+        if (separator <= 0) return -1;
+        var id = normalized[..separator];
+        return tickets
+            .Select((ticket, index) => (ticket, index))
+            .Where(value =>
+                value.ticket.Id == id &&
+                value.ticket.GroupId == groupId &&
+                value.ticket.UsedAtUtc is null &&
+                value.ticket.ExpiresAtUtc > now)
+            .Where(value => VerifyToken(normalized, value.ticket.TokenHashBase64))
+            .Select(value => value.index)
+            .DefaultIfEmpty(-1)
+            .First();
+    }
+
+'''+helper_marker
+          if text.count(helper_marker) != 1: raise SystemExit('NormalizeId marker mismatch.')
+          store.write_text(text.replace(helper_marker, helpers), encoding='utf-8', newline='\n')
+
+          admin = Path('src/Sirk.Portal/Administration/PortalAdministrationEndpoints.cs')
+          text = admin.read_text(encoding='utf-8')
+          marker = '''internal sealed record ComputerGroupAdminRequest(
+    string? Id,
+    string? Name,
+    string? Description,
+    bool? Enabled);
+'''
+          addition = marker + '''
+internal sealed record ComputerGroupInstallerRequest(
+    int? ValidMinutes,
+    string? Channel);
+'''
+          if text.count(marker) != 1: raise SystemExit('Admin request marker mismatch.')
+          text = text.replace(marker, addition)
+          route = '''        admin.MapPost("/computer-groups/{groupId}/rotate-token", RotateComputerGroupTokenAsync);
+'''
+          route_new = route + '''        admin.MapPost("/computer-groups/{groupId}/installer", GenerateComputerGroupInstallerAsync);
+'''
+          if text.count(route) != 1: raise SystemExit('Admin route marker mismatch.')
+          text = text.replace(route, route_new)
+          delete_marker = '''    private static async Task<IResult> DeleteComputerGroupAsync(
+'''
+          method = '''    private static async Task<IResult> GenerateComputerGroupInstallerAsync(
+        string groupId,
+        ComputerGroupInstallerRequest request,
+        HttpContext context,
+        IAntiforgery antiforgery,
+        AgentStore agents,
+        PortalAuditLog audit,
+        CancellationToken cancellationToken)
+    {
+        var csrf = await PortalAuthenticationEndpoints.ValidateCsrfAsync(context, antiforgery);
+        if (csrf is not null) return csrf;
+
+        var minutes = Math.Clamp(request.ValidMinutes ?? 24 * 60, 5, 7 * 24 * 60);
+        var channel = (request.Channel ?? "stable").Trim().ToLowerInvariant();
+        if (channel is not ("stable" or "dev"))
+            return PortalAuthenticationEndpoints.Error(400, "AGENT_INSTALLER_CHANNEL_INVALID", "Channel must be stable or dev.");
+
+        AgentInstallerTicketIssue issue;
+        try
+        {
+            issue = agents.IssueInstallerTicket(groupId, TimeSpan.FromMinutes(minutes));
+        }
+        catch (KeyNotFoundException exception)
+        {
+            return PortalAuthenticationEndpoints.Error(404, "COMPUTER_GROUP_NOT_FOUND", exception.Message);
+        }
+        catch (InvalidOperationException exception)
+        {
+            return PortalAuthenticationEndpoints.Error(409, "COMPUTER_GROUP_DISABLED", exception.Message);
+        }
+
+        try
+        {
+            var origin = $"{context.Request.Scheme}://{context.Request.Host.Value}";
+            var package = await AgentInstallerPackageBuilder.BuildAsync(
+                origin,
+                issue.Ticket.GroupId,
+                issue.EnrollmentTicket,
+                channel,
+                cancellationToken);
+            WriteGroupAudit(audit, context, "computer-group.generate-installer", issue.Ticket.GroupId);
+            context.Response.Headers.CacheControl = "no-store, max-age=0";
+            context.Response.Headers.Pragma = "no-cache";
+            context.Response.Headers["X-SIRK-Installer-Expires-At"] = issue.Ticket.ExpiresAtUtc.ToString("O");
+            context.Response.Headers["X-SIRK-Enrollment-Mode"] = "single-use";
+            return Results.File(
+                package.Content,
+                "application/vnd.microsoft.portable-executable",
+                package.FileName,
+                enableRangeProcessing: false);
+        }
+        catch (Exception exception) when (
+            exception is PlatformNotSupportedException or
+            FileNotFoundException or
+            InvalidDataException or
+            InvalidOperationException or
+            IOException)
+        {
+            agents.RevokeInstallerTicket(issue.Ticket.Id);
+            return PortalAuthenticationEndpoints.Error(
+                StatusCodes.Status503ServiceUnavailable,
+                "AGENT_INSTALLER_GENERATION_FAILED",
+                exception.Message);
+        }
+    }
+
+'''+delete_marker
+          if text.count(delete_marker) != 1: raise SystemExit('Delete-group method marker mismatch.')
+          admin.write_text(text.replace(delete_marker, method), encoding='utf-8', newline='\n')
+
+          ui = Path('public/portal/standalone/scripts/settings-native-v2.js')
+          text = ui.read_text(encoding='utf-8')
+          marker = '''    function renderComputerGroups(host) {
+'''
+          helper = '''    function downloadComputerGroupInstaller(group) {
+        return issueCsrf().then(function () {
+            return fetch("/api/v1/admin/computer-groups/" + encodeURIComponent(group.id) + "/installer", {
+                method: "POST",
+                credentials: "same-origin",
+                cache: "no-store",
+                headers: {
+                    Accept: "application/vnd.microsoft.portable-executable, application/json",
+                    "Content-Type": "application/json; charset=UTF-8",
+                    "X-SIRK-CSRF": state.csrf
+                },
+                body: JSON.stringify({ validMinutes: 1440, channel: "stable" })
+            });
+        }).then(function (response) {
+            if (response.status === 401) {
+                location.replace("/login");
+                throw new Error("Authentication required.");
+            }
+            if (!response.ok) {
+                return response.text().then(function (text) {
+                    var payload = {};
+                    try { payload = text ? JSON.parse(text) : {}; } catch (_) {}
+                    throw new Error(payload.error || payload.title || ("HTTP " + response.status));
+                });
+            }
+            var disposition = response.headers.get("Content-Disposition") || "";
+            var match = /filename\*?=(?:UTF-8''|\")?([^\";]+)/i.exec(disposition);
+            var fileName = match ? decodeURIComponent(match[1].replace(/^\"|\"$/g, "")) : ("SIRK-Agent-" + group.id + "-Installer.exe");
+            var expires = response.headers.get("X-SIRK-Installer-Expires-At");
+            return response.blob().then(function (blob) { return { blob: blob, fileName: fileName, expires: expires }; });
+        }).then(function (download) {
+            var url = URL.createObjectURL(download.blob);
+            var link = el("a");
+            link.href = url;
+            link.download = download.fileName;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+            window.alert("Wygenerowano jednorazowy instalator EXE dla grupy " + group.name + "." +
+                (download.expires ? " Ważny do: " + new Date(download.expires).toLocaleString() + "." : "") +
+                " Po pierwszej poprawnej rejestracji nie może zostać użyty ponownie.");
+        });
+    }
+
+'''+marker
+          if text.count(marker) != 1: raise SystemExit('Computer-group UI marker mismatch.')
+          text = text.replace(marker, helper)
+          action = '''            actions.appendChild(button("Rotuj token", function () {
+'''
+          action_new = '''            actions.appendChild(button("Pobierz instalator EXE", function () {
+                downloadComputerGroupInstaller(group).catch(showError);
+            }));
+''' + action
+          if text.count(action) != 1: raise SystemExit('Rotate-token UI marker mismatch.')
+          ui.write_text(text.replace(action, action_new), encoding='utf-8', newline='\n')
+
+          installer = Path('install-dotnet10.ps1')
+          text = installer.read_text(encoding='utf-8')
+          old = '''            CentralTunnel = @{
+                Enabled = $false'''
+          new = '''            CentralTunnel = @{
+                Enabled = $true'''
+          if text.count(old) != 1: raise SystemExit('Installer CentralTunnel marker mismatch.')
+          installer.write_text(text.replace(old, new), encoding='utf-8', newline='\n')
+
+          tests = Path('tests/Sirk.Portal.ProtocolTests/Program.cs')
+          text = tests.read_text(encoding='utf-8')
+          text = text.replace('using Microsoft.Extensions.Configuration;\n', 'using Microsoft.Extensions.Configuration;\nusing Microsoft.AspNetCore.DataProtection;\nusing Sirk.Portal.Agent;\nusing Sirk.Portal.Infrastructure;\n')
+          marker = '''Console.WriteLine("SIRK Portal signed heartbeat, protected config and filesystem script contracts: OK");
+'''
+          test_block = '''var agentRoot = Path.Combine(Path.GetTempPath(), $"sirk-portal-agent-tickets-{Guid.NewGuid():N}");
+try
+{
+    var configuration = new ConfigurationBuilder()
+        .AddInMemoryCollection(new Dictionary<string, string?> { ["Sirk:DataRoot"] = agentRoot })
+        .Build();
+    var paths = new PortalPaths(configuration);
+    var protector = DataProtectionProvider.Create(new DirectoryInfo(Path.Combine(agentRoot, "keys")));
+    var agents = new AgentStore(paths, protector);
+    var group = agents.CreateGroup("ticket-group", "Ticket Group", "Single-use installer contract");
+    var installer = agents.IssueInstallerTicket("ticket-group", TimeSpan.FromHours(1));
+    Assert(installer.EnrollmentTicket.StartsWith("install-", StringComparison.Ordinal),
+        "Installer enrollment ticket prefix is invalid.");
+
+    AgentEnrollmentRequest Enrollment(string deviceId, string token) => new(
+        "ticket-group",
+        token,
+        deviceId,
+        "tenant-test",
+        deviceId,
+        deviceId,
+        "windows",
+        "1.0.16",
+        new Dictionary<string, string>());
+
+    var first = agents.Enroll(Enrollment("device-ticket-1", installer.EnrollmentTicket), "127.0.0.1");
+    Assert(first.Device.GroupId == "ticket-group", "Single-use installer ticket did not enroll in the bound group.");
+    AssertThrows<UnauthorizedAccessException>(
+        () => agents.Enroll(Enrollment("device-ticket-2", installer.EnrollmentTicket), "127.0.0.1"),
+        "Single-use installer ticket was accepted more than once.");
+    var legacy = agents.Enroll(Enrollment("device-group-token", group.EnrollmentToken), "127.0.0.1");
+    Assert(legacy.Device.GroupId == "ticket-group", "Existing group-token enrollment contract regressed.");
+    var snapshot = JsonSerializer.Serialize(agents.Snapshot());
+    Assert(!snapshot.Contains(installer.EnrollmentTicket, StringComparison.Ordinal),
+        "Installer ticket must not be exposed in the administrative snapshot.");
+    Assert(new CentralTunnelOptions().Enabled,
+        "Central tunnel must be ready by default and activate only after a protected Central connection is imported.");
+}
+finally
+{
+    if (Directory.Exists(agentRoot)) Directory.Delete(agentRoot, recursive: true);
+}
+
+Console.WriteLine("SIRK Portal signed heartbeat, protected config, filesystem scripts and single-use Agent installer contracts: OK");
+'''
+          if text.count(marker) != 1: raise SystemExit('Protocol test final marker mismatch.')
+          tests.write_text(text.replace(marker, test_block), encoding='utf-8', newline='\n')
+
+          validate = Path('.github/scripts/validate-node-free-dotnet10.sh')
+          text = validate.read_text(encoding='utf-8')
+          marker = '''for marker in ('FileSystemScriptLibrary.Scan', 'FileSystemScriptLibrary.Write', 'FileSystemScriptLibrary.Delete'):
+'''
+          contract = '''installer_builder = Path('src/Sirk.Portal/Agent/AgentInstallerPackageBuilder.cs').read_text(encoding='utf-8')
+agent_store = Path('src/Sirk.Portal/Agent/AgentStore.cs').read_text(encoding='utf-8')
+admin_endpoints = Path('src/Sirk.Portal/Administration/PortalAdministrationEndpoints.cs').read_text(encoding='utf-8')
+for required in ('IEXPRESS', 'Install.ps1', 'single-use', 'SIRK_AGENT_GROUP_INSTALLER_OK'):
+    if required not in installer_builder:
+        raise SystemExit('Group-bound EXE installer builder is missing: ' + required)
+for required in ('IssueInstallerTicket', 'FindInstallerTicket', 'UsedAtUtc', 'InstallerTickets'):
+    if required not in agent_store:
+        raise SystemExit('Single-use installer ticket store is missing: ' + required)
+for required in ('/computer-groups/{groupId}/installer', 'X-SIRK-Enrollment-Mode', 'no-store'):
+    if required not in admin_endpoints:
+        raise SystemExit('Agent installer download endpoint is missing: ' + required)
+
+'''+marker
+          if text.count(marker) != 1: raise SystemExit('Validation marker mismatch.')
+          validate.write_text(text.replace(marker, contract), encoding='utf-8', newline='\n')
+          PY
+          rm -f .github/workflows/apply-group-installer.yml
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A
+          git diff --cached --check
+          git commit -m 'Add single-use group-bound Agent EXE installers'
+          git push origin HEAD:feature/group-bound-agent-installer
