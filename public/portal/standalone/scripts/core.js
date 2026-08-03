@@ -4,6 +4,7 @@
     window.SirkPlatformCore = window.SirkPlatformCore || {};
     window.SirkPlatformModules = window.SirkPlatformModules || {};
     var core = window.SirkPlatformCore;
+    var csrfState = { headerName: "X-SIRK-CSRF", requestToken: "", pending: null };
 
     (function prepareInitialView() {
         var root = document.getElementById("sirkStandaloneRoot");
@@ -169,8 +170,49 @@
         return error;
     }
 
+    function parseResponse(response) {
+        return response.text().then(function (text) {
+            if (response.status === 401) {
+                core.redirectToLogin();
+                throw authenticationError();
+            }
+            var result = {};
+            try { result = text ? JSON.parse(text) : {}; }
+            catch (error) {
+                var invalid = new Error("HTTP " + response.status + ": invalid JSON response.");
+                invalid.status = response.status;
+                throw invalid;
+            }
+            if (!response.ok || result.ok === false) {
+                var failure = new Error(result.error || "HTTP " + response.status);
+                failure.status = response.status;
+                failure.code = result.code || "";
+                throw failure;
+            }
+            return result;
+        });
+    }
+
+    function issueCsrfToken() {
+        if (csrfState.requestToken) return Promise.resolve(csrfState);
+        if (csrfState.pending) return csrfState.pending;
+        csrfState.pending = window.fetch("/api/v1/auth/csrf", {
+            method: "GET",
+            credentials: "same-origin",
+            cache: "no-store",
+            headers: { "Accept": "application/json" }
+        }).then(parseResponse).then(function (value) {
+            csrfState.headerName = String(value.headerName || "X-SIRK-CSRF");
+            csrfState.requestToken = String(value.requestToken || "");
+            if (!csrfState.requestToken) throw new Error("CSRF token could not be issued.");
+            return csrfState;
+        }).finally(function () { csrfState.pending = null; });
+        return csrfState.pending;
+    }
+
+    core.csrf = issueCsrfToken;
     core.assetUrl = function (moduleName, assetName, parameters) {
-        var base = String(window.__SIRK_PLATFORM_API_BASE__ || "/api").replace(/\/$/, "");
+        var base = String(window.__SIRK_PLATFORM_API_BASE__ || "/api/v1").replace(/\/$/, "");
         var endpoint = !moduleName && assetName === "bootstrap"
             ? new URL(base + "/bootstrap", window.location.href)
             : new URL(base + "/modules/" + encodeURIComponent(moduleName || "_runtime") + "/" + encodeURIComponent(assetName || "index"), window.location.href);
@@ -182,35 +224,28 @@
     };
 
     core.api = function (moduleName, assetName, options, parameters) {
-        var request = options || {};
-        request.credentials = "same-origin";
-        request.cache = "no-store";
-        return window.fetch(core.assetUrl(moduleName, assetName, parameters), request).then(function (response) {
-            return response.text().then(function (text) {
-                if (response.status === 401) {
-                    core.redirectToLogin();
-                    throw authenticationError();
-                }
-                var result = {};
-                try { result = text ? JSON.parse(text) : {}; }
-                catch (error) {
-                    var invalid = new Error("HTTP " + response.status + ": invalid JSON response.");
-                    invalid.status = response.status;
-                    throw invalid;
-                }
-                if (!response.ok || result.ok === false) throw new Error(result.error || "HTTP " + response.status);
-                return result;
-            });
-        });
+        var input = options || {};
+        var method = String(input.method || "GET").toUpperCase();
+        var send = function () {
+            var request = Object.assign({}, input);
+            request.method = method;
+            request.credentials = "same-origin";
+            request.cache = "no-store";
+            request.headers = new Headers(input.headers || {});
+            request.headers.set("Accept", "application/json");
+            if (!/^(GET|HEAD|OPTIONS)$/.test(method)) {
+                request.headers.set(csrfState.headerName, csrfState.requestToken);
+            }
+            return window.fetch(core.assetUrl(moduleName, assetName, parameters), request).then(parseResponse);
+        };
+        return /^(GET|HEAD|OPTIONS)$/.test(method) ? send() : issueCsrfToken().then(send);
     };
 
     core.post = function (moduleName, assetName, values) {
-        var body = new URLSearchParams();
-        body.set("payload", JSON.stringify(values && typeof values === "object" ? values : {}));
         return core.api(moduleName, assetName, {
             method: "POST",
-            headers: { "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8" },
-            body: body.toString()
+            headers: { "Content-Type": "application/json; charset=UTF-8" },
+            body: JSON.stringify(values && typeof values === "object" ? values : {})
         });
     };
 

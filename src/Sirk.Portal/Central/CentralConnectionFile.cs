@@ -1,10 +1,22 @@
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.Options;
+using Sirk.Portal.Infrastructure;
 
 namespace Sirk.Portal.Central;
 
 internal sealed record CentralConnectionFileDocument(
+    int SchemaVersion,
+    string CentralUrl,
+    string TunnelUrl,
+    string PortalId,
+    string PortalName,
+    string PortalToken,
+    string PublicUrl,
+    DateTimeOffset UpdatedAtUtc);
+
+internal sealed record RedactedCentralConnection(
     int SchemaVersion,
     string CentralUrl,
     string TunnelUrl,
@@ -20,7 +32,8 @@ internal sealed record ResolvedCentralConnection(
     string SourcePath);
 
 [JsonSerializable(typeof(CentralConnectionFileDocument))]
-[JsonSourceGenerationOptions(JsonSerializerDefaults.Web)]
+[JsonSerializable(typeof(RedactedCentralConnection))]
+[JsonSourceGenerationOptions(JsonSerializerDefaults.Web, WriteIndented = true)]
 internal sealed partial class CentralConnectionFileJsonContext : JsonSerializerContext;
 
 internal sealed class CentralConnectionResolver
@@ -53,14 +66,13 @@ internal sealed class CentralConnectionResolver
         var path = ResolveConnectionFilePath(_configuredOptions.ConnectionFile);
         if (!File.Exists(path))
         {
-            return new ResolvedCentralConnection(Clone(_configuredOptions), "configuration", string.Empty);
+            return new ResolvedCentralConnection(
+                Clone(_configuredOptions),
+                "configuration",
+                string.Empty);
         }
 
-        ValidateFileSecurity(path);
-        var document = ReadDocument(path);
-        ValidateDocument(document);
-        ValidateTunnelOrigin(document.CentralUrl, document.TunnelUrl);
-
+        var document = ReadProtectedDocument(path);
         var resolved = new CentralConnectionOptions
         {
             Enabled = true,
@@ -81,6 +93,124 @@ internal sealed class CentralConnectionResolver
             path);
 
         return new ResolvedCentralConnection(resolved, "protected-file", path);
+    }
+
+    internal static string ResolveConnectionFilePath(string? configuredPath)
+    {
+        if (!string.IsNullOrWhiteSpace(configuredPath))
+        {
+            return Path.GetFullPath(
+                Environment.ExpandEnvironmentVariables(configuredPath.Trim()));
+        }
+
+        if (OperatingSystem.IsWindows())
+        {
+            return Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+                "SIRK",
+                "Portal",
+                "central-connection.json");
+        }
+
+        return "/var/lib/sirk-portal/central-connection.json";
+    }
+
+    internal static CentralConnectionFileDocument ReadProtectedDocument(string path)
+    {
+        var resolved = ResolveConnectionFilePath(path);
+        ValidateFileSecurity(resolved);
+        var document = ReadDocument(resolved);
+        ValidateDocument(document);
+        ValidateTunnelOrigin(document.CentralUrl, document.TunnelUrl);
+        return document;
+    }
+
+    internal static CentralConnectionFileDocument ImportProtectedDocument(
+        string sourcePath,
+        string destinationPath,
+        bool consumeSource)
+    {
+        var source = Path.GetFullPath(
+            Environment.ExpandEnvironmentVariables(
+                (sourcePath ?? string.Empty).Trim()));
+        if (!File.Exists(source))
+            throw new FileNotFoundException("Central connection source file was not found.", source);
+        ValidateFileSecurity(source);
+        var document = ReadProtectedDocument(source);
+
+        var destination = ResolveConnectionFilePath(destinationPath);
+        if (string.Equals(source, destination, PathComparison()))
+        {
+            SecureFile(destination);
+            return document;
+        }
+
+        var directory = Path.GetDirectoryName(destination)
+                        ?? throw new InvalidOperationException(
+                            "Central connection destination has no parent directory.");
+        Directory.CreateDirectory(directory);
+        AtomicJsonFile.SecureDirectory(directory);
+
+        var temporary = $"{destination}.tmp-{Environment.ProcessId}-{Guid.NewGuid():N}";
+        try
+        {
+            using (var stream = new FileStream(
+                       temporary,
+                       FileMode.CreateNew,
+                       FileAccess.Write,
+                       FileShare.None,
+                       16 * 1024,
+                       FileOptions.WriteThrough))
+            {
+                JsonSerializer.Serialize(
+                    stream,
+                    document,
+                    CentralConnectionFileJsonContext.Default.CentralConnectionFileDocument);
+                stream.Flush(flushToDisk: true);
+            }
+
+            SecureFile(temporary);
+            File.Move(temporary, destination, overwrite: true);
+            SecureFile(destination);
+        }
+        finally
+        {
+            File.Delete(temporary);
+        }
+
+        if (consumeSource)
+        {
+            SecureDelete(source);
+        }
+
+        return document;
+    }
+
+    internal static bool RemoveProtectedDocument(string path)
+    {
+        var resolved = ResolveConnectionFilePath(path);
+        if (!File.Exists(resolved)) return false;
+        ValidateFileSecurity(resolved);
+        SecureDelete(resolved);
+        return true;
+    }
+
+    internal static RedactedCentralConnection Redact(
+        CentralConnectionFileDocument document)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+        var visible = document.PortalToken.Length <= 8
+            ? "***"
+            : document.PortalToken[..4] + "..." + document.PortalToken[^4..];
+        return new RedactedCentralConnection(
+            document.SchemaVersion,
+            document.CentralUrl,
+            document.TunnelUrl,
+            document.PortalId,
+            document.PortalName,
+            visible,
+            document.PublicUrl,
+            document.UpdatedAtUtc);
     }
 
     private static CentralConnectionFileDocument ReadDocument(string path)
@@ -104,28 +234,26 @@ internal sealed class CentralConnectionResolver
             var document = JsonSerializer.Deserialize(
                 stream,
                 CentralConnectionFileJsonContext.Default.CentralConnectionFileDocument);
-
-            if (document is null)
-            {
-                throw new InvalidDataException("Central connection file is empty.");
-            }
-
-            if (document.SchemaVersion != 1)
-            {
-                throw new InvalidDataException(
-                    $"Central connection schema version {document.SchemaVersion} is unsupported.");
-            }
-
-            return document;
+            return document
+                   ?? throw new InvalidDataException(
+                       "Central connection file is empty.");
         }
         catch (JsonException exception)
         {
-            throw new InvalidDataException("Central connection file contains invalid JSON.", exception);
+            throw new InvalidDataException(
+                "Central connection file contains invalid JSON.",
+                exception);
         }
     }
 
     private static void ValidateDocument(CentralConnectionFileDocument document)
     {
+        if (document.SchemaVersion != 1)
+        {
+            throw new InvalidDataException(
+                $"Central connection schema version {document.SchemaVersion} is unsupported.");
+        }
+
         if (string.IsNullOrWhiteSpace(document.CentralUrl) ||
             string.IsNullOrWhiteSpace(document.TunnelUrl))
         {
@@ -141,7 +269,10 @@ internal sealed class CentralConnectionResolver
 
         if (string.IsNullOrWhiteSpace(document.PortalName) ||
             document.PortalName.Length is < 2 or > 100 ||
-            !string.Equals(document.PortalName, document.PortalName.Trim(), StringComparison.Ordinal))
+            !string.Equals(
+                document.PortalName,
+                document.PortalName.Trim(),
+                StringComparison.Ordinal))
         {
             throw new InvalidDataException(
                 "Central connection file contains an invalid Portal name.");
@@ -172,7 +303,12 @@ internal sealed class CentralConnectionResolver
 
     private static void ValidateFileSecurity(string path)
     {
-        var attributes = File.GetAttributes(path);
+        var file = new FileInfo(path);
+        if (!file.Exists)
+            throw new FileNotFoundException(
+                "Central connection file was not found.",
+                path);
+        var attributes = file.Attributes;
         if ((attributes & FileAttributes.ReparsePoint) != 0)
         {
             throw new InvalidDataException(
@@ -190,43 +326,25 @@ internal sealed class CentralConnectionResolver
         }
     }
 
-    private static string ResolveConnectionFilePath(string configuredPath)
-    {
-        if (!string.IsNullOrWhiteSpace(configuredPath))
-        {
-            return Path.GetFullPath(
-                Environment.ExpandEnvironmentVariables(configuredPath.Trim()));
-        }
-
-        if (OperatingSystem.IsWindows())
-        {
-            return Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
-                "SIRK",
-                "Portal",
-                "central-connection.json");
-        }
-
-        return "/var/lib/sirk-portal/central-connection.json";
-    }
-
     private static void ValidateTunnelOrigin(string centralUrl, string tunnelUrl)
     {
         if (!Uri.TryCreate(centralUrl, UriKind.Absolute, out var central) ||
             central is null ||
+            central.Scheme != Uri.UriSchemeHttps ||
             !IsOriginOnly(central))
         {
             throw new InvalidDataException(
-                "Central connection file contains an invalid Central origin URL.");
+                "Central connection file contains an invalid HTTPS Central origin URL.");
         }
 
-        if (!Uri.TryCreate(tunnelUrl, UriKind.Absolute, out var tunnel) || tunnel is null)
+        if (!Uri.TryCreate(tunnelUrl, UriKind.Absolute, out var tunnel) ||
+            tunnel is null)
         {
-            throw new InvalidDataException("Central connection file contains an invalid tunnel URL.");
+            throw new InvalidDataException(
+                "Central connection file contains an invalid tunnel URL.");
         }
 
-        var expectedScheme = central.Scheme == Uri.UriSchemeHttps ? "wss" : "ws";
-        if (!string.Equals(tunnel.Scheme, expectedScheme, StringComparison.OrdinalIgnoreCase) ||
+        if (!string.Equals(tunnel.Scheme, "wss", StringComparison.OrdinalIgnoreCase) ||
             !string.Equals(tunnel.Host, central.Host, StringComparison.OrdinalIgnoreCase) ||
             tunnel.Port != central.Port ||
             !string.Equals(tunnel.AbsolutePath, "/tunnel", StringComparison.Ordinal) ||
@@ -235,7 +353,49 @@ internal sealed class CentralConnectionResolver
             !string.IsNullOrEmpty(tunnel.UserInfo))
         {
             throw new InvalidDataException(
-                "Central tunnel URL must use the Central origin and the /tunnel path.");
+                "Central tunnel URL must use the HTTPS Central origin and the /tunnel path.");
+        }
+    }
+
+    private static void SecureFile(string path)
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            File.SetUnixFileMode(
+                path,
+                UnixFileMode.UserRead | UnixFileMode.UserWrite);
+        }
+    }
+
+    private static void SecureDelete(string path)
+    {
+        if (!File.Exists(path)) return;
+        try
+        {
+            var length = new FileInfo(path).Length;
+            if (length is > 0 and <= MaximumFileBytes)
+            {
+                using var stream = new FileStream(
+                    path,
+                    FileMode.Open,
+                    FileAccess.Write,
+                    FileShare.None,
+                    4096,
+                    FileOptions.WriteThrough);
+                var zeros = new byte[Math.Min(length, 4096)];
+                long remaining = length;
+                while (remaining > 0)
+                {
+                    var count = (int)Math.Min(zeros.Length, remaining);
+                    stream.Write(zeros, 0, count);
+                    remaining -= count;
+                }
+                stream.Flush(flushToDisk: true);
+            }
+        }
+        finally
+        {
+            File.Delete(path);
         }
     }
 
@@ -257,20 +417,19 @@ internal sealed class CentralConnectionResolver
         foreach (var character in value)
         {
             if (!IsLowercaseLetterOrDigit(character) && character != '-')
-            {
                 return false;
-            }
         }
 
         return true;
     }
 
-    private static bool IsValidBase64UrlSecret(string? value, int minimum, int maximum)
+    private static bool IsValidBase64UrlSecret(
+        string? value,
+        int minimum,
+        int maximum)
     {
         if (value is null || value.Length < minimum || value.Length > maximum)
-        {
             return false;
-        }
 
         foreach (var character in value)
         {
@@ -289,6 +448,11 @@ internal sealed class CentralConnectionResolver
 
     private static bool IsLowercaseLetterOrDigit(char value) =>
         value is >= 'a' and <= 'z' or >= '0' and <= '9';
+
+    private static StringComparison PathComparison() =>
+        OperatingSystem.IsWindows()
+            ? StringComparison.OrdinalIgnoreCase
+            : StringComparison.Ordinal;
 
     private static CentralConnectionOptions Clone(CentralConnectionOptions source) =>
         new()

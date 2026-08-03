@@ -20,13 +20,16 @@
         <header>
           <span>Dostęp do Portalu</span>
           <h2>Zaloguj się</h2>
-          <p>Użyj konta utworzonego przez administratora SIRK Portal.</p>
+          <p>Użyj konta lokalnego SIRK Portal. Dla konta Break-Glass podaj także aktualny Access Code.</p>
         </header>
         <label>Nazwa użytkownika
           <input name="username" type="text" autocomplete="username" required autofocus maxlength="64">
         </label>
         <label>Hasło
           <input name="password" type="password" autocomplete="current-password" required maxlength="256">
+        </label>
+        <label>Access Code
+          <input name="accessCode" type="password" autocomplete="off" maxlength="256" spellcheck="false">
         </label>
         <div id="sirkLoginError" class="sirk-login-error" role="alert" hidden></div>
         <button type="submit">Zaloguj się</button>

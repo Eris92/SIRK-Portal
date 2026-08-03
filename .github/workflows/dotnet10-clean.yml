@@ -1,0 +1,186 @@
+name: SIRK Portal .NET 10 Clean
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - rewrite/dotnet10-clean
+  pull_request:
+    branches:
+      - rewrite/dotnet10
+      - develop
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sirk-portal-dotnet10-clean-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: SDK contract
+        run: |
+          dotnet --info
+          python3 - <<'PY'
+          from pathlib import Path
+          roots = [Path('src/Sirk.Portal'), Path('tests/Sirk.Portal.ProtocolTests'), Path('Directory.Build.props'), Path('global.json')]
+          forbidden = ('net8.0', 'net9.0')
+          failures = []
+          for root in roots:
+              paths = [root] if root.is_file() else list(root.rglob('*'))
+              for path in paths:
+                  if path.is_file() and path.suffix in {'.csproj', '.props', '.json'}:
+                      text = path.read_text(encoding='utf-8', errors='ignore')
+                      if any(value in text for value in forbidden):
+                          failures.append(str(path))
+          if failures:
+              raise SystemExit('Unsupported target framework reference: ' + ', '.join(failures))
+          PY
+
+      - name: Native installer contract
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('install-dotnet10.ps1')
+          text = path.read_text(encoding='utf-8')
+          required = (
+              'New-SelfSignedCertificate',
+              "Cert:\\LocalMachine\\Root",
+              'New-Service',
+              'Kestrel',
+              'portal\\standalone\\index.html',
+              'portal\\standalone\\login.html',
+              'New-NetFirewallRule',
+          )
+          missing = [value for value in required if value not in text]
+          forbidden = ('Ensure Node.js', 'node.exe', 'npm.cmd', 'sc.exe create')
+          present = [value for value in forbidden if value in text]
+          if missing:
+              raise SystemExit('Installer contract is missing: ' + ', '.join(missing))
+          if present:
+              raise SystemExit('Legacy runtime found in native installer: ' + ', '.join(present))
+          PY
+          pwsh -NoProfile -Command '$tokens=$null; $errors=$null; [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path "install-dotnet10.ps1"), [ref]$tokens, [ref]$errors) | Out-Null; if ($errors.Count) { $errors | ForEach-Object { Write-Error $_.Message }; exit 1 }'
+
+      - name: Restore
+        run: dotnet restore tests/Sirk.Portal.ProtocolTests/Sirk.Portal.ProtocolTests.csproj
+
+      - name: Build
+        run: dotnet build tests/Sirk.Portal.ProtocolTests/Sirk.Portal.ProtocolTests.csproj --configuration Release --no-restore
+
+      - name: Protocol contracts
+        run: dotnet run --project tests/Sirk.Portal.ProtocolTests/Sirk.Portal.ProtocolTests.csproj --configuration Release --no-build
+
+      - name: Publish Windows x64
+        run: dotnet publish src/Sirk.Portal/Sirk.Portal.csproj --configuration Release --runtime win-x64 --self-contained false --output artifacts/win-x64
+
+      - name: Publish Linux x64
+        run: dotnet publish src/Sirk.Portal/Sirk.Portal.csproj --configuration Release --runtime linux-x64 --self-contained false --output artifacts/linux-x64
+
+      - name: Published frontend contract
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          roots = [Path('artifacts/win-x64'), Path('artifacts/linux-x64')]
+          required = (
+              'public/portal/standalone/index.html',
+              'public/portal/standalone/login.html',
+              'public/portal/standalone/scripts/core.js',
+              'public/portal/standalone/scripts/app.js',
+              'public/portal/standalone/scripts/settings-native-v2.js',
+              'public/portal/standalone/styles/base.css',
+              'public/shared/ui/shared-ui.css',
+          )
+          missing = [str(root / item) for root in roots for item in required if not (root / item).is_file()]
+          if missing:
+              raise SystemExit('Published frontend is incomplete: ' + ', '.join(missing))
+          PY
+
+      - name: Live Central heartbeat smoke
+        run: python3 .github/scripts/test-dotnet10-central-heartbeat.py artifacts/linux-x64/Sirk.Portal.dll
+
+      - name: Native API end-to-end smoke
+        run: python3 .github/scripts/test-dotnet10-native-api.py artifacts/linux-x64/Sirk.Portal.dll
+
+      - name: Complete native UI and maintenance smoke
+        run: python3 .github/scripts/test-dotnet10-full-ui.py artifacts/linux-x64/Sirk.Portal.dll
+
+      - name: Container build
+        run: docker build --file Dockerfile.dotnet10 --tag sirk-portal:dotnet10-clean .
+
+      - name: Container runtime health smoke
+        run: |
+          docker run --detach --name sirk-portal-dotnet10-clean-smoke --health-interval 1s --health-timeout 5s --health-start-period 1s --health-retries 20 sirk-portal:dotnet10-clean
+          for attempt in $(seq 1 60); do
+            status=$(docker inspect --format '{{.State.Health.Status}}' sirk-portal-dotnet10-clean-smoke)
+            if [ "$status" = healthy ]; then
+              docker rm --force --volumes sirk-portal-dotnet10-clean-smoke
+              exit 0
+            fi
+            if [ "$status" = unhealthy ]; then
+              docker logs sirk-portal-dotnet10-clean-smoke
+              docker rm --force --volumes sirk-portal-dotnet10-clean-smoke
+              exit 1
+            fi
+            sleep 1
+          done
+          docker logs sirk-portal-dotnet10-clean-smoke
+          docker rm --force --volumes sirk-portal-dotnet10-clean-smoke
+          exit 1
+
+  windows-installer-e2e:
+    name: Windows installer HTTPS service E2E
+    needs: build
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install and validate complete native Portal
+        shell: powershell
+        run: .\.github\scripts\test-dotnet10-windows-installer.ps1
+
+      - name: Show Windows diagnostics on failure
+        if: failure()
+        shell: powershell
+        run: |
+          Get-Service SirkPortal -ErrorAction SilentlyContinue | Format-List *
+          Get-CimInstance Win32_Service -Filter "Name='SirkPortal'" -ErrorAction SilentlyContinue | Format-List *
+          Get-Content 'C:\ProgramData\SIRK\Logs\Portal-DotNet10-Install.log' -Tail 400 -ErrorAction SilentlyContinue
+          Get-WinEvent -FilterHashtable @{ LogName='Application'; StartTime=(Get-Date).AddMinutes(-30) } -ErrorAction SilentlyContinue |
+            Where-Object { $_.ProviderName -match 'Sirk|\.NET Runtime|Application Error' -or $_.Message -match 'Sirk\.Portal' } |
+            Select-Object -First 100 TimeCreated,ProviderName,Id,LevelDisplayName,Message |
+            Format-List
+
+      - name: Cleanup Windows test installation
+        if: always()
+        shell: powershell
+        run: |
+          Stop-Service SirkPortal -Force -ErrorAction SilentlyContinue
+          & sc.exe delete SirkPortal | Out-Null
+          $global:LASTEXITCODE = 0
+          Remove-NetFirewallRule -DisplayName 'SIRK Portal HTTPS' -ErrorAction SilentlyContinue
+          Get-ChildItem Cert:\LocalMachine\My,Cert:\LocalMachine\Root -ErrorAction SilentlyContinue |
+            Where-Object FriendlyName -eq 'SIRK Portal HTTPS' |
+            Remove-Item -Force -ErrorAction SilentlyContinue
+          Remove-Item `
+            'C:\Program Files\SIRK\Portal',
+            'C:\ProgramData\SIRK\Portal',
+            'C:\ProgramData\SIRK\Portal Backups',
+            'C:\ProgramData\SIRK\Install Backups' `
+            -Recurse -Force -ErrorAction SilentlyContinue
+          $hosts = Join-Path $env:SystemRoot 'System32\drivers\etc\hosts'
+          if (Test-Path -LiteralPath $hosts) {
+            $lines = Get-Content -LiteralPath $hosts | Where-Object { $_ -notmatch 'portal-ci\.sirk\.local' }
+            Set-Content -LiteralPath $hosts -Value $lines -Encoding ASCII
+          }

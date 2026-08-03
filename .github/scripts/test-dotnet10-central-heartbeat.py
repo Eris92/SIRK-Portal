@@ -68,16 +68,15 @@ def validate_heartbeat(handler: BaseHTTPRequestHandler, body: bytes) -> None:
 
 
 class CentralHandler(BaseHTTPRequestHandler):
-    def do_POST(self) -> None:  # noqa: N802 - BaseHTTPRequestHandler contract
+    def do_POST(self) -> None:  # noqa: N802
         if self.path != "/api/portal/v1/heartbeat":
             self.send_error(404)
             return
-
         content_length = int(self.headers.get("Content-Length", "0"))
         body = self.rfile.read(content_length)
         try:
             validate_heartbeat(self, body)
-        except Exception as error:  # noqa: BLE001 - test boundary
+        except Exception as error:  # noqa: BLE001
             HEARTBEAT_ERROR.append(str(error))
             self.send_response(401)
             self.send_header("Content-Type", "application/json")
@@ -85,7 +84,6 @@ class CentralHandler(BaseHTTPRequestHandler):
             self.wfile.write(b'{"ok":false}')
             HEARTBEAT_RECEIVED.set()
             return
-
         self.send_response(202)
         self.send_header("Content-Type", "application/json")
         self.send_header("Cache-Control", "no-store")
@@ -106,33 +104,15 @@ def wait_portal_status(timeout_seconds: int) -> dict:
                 status = json.loads(response.read().decode("utf-8"))
                 if status.get("central", {}).get("connected") is True:
                     return status
-        except Exception as error:  # noqa: BLE001 - bounded startup retry
+        except Exception as error:  # noqa: BLE001
             last_error = error
         time.sleep(0.25)
     raise RuntimeError(f"Portal did not report a connected Central state: {last_error}")
 
 
-def write_protected_connection_file(directory: Path) -> Path:
-    path = directory / "central-connection.json"
-    document = {
-        "schemaVersion": 1,
-        "centralUrl": CENTRAL_URL,
-        "tunnelUrl": "ws://127.0.0.1:19090/tunnel",
-        "portalId": PORTAL_ID,
-        "portalName": "Portal Test",
-        "portalToken": PORTAL_TOKEN,
-        "publicUrl": "https://portal.example",
-        "updatedAtUtc": "2026-08-02T12:00:00Z",
-    }
-    path.write_text(json.dumps(document, separators=(",", ":")), encoding="utf-8")
-    path.chmod(0o600)
-    return path
-
-
 def main() -> int:
     if len(sys.argv) != 2:
         raise RuntimeError("Usage: test-dotnet10-central-heartbeat.py <Sirk.Portal.dll>")
-
     portal_dll = Path(sys.argv[1]).resolve()
     if not portal_dll.is_file():
         raise RuntimeError(f"Portal assembly was not found: {portal_dll}")
@@ -142,16 +122,26 @@ def main() -> int:
     server_thread.start()
 
     with tempfile.TemporaryDirectory(prefix="sirk-portal-central-") as temporary_directory:
-        connection_file = write_protected_connection_file(Path(temporary_directory))
+        test_root = Path(temporary_directory)
+        data_root = test_root / "portal-data"
+        data_root.mkdir(mode=0o700)
         environment = os.environ.copy()
         environment.update(
             {
                 "ASPNETCORE_ENVIRONMENT": "Development",
                 "ASPNETCORE_URLS": PORTAL_URL,
-                "Sirk__Central__ConnectionFile": str(connection_file),
+                "Sirk__DataRoot": str(data_root),
+                "Sirk__Central__Enabled": "true",
+                "Sirk__Central__BaseUrl": CENTRAL_URL,
+                "Sirk__Central__PortalId": PORTAL_ID,
+                "Sirk__Central__PortalName": "Portal Test",
+                "Sirk__Central__PortalToken": PORTAL_TOKEN,
+                "Sirk__Central__PublicUrl": "https://portal.example",
                 "Sirk__Central__UpdateChannel": "dev",
                 "Sirk__Central__HeartbeatIntervalSeconds": "30",
                 "Sirk__Central__RequestTimeoutSeconds": "5",
+                "Sirk__Central__ConnectionFile": str(test_root / "missing-central-connection.json"),
+                "Sirk__CentralTunnel__Enabled": "false",
             }
         )
 
@@ -163,23 +153,20 @@ def main() -> int:
             stderr=subprocess.STDOUT,
             text=True,
         )
-
         try:
             if not HEARTBEAT_RECEIVED.wait(timeout=30):
                 raise RuntimeError("Portal did not send a heartbeat within 30 seconds.")
             if HEARTBEAT_ERROR:
                 raise RuntimeError(HEARTBEAT_ERROR[0])
-
             status = wait_portal_status(15)
             central = status["central"]
             if central.get("lastStatusCode") != 202 or central.get("portalId") != PORTAL_ID:
                 raise RuntimeError("Portal Central status does not contain the accepted heartbeat state.")
-            if central.get("configurationSource") != "protected-file":
-                raise RuntimeError("Portal did not load the protected Central connection file.")
+            if central.get("configurationSource") != "configuration":
+                raise RuntimeError("Portal did not use the explicit Development heartbeat configuration.")
             if PORTAL_TOKEN in json.dumps(status, separators=(",", ":")):
                 raise RuntimeError("Portal status response exposes the Portal token.")
-
-            print("SIRK Portal protected-file Central heartbeat smoke: OK")
+            print("SIRK Portal signed Central heartbeat smoke: OK")
             return 0
         finally:
             if process.poll() is None:
@@ -200,6 +187,6 @@ def main() -> int:
 if __name__ == "__main__":
     try:
         raise SystemExit(main())
-    except Exception as error:  # noqa: BLE001 - CI entry point
+    except Exception as error:  # noqa: BLE001
         print(str(error), file=sys.stderr)
         raise SystemExit(1)
