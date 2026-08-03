@@ -3,6 +3,7 @@
 import http.cookiejar
 import json
 import os
+import signal
 import subprocess
 import sys
 import tempfile
