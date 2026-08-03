@@ -60,6 +60,7 @@ try {
     foreach ($asset in @(
         '/login',
         '/assets/portal-login.css',
+        '/assets/portal-login.js',
         '/assets/portal-standalone.css',
         '/assets/standalone-core.js',
         '/assets/portal-standalone.js',
@@ -72,12 +73,32 @@ try {
         }
     }
 
+    $loginPage = (Invoke-WebRequest "$baseUrl/login" -UseBasicParsing).Content
+    foreach ($marker in @('id="sirkMicrosoftLogin"','id="sirkLocalLogin" class="sirk-local-login" hidden')) {
+        if ($loginPage -notmatch [regex]::Escape($marker)) { throw "Login UI marker missing: $marker" }
+    }
+    if ($loginPage -match 'name="accessCode"') { throw 'Access Code field must not be rendered.' }
+
     $accessCode = (Get-Content 'C:\ProgramData\SIRK\Portal\security\break-glass-access-code.txt' -Raw).Trim()
     if ($accessCode.Length -lt 40) { throw 'Break-Glass access code is invalid.' }
+    $authHeaders = @{ Authorization = "Bearer $accessCode" }
+    $access = Invoke-RestMethod "$baseUrl/api/v1/auth/local-access" -Headers $authHeaders
+    if ($access.ok -ne $true) { throw 'Portal access URL validation failed.' }
+
     $session = New-Object Microsoft.PowerShell.Commands.WebRequestSession
     $payload = @{ userName='admin'; password=$Password; accessCode=$accessCode } | ConvertTo-Json -Compress
-    $login = Invoke-RestMethod "$baseUrl/api/v1/auth/login" -Method Post -ContentType 'application/json' -Body $payload -WebSession $session
-    if ($login.user.role -ne 'Break-Glass') { throw 'Break-Glass login failed.' }
+    try {
+        Invoke-RestMethod "$baseUrl/api/v1/auth/login" -Method Post -ContentType 'application/json' -Body $payload -WebSession $session | Out-Null
+        throw 'Local login without the access URL was unexpectedly accepted.'
+    }
+    catch {
+        if ($_.Exception.Message -eq 'Local login without the access URL was unexpectedly accepted.') { throw }
+        $status = [int]$_.Exception.Response.StatusCode
+        if ($status -ne 404) { throw "Local login without access returned HTTP $status instead of 404." }
+    }
+
+    $login = Invoke-RestMethod "$baseUrl/api/v1/auth/login" -Method Post -ContentType 'application/json' -Body $payload -Headers $authHeaders -WebSession $session
+    if ($login.user.role -ne 'Break-Glass') { throw 'Break-Glass access URL login failed.' }
 
     $portal = (Invoke-WebRequest "$baseUrl/" -WebSession $session -UseBasicParsing).Content
     foreach ($marker in @('sirkStandaloneRoot','data-view="devices"','data-view="settings"')) {
