@@ -56,10 +56,12 @@ if missing:
     raise SystemExit('Published frontend is incomplete: ' + ', '.join(missing))
 PY
 
-python3 .github/scripts/test-dotnet10-central-heartbeat.py artifacts/linux-x64/Sirk.Portal
-python3 .github/scripts/test-dotnet10-native-api.py artifacts/linux-x64/Sirk.Portal
-python3 .github/scripts/test-dotnet10-native-settings-v2.py artifacts/linux-x64/Sirk.Portal
-python3 .github/scripts/test-dotnet10-full-ui.py artifacts/linux-x64/Sirk.Portal
+portal_dll='artifacts/linux-x64/Sirk.Portal.dll'
+test -f "$portal_dll"
+python3 .github/scripts/test-dotnet10-central-heartbeat.py "$portal_dll"
+python3 .github/scripts/test-dotnet10-native-api.py "$portal_dll"
+python3 .github/scripts/test-dotnet10-native-settings-v2.py "$portal_dll"
+python3 .github/scripts/test-dotnet10-full-ui.py "$portal_dll"
 
 docker build --tag sirk-portal:dotnet10 .
 docker run --detach --name sirk-portal-smoke \
