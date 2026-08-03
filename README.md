@@ -27,4 +27,8 @@ Instalator pyta o FQDN, hasło Break-Glass i zaufanie certyfikatu. Następnie pu
 - trwałe dane: `C:\ProgramData\SIRK\Portal`
 - pliki programu: `C:\Program Files\SIRK\Portal`
 
+## Walidacja
+
+Workflow `SIRK Portal .NET 10 CI` wykonuje build, kontrakty bezpieczeństwa, self-contained publish, smoke test pełnego UI/API, test kontenera oraz rzeczywistą instalację od zera na Windows.
+
 Repozytorium nie zawiera `package.json`, backendu `server/`, `npm`, `node.exe`, `node-windows` ani serwerowych testów JavaScript.
