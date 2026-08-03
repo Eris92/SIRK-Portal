@@ -29,4 +29,4 @@ jobs:
         run: dotnet publish src/Sirk.Portal/Sirk.Portal.csproj --configuration Release --runtime linux-x64 --self-contained false --output artifacts/linux-x64
 
       - name: Native settings and maintenance E2E
-        run: python3 .github/scripts/test-dotnet10-native-settings.py artifacts/linux-x64/Sirk.Portal.dll
+        run: python3 .github/scripts/test-dotnet10-native-settings-v2.py artifacts/linux-x64/Sirk.Portal.dll
