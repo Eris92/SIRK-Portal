@@ -330,7 +330,7 @@ try {
     $readyRaw = & curl.exe -sS --max-time 10 "$publicUrl/readyz"
     $ready = $readyRaw | ConvertFrom-Json
     if ($ready.status -ne 'ready') { throw 'Portal nie przeszedł readiness check.' }
-    $loginHtml = & curl.exe -sS --max-time 10 "$publicUrl/login"
+    $loginHtml = (& curl.exe -sS --max-time 10 "$publicUrl/login" | Out-String)
     if ($loginHtml -notmatch 'sirk-login-page' -or $loginHtml -notmatch '/assets/portal-login.css') {
         throw 'Pełny frontend logowania nie został opublikowany.'
     }
