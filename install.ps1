@@ -25,6 +25,14 @@ $workRoot = Join-Path $env:TEMP ('SIRK-Portal-Bootstrap-' + [guid]::NewGuid().To
 $sourceZip = Join-Path $workRoot 'source.zip'
 $extractRoot = Join-Path $workRoot 'source'
 
+function ConvertFrom-SecureStringPlain {
+    param([Parameter(Mandatory)][Security.SecureString]$Value)
+
+    $pointer = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($Value)
+    try { return [Runtime.InteropServices.Marshal]::PtrToStringBSTR($pointer) }
+    finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($pointer) }
+}
+
 function Invoke-Utf8Script {
     param(
         [Parameter(Mandatory)][string]$Path,
@@ -43,6 +51,55 @@ function Invoke-Utf8Script {
     }
     $script = [scriptblock]::Create($source)
     & $script @Parameters
+}
+
+$defaultFqdn = ($env:COMPUTERNAME + '.local').ToLowerInvariant()
+$effectiveFqdn = $PortalFqdn.Trim().ToLowerInvariant()
+if ([string]::IsNullOrWhiteSpace($effectiveFqdn)) {
+    if (-not [string]::IsNullOrWhiteSpace($env:SIRK_INSTALL_FQDN)) {
+        $effectiveFqdn = $env:SIRK_INSTALL_FQDN.Trim().ToLowerInvariant()
+    }
+    elseif ($NonInteractive) {
+        $effectiveFqdn = $defaultFqdn
+    }
+    else {
+        $answer = Read-Host "Nazwa DNS Portalu [$defaultFqdn]"
+        $effectiveFqdn = if ([string]::IsNullOrWhiteSpace($answer)) {
+            $defaultFqdn
+        } else {
+            $answer.Trim().ToLowerInvariant()
+        }
+    }
+}
+
+if (-not $NonInteractive -and [string]::IsNullOrWhiteSpace($env:SIRK_INSTALL_BREAKGLASS_PASSWORD)) {
+    $password1 = Read-Host 'Hasło administratora Break-Glass (minimum 14 znaków)' -AsSecureString
+    $password2 = Read-Host 'Powtórz hasło' -AsSecureString
+    $plain1 = ConvertFrom-SecureStringPlain $password1
+    $plain2 = ConvertFrom-SecureStringPlain $password2
+    try {
+        if ([string]::IsNullOrWhiteSpace($plain1) -or $plain1.Length -lt 14) {
+            throw 'Hasło musi mieć minimum 14 znaków.'
+        }
+        if ($plain1 -cne $plain2) { throw 'Hasła nie są identyczne.' }
+        $env:SIRK_INSTALL_BREAKGLASS_PASSWORD = $plain1
+    }
+    finally {
+        $plain1 = $null
+        $plain2 = $null
+    }
+}
+
+if (-not $NonInteractive -and
+    -not $TrustCertificate -and
+    -not $DoNotTrustCertificate -and
+    [string]::IsNullOrWhiteSpace($env:SIRK_INSTALL_TRUST_CERTIFICATE)) {
+    $trustAnswer = (Read-Host 'Dodać certyfikat Portalu do LocalMachine\Root? [T/n]').Trim().ToLowerInvariant()
+    if ($trustAnswer -in @('n','nie','no')) {
+        $DoNotTrustCertificate = $true
+    } else {
+        $TrustCertificate = $true
+    }
 }
 
 New-Item -ItemType Directory -Path $workRoot,$extractRoot -Force | Out-Null
@@ -70,11 +127,11 @@ try {
         DataRoot = $DataRoot
         HttpsPort = $HttpsPort
         BootstrapUserName = $BootstrapUserName
-        PortalFqdn = $PortalFqdn
+        PortalFqdn = $effectiveFqdn
+        NonInteractive = $true
     }
     if ($TrustCertificate) { $parameters.TrustCertificate = $true }
     if ($DoNotTrustCertificate) { $parameters.DoNotTrustCertificate = $true }
-    if ($NonInteractive) { $parameters.NonInteractive = $true }
     if ($RemoveData) { $parameters.RemoveData = $true }
 
     Invoke-Utf8Script -Path $installerPath -Parameters $parameters
@@ -100,8 +157,27 @@ try {
         throw "Nieprawidłowy stan SirkPortal: $($portal.Status) / $($portal.StartType)"
     }
 
+    $accessFile = Join-Path $DataRoot 'security\break-glass-access-code.txt'
+    if (-not (Test-Path -LiteralPath $accessFile -PathType Leaf)) {
+        throw "Brak wygenerowanego Access Code: $accessFile"
+    }
+    $accessCode = (Get-Content -LiteralPath $accessFile -Raw -Encoding ASCII).Trim()
+    if ($accessCode -notmatch '^[A-Za-z0-9_-]{32,256}$') {
+        throw 'Wygenerowany Access Code jest nieprawidłowy.'
+    }
+    $publicUrl = if ($HttpsPort -eq 443) {
+        "https://$effectiveFqdn"
+    } else {
+        "https://$effectiveFqdn`:$HttpsPort"
+    }
+    $accessUrl = "$publicUrl/login#access=$accessCode"
+
+    Write-Host "`nAccess URL: $accessUrl" -ForegroundColor Yellow
+    Write-Host "Access URL zapisano również w: $accessFile" -ForegroundColor DarkYellow
     Write-Host 'SIRK_PORTAL_DOTNET10_INSTALL_OK' -ForegroundColor Green
+    if (-not $NonInteractive) { Start-Process $accessUrl }
 }
 finally {
+    Remove-Item Env:SIRK_INSTALL_BREAKGLASS_PASSWORD -ErrorAction SilentlyContinue
     Remove-Item -LiteralPath $workRoot -Recurse -Force -ErrorAction SilentlyContinue
 }

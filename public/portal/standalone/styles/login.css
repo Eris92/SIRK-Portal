@@ -1,6 +1,7 @@
 :root{color-scheme:light;font-family:Inter,"Segoe UI",Arial,sans-serif;background:#f7f9fc;color:#172033}
 *{box-sizing:border-box}
 body{margin:0;min-height:100vh}
+[hidden]{display:none!important}
 .sirk-login-page{display:grid;grid-template-columns:minmax(360px,1.1fr) minmax(380px,.9fr);min-height:100vh}
 .sirk-login-brand{display:flex;flex-direction:column;justify-content:center;padding:clamp(48px,8vw,120px);background:radial-gradient(circle at 15% 15%,#7b61ff55,transparent 36%),linear-gradient(145deg,#111936,#222f68);color:#fff}
 .sirk-login-mark{display:grid;place-items:center;width:58px;height:58px;border-radius:17px;background:#7657ff;font-size:30px;font-weight:800;box-shadow:0 16px 44px #0005}
@@ -12,11 +13,15 @@ body{margin:0;min-height:100vh}
 .sirk-login-card header span{color:#7256e8;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.12em}
 .sirk-login-card h2{margin:10px 0 8px;font-size:34px}
 .sirk-login-card header p,.sirk-login-card footer{color:#667085;line-height:1.55}
+.sirk-login-provider,.sirk-login-card button{display:flex;align-items:center;justify-content:center;width:100%;margin-top:26px;padding:14px;border:0;border-radius:10px;background:#6947ed;color:#fff;font:700 15px Inter,"Segoe UI",Arial,sans-serif;text-decoration:none;cursor:pointer}
+.sirk-login-provider:hover,.sirk-login-card button:hover{filter:brightness(1.04)}
+.sirk-login-card button:disabled{opacity:.6;cursor:wait}
+.sirk-local-login{margin-top:24px}
+.sirk-login-separator{display:flex;align-items:center;gap:12px;margin:4px 0 2px;color:#667085;font-size:11px;font-weight:750;letter-spacing:.12em;text-transform:uppercase}
+.sirk-login-separator:before,.sirk-login-separator:after{content:"";height:1px;flex:1;background:#dce3ec}
 .sirk-login-card label{display:grid;gap:8px;margin-top:22px;font-size:14px;font-weight:650}
 .sirk-login-card input{width:100%;padding:13px 14px;border:1px solid #cfd8e6;border-radius:10px;background:#fff;color:#172033;font:inherit}
 .sirk-login-card input:focus{border-color:#7657ff;outline:3px solid #7657ff22}
-.sirk-login-card button{width:100%;margin-top:26px;padding:14px;border:0;border-radius:10px;background:#6947ed;color:#fff;font:700 15px inherit;cursor:pointer}
-.sirk-login-card button:disabled{opacity:.6;cursor:wait}
 .sirk-login-card footer{margin-top:28px;padding-top:22px;border-top:1px solid #e8edf4;font-size:12px}
 .sirk-login-error{margin-top:16px;padding:11px 13px;border-radius:9px;background:#fee2e2;color:#991b1b;font-size:13px}
 .sirk-login-public-banner{position:fixed;inset:0 0 auto;z-index:10;padding:12px 18px;text-align:center;box-shadow:0 1px 0 #0f172a24}

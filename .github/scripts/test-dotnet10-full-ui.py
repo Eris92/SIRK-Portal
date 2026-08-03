@@ -14,7 +14,7 @@ from pathlib import Path
 
 BASE_URL = "http://127.0.0.1:18083"
 PASSWORD = "Sirk-Portal-Ui-Test!2026"
-ACCESS_CODE = "sirk-ui-test-access-code-2026"
+ACCESS_CODE = "sirk-ui-test-access-code-2026-secure"
 
 
 class Browser:
@@ -31,16 +31,18 @@ class Browser:
         payload: object | None = None,
         expected: int = 200,
         accept: str = "application/json",
+        headers: dict[str, str] | None = None,
     ) -> tuple[bytes, dict[str, str]]:
         body = None
-        headers = {"Accept": accept}
+        request_headers = {"Accept": accept}
+        request_headers.update(headers or {})
         if payload is not None:
             body = json.dumps(payload, separators=(",", ":")).encode("utf-8")
-            headers["Content-Type"] = "application/json; charset=utf-8"
+            request_headers["Content-Type"] = "application/json; charset=utf-8"
         request = urllib.request.Request(
             BASE_URL + path,
             data=body,
-            headers=headers,
+            headers=request_headers,
             method=method,
         )
         try:
@@ -59,8 +61,15 @@ class Browser:
             )
         return raw, response_headers
 
-    def json(self, method: str, path: str, payload: object | None = None, expected: int = 200) -> dict:
-        raw, _ = self.request(method, path, payload, expected)
+    def json(
+        self,
+        method: str,
+        path: str,
+        payload: object | None = None,
+        expected: int = 200,
+        headers: dict[str, str] | None = None,
+    ) -> dict:
+        raw, _ = self.request(method, path, payload, expected, headers=headers)
         return json.loads(raw.decode("utf-8")) if raw else {}
 
 
@@ -122,7 +131,10 @@ def main() -> int:
             login = login_raw.decode("utf-8")
             require(login, 'class="sirk-login-page"', "Styled login")
             require(login, '/assets/portal-login.css', "Styled login")
-            require(login, 'name="accessCode"', "Break-Glass login")
+            require(login, 'id="sirkMicrosoftLogin"', "Microsoft sign-in")
+            require(login, 'id="sirkLocalLogin" class="sirk-local-login" hidden', "Hidden local sign-in")
+            if 'name="accessCode"' in login:
+                raise RuntimeError("Access Code must not be rendered as a local sign-in field.")
             if "text/html" not in login_headers.get("content-type", ""):
                 raise RuntimeError("Login response has an invalid content type.")
 
@@ -136,8 +148,10 @@ def main() -> int:
                 "/assets/shared-ui/shared-ui.css": "text/css",
                 "/assets/icons/sirk-ui.svg": "image/svg+xml",
             }
+            asset_bodies: dict[str, bytes] = {}
             for path, expected_type in critical_assets.items():
                 raw, headers = browser.request("GET", path, accept="*/*")
+                asset_bodies[path] = raw
                 if not raw:
                     raise RuntimeError(f"Frontend asset is empty: {path}")
                 if expected_type not in headers.get("content-type", ""):
@@ -146,7 +160,41 @@ def main() -> int:
                         f"{headers.get('content-type', '')}"
                     )
 
+            login_script = asset_bodies["/assets/portal-login.js"].decode("utf-8")
+            for marker in (
+                "window.location.hash",
+                'fragment.get("access")',
+                'fetch("/api/v1/auth/local-access"',
+                '"Authorization": "Bearer " + accessCode',
+            ):
+                require(login_script, marker, "Access URL login script")
+
+            browser.request("GET", "/api/v1/auth/local-access", expected=404)
+            browser.request(
+                "GET",
+                "/api/v1/auth/local-access",
+                expected=404,
+                headers={"Authorization": "Bearer invalid-invalid-invalid-invalid-invalid"},
+            )
+            local_access = browser.json(
+                "GET",
+                "/api/v1/auth/local-access",
+                headers={"Authorization": "Bearer " + ACCESS_CODE},
+            )
+            if local_access.get("ok") is not True:
+                raise RuntimeError("Valid Portal access URL was not accepted.")
+
             browser.request("GET", "/", expected=200, accept="text/html")
+            browser.json(
+                "POST",
+                "/api/v1/auth/login",
+                {
+                    "userName": "admin",
+                    "password": PASSWORD,
+                    "accessCode": ACCESS_CODE,
+                },
+                expected=404,
+            )
             login_result = browser.json(
                 "POST",
                 "/api/v1/auth/login",
@@ -155,9 +203,10 @@ def main() -> int:
                     "password": PASSWORD,
                     "accessCode": ACCESS_CODE,
                 },
+                headers={"Authorization": "Bearer " + ACCESS_CODE},
             )
             if login_result.get("user", {}).get("role") != "Break-Glass":
-                raise RuntimeError("Styled UI login did not establish a Break-Glass session.")
+                raise RuntimeError("Access URL login did not establish a Break-Glass session.")
 
             portal_raw, _ = browser.request("GET", "/", accept="text/html")
             portal = portal_raw.decode("utf-8")
@@ -202,7 +251,7 @@ def main() -> int:
             if updates.get("value", {}).get("current", {}).get("version") is None:
                 raise RuntimeError("System update status adapter is incomplete.")
 
-            print("SIRK Portal complete native UI smoke: OK")
+            print("SIRK Portal access URL gated native UI smoke: OK")
             return 0
         finally:
             if process.poll() is None:

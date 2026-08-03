@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="color-scheme" content="light dark">
+  <meta name="robots" content="noindex,nofollow">
   <title>SIRK Portal — logowanie</title>
   <link rel="stylesheet" href="__ASSET_BASE__/portal-login.css?v=__VERSION__">
 </head>
@@ -16,25 +17,32 @@
       <p>Urządzenia, automatyzacja, bezpieczeństwo i zdalna obsługa w jednym Portalu.</p>
     </section>
     <section class="sirk-login-panel">
-      <form id="sirkLoginForm" class="sirk-login-card" autocomplete="on">
+      <div class="sirk-login-card">
         <header>
           <span>Dostęp do Portalu</span>
-          <h2>Zaloguj się</h2>
-          <p>Użyj konta lokalnego SIRK Portal. Dla konta Break-Glass podaj także aktualny Access Code.</p>
+          <h2>SIRK Portal</h2>
+          <p>Zaloguj się kontem organizacyjnym Microsoft Entra.</p>
         </header>
-        <label>Nazwa użytkownika
-          <input name="username" type="text" autocomplete="username" required autofocus maxlength="64">
-        </label>
-        <label>Hasło
-          <input name="password" type="password" autocomplete="current-password" required maxlength="256">
-        </label>
-        <label>Access Code
-          <input name="accessCode" type="password" autocomplete="off" maxlength="256" spellcheck="false">
-        </label>
-        <div id="sirkLoginError" class="sirk-login-error" role="alert" hidden></div>
-        <button type="submit">Zaloguj się</button>
+
+        <a id="sirkMicrosoftLogin" class="sirk-login-provider" href="/login?microsoft=not-configured">Zaloguj przez Microsoft</a>
+
+        <section id="sirkLocalLogin" class="sirk-local-login" hidden>
+          <div class="sirk-login-separator"><span>lokalne logowanie</span></div>
+          <form id="sirkLoginForm" autocomplete="on">
+            <label>Nazwa użytkownika
+              <input name="username" type="text" autocomplete="username" required maxlength="64">
+            </label>
+            <label>Hasło
+              <input name="password" type="password" autocomplete="current-password" required maxlength="256">
+            </label>
+            <div id="sirkLoginError" class="sirk-login-error" role="alert" hidden></div>
+            <button type="submit">Zaloguj lokalnie</button>
+          </form>
+        </section>
+
+        <div id="sirkMicrosoftMessage" class="sirk-login-error" role="alert" hidden></div>
         <footer>SIRK Portal działa niezależnie od zewnętrznego hosta zarządzającego.</footer>
-      </form>
+      </div>
     </section>
   </main>
   <script>

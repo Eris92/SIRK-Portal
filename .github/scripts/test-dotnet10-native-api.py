@@ -234,6 +234,7 @@ def main() -> int:
                     "password": PASSWORD,
                     "accessCode": ACCESS_CODE,
                 },
+                headers={"Authorization": "Bearer " + ACCESS_CODE},
             )
             if login.get("user", {}).get("role") != "Break-Glass":
                 raise RuntimeError("Break-Glass login did not return the expected role.")
