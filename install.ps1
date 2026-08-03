@@ -45,43 +45,6 @@ function Invoke-Utf8Script {
     & $script @Parameters
 }
 
-function Enable-FirewallCompatibility {
-    param([Parameter(Mandatory)][string]$InstallerPath)
-
-    $source = Get-Content -LiteralPath $InstallerPath -Raw -Encoding UTF8
-    $pattern = "(?ms)^    \`$firewallName = 'SIRK Portal HTTPS'\r?\n    Remove-NetFirewallRule[^\r\n]*\r?\n    New-NetFirewallRule[^\r\n]*\r?\n"
-    $replacement = @'
-    $firewallName = 'SIRK Portal HTTPS'
-    $firewallConfigured = $false
-    try {
-        if (-not (Get-Command Remove-NetFirewallRule -ErrorAction SilentlyContinue) -or
-            -not (Get-Command New-NetFirewallRule -ErrorAction SilentlyContinue)) {
-            throw 'Cmdlety Windows Firewall są niedostępne.'
-        }
-        Remove-NetFirewallRule -DisplayName $firewallName -ErrorAction SilentlyContinue
-        New-NetFirewallRule -DisplayName $firewallName -Direction Inbound -Action Allow -Protocol TCP -LocalPort $HttpsPort -Profile Domain,Private -ErrorAction Stop | Out-Null
-        $firewallConfigured = $true
-    }
-    catch {
-        Write-Warning ('Nie można skonfigurować zapory przez NetSecurity: {0}. Próba netsh.exe.' -f $_.Exception.Message)
-    }
-    if (-not $firewallConfigured) {
-        & netsh.exe advfirewall firewall delete rule name="$firewallName" | Out-Null
-        & netsh.exe advfirewall firewall add rule name="$firewallName" dir=in action=allow protocol=TCP localport=$HttpsPort profile=domain,private enable=yes | Out-Null
-        if ($LASTEXITCODE -eq 0) { $firewallConfigured = $true }
-    }
-    if (-not $firewallConfigured) {
-        Write-Warning "Nie udało się dodać reguły zapory dla TCP/$HttpsPort. Portal będzie działał lokalnie; regułę można dodać później ręcznie."
-    }
-'@
-
-    $patched = [regex]::Replace($source, $pattern, ($replacement + [Environment]::NewLine), 1)
-    if ($patched -eq $source) {
-        throw 'Nie znaleziono oczekiwanego bloku konfiguracji zapory w instalatorze.'
-    }
-    Set-Content -LiteralPath $InstallerPath -Value $patched -Encoding UTF8
-}
-
 New-Item -ItemType Directory -Path $workRoot,$extractRoot -Force | Out-Null
 try {
     Write-Host "=== SIRK Portal .NET 10 clean installation ===" -ForegroundColor Cyan
@@ -100,7 +63,6 @@ try {
     if (-not (Test-Path -LiteralPath $installerPath)) {
         throw "Brak natywnego instalatora .NET 10: $installerPath"
     }
-    Enable-FirewallCompatibility -InstallerPath $installerPath
 
     $parameters = @{
         Branch = $Branch
