@@ -14,6 +14,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: sirk-portal-dotnet10-clean-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -93,8 +97,8 @@ jobs:
               'public/portal/standalone/login.html',
               'public/portal/standalone/scripts/core.js',
               'public/portal/standalone/scripts/app.js',
+              'public/portal/standalone/scripts/settings-native-v2.js',
               'public/portal/standalone/styles/base.css',
-              'public/portal/settings.js',
               'public/shared/ui/shared-ui.css',
           )
           missing = [str(root / item) for root in roots for item in required if not (root / item).is_file()]
@@ -108,7 +112,7 @@ jobs:
       - name: Native API end-to-end smoke
         run: python3 .github/scripts/test-dotnet10-native-api.py artifacts/linux-x64/Sirk.Portal.dll
 
-      - name: Complete native UI smoke
+      - name: Complete native UI and maintenance smoke
         run: python3 .github/scripts/test-dotnet10-full-ui.py artifacts/linux-x64/Sirk.Portal.dll
 
       - name: Container build
@@ -133,3 +137,50 @@ jobs:
           docker logs sirk-portal-dotnet10-clean-smoke
           docker rm --force --volumes sirk-portal-dotnet10-clean-smoke
           exit 1
+
+  windows-installer-e2e:
+    name: Windows installer HTTPS service E2E
+    needs: build
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install and validate complete native Portal
+        shell: powershell
+        run: .\.github\scripts\test-dotnet10-windows-installer.ps1
+
+      - name: Show Windows diagnostics on failure
+        if: failure()
+        shell: powershell
+        run: |
+          Get-Service SirkPortal -ErrorAction SilentlyContinue | Format-List *
+          Get-CimInstance Win32_Service -Filter "Name='SirkPortal'" -ErrorAction SilentlyContinue | Format-List *
+          Get-Content 'C:\ProgramData\SIRK\Logs\Portal-DotNet10-Install.log' -Tail 400 -ErrorAction SilentlyContinue
+          Get-WinEvent -FilterHashtable @{ LogName='Application'; StartTime=(Get-Date).AddMinutes(-30) } -ErrorAction SilentlyContinue |
+            Where-Object { $_.ProviderName -match 'Sirk|\.NET Runtime|Application Error' -or $_.Message -match 'Sirk\.Portal' } |
+            Select-Object -First 100 TimeCreated,ProviderName,Id,LevelDisplayName,Message |
+            Format-List
+
+      - name: Cleanup Windows test installation
+        if: always()
+        shell: powershell
+        run: |
+          Stop-Service SirkPortal -Force -ErrorAction SilentlyContinue
+          & sc.exe delete SirkPortal | Out-Null
+          $global:LASTEXITCODE = 0
+          Remove-NetFirewallRule -DisplayName 'SIRK Portal HTTPS' -ErrorAction SilentlyContinue
+          Get-ChildItem Cert:\LocalMachine\My,Cert:\LocalMachine\Root -ErrorAction SilentlyContinue |
+            Where-Object FriendlyName -eq 'SIRK Portal HTTPS' |
+            Remove-Item -Force -ErrorAction SilentlyContinue
+          Remove-Item `
+            'C:\Program Files\SIRK\Portal',
+            'C:\ProgramData\SIRK\Portal',
+            'C:\ProgramData\SIRK\Portal Backups',
+            'C:\ProgramData\SIRK\Install Backups' `
+            -Recurse -Force -ErrorAction SilentlyContinue
+          $hosts = Join-Path $env:SystemRoot 'System32\drivers\etc\hosts'
+          if (Test-Path -LiteralPath $hosts) {
+            $lines = Get-Content -LiteralPath $hosts | Where-Object { $_ -notmatch 'portal-ci\.sirk\.local' }
+            Set-Content -LiteralPath $hosts -Value $lines -Encoding ASCII
+          }
