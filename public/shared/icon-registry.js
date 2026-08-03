@@ -5,7 +5,8 @@
 
     function base() {
         var assetBase = String(window.__SIRK_PLATFORM_ASSET_BASE__ || "").replace(/\/$/, "");
-        return assetBase ? assetBase + "/icons/sirk-ui.svg" : "";
+        var version = encodeURIComponent(String(window.__SIRK_PLATFORM_PORTAL_VERSION__ || ""));
+        return assetBase ? assetBase + "/icons/sirk-ui.svg" + (version ? "?v=" + version : "") : "";
     }
 
     function href(name) {

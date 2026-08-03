@@ -8,6 +8,9 @@
         identity: null,
         runtime: null,
         maintenance: null,
+        central: null,
+        computerGroups: null,
+        issuedEnrollment: null,
         csrf: "",
         host: null,
         page: null
@@ -80,12 +83,16 @@
             api("/api/v1/admin/settings"),
             api("/api/v1/admin/identity/"),
             api("/api/v1/admin/runtime"),
-            api("/api/v1/admin/maintenance/status")
+            api("/api/v1/admin/maintenance/status"),
+            api("/api/v1/admin/central"),
+            api("/api/v1/admin/computer-groups")
         ]).then(function (values) {
             state.settings = values[0].value;
             state.identity = values[1].value;
             state.runtime = values[2];
             state.maintenance = values[3].value;
+            state.central = values[4].value;
+            state.computerGroups = values[5].value;
         });
     }
 
@@ -183,18 +190,21 @@
     function sectionDefinitions() {
         if (state.tab === "portal") return [
             { key: "general", label: "Ogólne" },
-            { key: "views", label: "Widoczność zakładek" }
+            { key: "views", label: "Widoczność zakładek" },
+            { key: "central", label: "Połączenie z Central" }
         ];
         if (state.tab === "modules") return Object.keys((state.settings && state.settings.modules) || {}).sort().map(function (key) {
             return { key: key, label: key };
         });
         if (state.tab === "identity") return [
             { key: "users", label: "Użytkownicy lokalni" },
-            { key: "groups", label: "Grupy dostępu" }
+            { key: "groups", label: "Grupy dostępu" },
+            { key: "computer-groups", label: "Grupy komputerów" }
         ];
         return [
             { key: "runtime", label: "Usługa i runtime" },
             { key: "updates", label: "Aktualizacje" },
+            { key: "history", label: "Historia aktualizacji" },
             { key: "backups", label: "Backupy" }
         ];
     }
@@ -433,6 +443,191 @@
         host.appendChild(groups);
     }
 
+    function slug(value) {
+        var result = String(value || "").trim().toLowerCase()
+            .replace(/[^a-z0-9._-]+/g, "-")
+            .replace(/^-+|-+$/g, "")
+            .replace(/-+/g, "-");
+        return result.length >= 3 ? result.slice(0, 96) : "group-" + Date.now().toString(36);
+    }
+
+    function copyText(value) {
+        value = String(value || "");
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(value).catch(function () {});
+        } else {
+            window.prompt("Skopiuj wartość:", value);
+        }
+    }
+
+    function renderCentral(host) {
+        var value = state.central || {};
+        var live = value.state || {};
+        var configuration = value.configuration || {};
+        var node = card("Połączenie z SIRK Central", "Importuj plik bootstrap wygenerowany w Central. Token jest przechowywany w chronionym pliku i nigdy nie jest zwracany w całości.");
+        var status = el("div", "sirk-status-grid");
+        status.appendChild(el("strong", "", value.configured ? (live.connected ? "Połączony" : "Skonfigurowany") : "Niepołączony"));
+        status.appendChild(el("span", "", "Stan: " + (live.status || "disabled")));
+        status.appendChild(el("span", "", "Central: " + (configuration.centralUrl || live.centralUrl || "—")));
+        status.appendChild(el("span", "", "Portal ID: " + (configuration.portalId || live.portalId || "—")));
+        status.appendChild(el("span", "", "Tunnel: " + (configuration.tunnelUrl || "—")));
+        status.appendChild(el("span", "", "Ostatnie połączenie: " + (live.lastSuccessAtUtc ? new Date(live.lastSuccessAtUtc).toLocaleString() : "—")));
+        if (live.lastError || value.error) status.appendChild(el("span", "sirk-error", live.lastError || value.error));
+        node.appendChild(status);
+
+        var importCard = el("section", "sirk-card");
+        importCard.appendChild(el("h3", "", "Import bootstrap JSON"));
+        importCard.appendChild(el("p", "sirk-muted", "Wybierz plik pobrany z SIRK Central. Po zapisaniu Portal uruchomi ponownie usługę."));
+        var input = el("input");
+        input.type = "file";
+        input.accept = "application/json,.json";
+        importCard.appendChild(input);
+        var payload = null;
+        var message = el("span", "sirk-muted", "");
+        var actions = actionRow();
+        var save = button("Zapisz i uruchom ponownie", function () {
+            if (!payload) return;
+            save.disabled = true;
+            message.textContent = "Zapisywanie…";
+            api("/api/v1/admin/central", "PUT", payload).then(function (result) {
+                state.central = result.value;
+                message.textContent = "Konfiguracja zapisana. Restartowanie Portalu…";
+                maintenance("restart", {}, true);
+            }).catch(function (error) {
+                save.disabled = false;
+                message.textContent = error.message || String(error);
+            });
+        });
+        save.disabled = true;
+        input.onchange = function () {
+            payload = null;
+            save.disabled = true;
+            message.textContent = "";
+            var file = input.files && input.files[0];
+            if (!file) return;
+            if (file.size > 32768) {
+                message.textContent = "Plik jest zbyt duży.";
+                return;
+            }
+            file.text().then(function (text) {
+                var parsed = JSON.parse(text);
+                payload = parsed && parsed.bootstrap ? parsed.bootstrap : parsed;
+                if (!payload || typeof payload !== "object") throw new Error("Nieprawidłowy plik bootstrap.");
+                save.disabled = false;
+                message.textContent = "Plik gotowy do importu.";
+            }).catch(function (error) {
+                message.textContent = error.message || String(error);
+            });
+        };
+        actions.appendChild(save);
+        if (value.configured) {
+            actions.appendChild(button("Odłącz od Central", function () {
+                if (!window.confirm("Usunąć konfigurację Central i uruchomić Portal ponownie?")) return;
+                api("/api/v1/admin/central", "DELETE").then(function (result) {
+                    state.central = result.value;
+                    maintenance("restart", {}, true);
+                }).catch(showError);
+            }, true));
+        }
+        actions.appendChild(message);
+        importCard.appendChild(actions);
+        node.appendChild(importCard);
+        host.appendChild(node);
+    }
+
+    function acceptComputerGroupResult(result) {
+        state.computerGroups = result.value || { groups: [], devices: [] };
+        if (result.enrollmentToken) {
+            state.issuedEnrollment = { groupId: result.groupId, token: result.enrollmentToken };
+        }
+        renderAll();
+    }
+
+    function renderComputerGroups(host) {
+        var snapshot = state.computerGroups || { groups: [], devices: [] };
+        var node = card("Grupy komputerów", "Grupy urządzeń SIRK Agent. Token rejestracyjny jest wyświetlany tylko po utworzeniu grupy lub jego rotacji.");
+        if (state.issuedEnrollment) {
+            var tokenCard = el("section", "sirk-card sirk-one-time-token");
+            tokenCard.appendChild(el("strong", "", "Token jednorazowy dla grupy " + state.issuedEnrollment.groupId));
+            tokenCard.appendChild(el("code", "", state.issuedEnrollment.token));
+            var tokenActions = actionRow();
+            tokenActions.appendChild(button("Kopiuj token", function () { copyText(state.issuedEnrollment.token); }));
+            tokenActions.appendChild(button("Ukryj", function () { state.issuedEnrollment = null; renderAll(); }));
+            tokenCard.appendChild(tokenActions);
+            node.appendChild(tokenCard);
+        }
+
+        (snapshot.groups || []).forEach(function (group) {
+            var details = el("details", "sirk-card");
+            details.appendChild(el("summary", "", group.name + " · " + (group.deviceCount || 0) + " urządzeń"));
+            var name = field("Nazwa", group.name || "");
+            var description = field("Opis", group.description || "");
+            var enabled = field("Aktywna", group.enabled !== false, "checkbox");
+            details.appendChild(name.wrapper);
+            details.appendChild(description.wrapper);
+            details.appendChild(enabled.wrapper);
+            details.appendChild(el("p", "sirk-muted", "ID: " + group.id));
+            var actions = actionRow();
+            actions.appendChild(button("Zapisz", function () {
+                api("/api/v1/admin/computer-groups/" + encodeURIComponent(group.id), "PUT", {
+                    name: name.input.value,
+                    description: description.input.value,
+                    enabled: enabled.input.checked
+                }).then(acceptComputerGroupResult).catch(showError);
+            }));
+            actions.appendChild(button("Rotuj token", function () {
+                if (!window.confirm("Wygenerować nowy token? Poprzedni przestanie działać.")) return;
+                api("/api/v1/admin/computer-groups/" + encodeURIComponent(group.id) + "/rotate-token", "POST", {})
+                    .then(acceptComputerGroupResult).catch(showError);
+            }));
+            var remove = button("Usuń", function () {
+                if (!window.confirm("Usunąć grupę " + group.name + "?")) return;
+                api("/api/v1/admin/computer-groups/" + encodeURIComponent(group.id), "DELETE")
+                    .then(acceptComputerGroupResult).catch(showError);
+            }, true);
+            remove.disabled = Number(group.deviceCount || 0) > 0;
+            actions.appendChild(remove);
+            details.appendChild(actions);
+            node.appendChild(details);
+        });
+
+        var create = el("details", "sirk-card");
+        create.appendChild(el("summary", "", "Dodaj grupę komputerów"));
+        var newName = field("Nazwa", "");
+        var newId = field("Identyfikator", "");
+        var newDescription = field("Opis", "");
+        create.appendChild(newName.wrapper);
+        create.appendChild(newId.wrapper);
+        create.appendChild(newDescription.wrapper);
+        var createActions = actionRow();
+        createActions.appendChild(button("Utwórz grupę", function () {
+            var id = newId.input.value.trim() || slug(newName.input.value);
+            api("/api/v1/admin/computer-groups", "POST", {
+                id: id,
+                name: newName.input.value,
+                description: newDescription.input.value
+            }).then(acceptComputerGroupResult).catch(showError);
+        }));
+        create.appendChild(createActions);
+        node.appendChild(create);
+        host.appendChild(node);
+    }
+
+    function renderUpdateHistory(host) {
+        var node = card("Historia aktualizacji");
+        var rows = (state.maintenance && state.maintenance.history) || [];
+        if (!rows.length) node.appendChild(el("p", "sirk-muted", "Brak historii operacji aktualizacyjnych."));
+        rows.forEach(function (entry) {
+            var row = el("div", "sirk-history-row");
+            row.appendChild(el("strong", "", entry.type || "operacja"));
+            row.appendChild(el("span", "", entry.at ? new Date(entry.at).toLocaleString() : "—"));
+            row.appendChild(el("span", "", entry.message || ""));
+            if (entry.error) row.appendChild(el("span", "sirk-error", entry.error));
+            node.appendChild(row);
+        });
+        host.appendChild(node);
+    }
+
     function renderRuntime(host) {
         var runtime = state.runtime || {};
         var service = runtime.service || {};
@@ -451,14 +646,21 @@
 
     function renderUpdates(host) {
         var current = state.maintenance.current || {};
-        var updates = card("Kanał aktualizacji", "Wersja: " + (current.version || "—"));
+        var remote = state.maintenance.remote || {};
+        var capabilities = state.maintenance.capabilities || {};
+        var updates = card("Aktualizacje", "Wersja: " + (current.version || "—") + " · dostępna: " + (remote.availableVersion || "—"));
         var channel = field("Kanał", current.channel || "dev", "select", [["stable", "Stable"], ["beta", "Beta"], ["dev", "Dev"]]);
         updates.appendChild(channel.wrapper);
         var actions = actionRow();
         actions.appendChild(button("Zapisz kanał", function () { maintenance("channel", { channel: channel.input.value }, false); }));
         actions.appendChild(button("Sprawdź aktualizacje", function () { maintenance("check", {}, false); }));
+        var updateNow = button("Aktualizuj teraz", function () { maintenance("update", {}, true); });
+        updateNow.disabled = !(capabilities.update && remote.updateAvailable);
+        updateNow.title = updateNow.disabled ? "Brak nowszego zweryfikowanego pakietu aktualizacji." : "Zainstaluj zweryfikowaną aktualizację przez SIRK Updater.";
+        actions.appendChild(updateNow);
         updates.appendChild(actions);
-        updates.appendChild(el("p", "", (state.maintenance.remote || {}).updateAvailable ? "Dostępna jest aktualizacja." : "System jest aktualny dla skonfigurowanego kanału."));
+        updates.appendChild(el("p", "", remote.updateAvailable ? "Dostępna jest aktualizacja." : "System jest aktualny dla skonfigurowanego kanału."));
+        if (!capabilities.update) updates.appendChild(el("p", "sirk-muted", "Przycisk uaktywni się, gdy kanał udostępni zweryfikowany pakiet obsługiwany przez SIRK Updater."));
         host.appendChild(updates);
     }
 
@@ -495,14 +697,18 @@
         }
         if (state.tab === "portal") {
             if (state.section === "views") renderPortalViews(state.page.details);
+            else if (state.section === "central") renderCentral(state.page.details);
             else renderPortalGeneral(state.page.details);
         } else if (state.tab === "modules") {
             renderModule(state.page.details, state.section);
         } else if (state.tab === "identity") {
             if (state.section === "groups") renderGroups(state.page.details);
+            else if (state.section === "computer-groups") renderComputerGroups(state.page.details);
             else renderUsers(state.page.details);
         } else if (state.section === "updates") {
             renderUpdates(state.page.details);
+        } else if (state.section === "history") {
+            renderUpdateHistory(state.page.details);
         } else if (state.section === "backups") {
             renderBackups(state.page.details);
         } else {

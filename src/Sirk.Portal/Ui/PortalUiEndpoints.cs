@@ -6,7 +6,7 @@ namespace Sirk.Portal.Ui;
 
 internal static class PortalUiEndpoints
 {
-    private const string AssetRevision = "canonical-modules-shell-20260803-1";
+    private const string AssetRevision = "admin-settings-central-groups-icons-20260803-1";
     private static readonly IReadOnlyDictionary<string, string> Assets = BuildAssets();
 
     public static IEndpointRouteBuilder MapPortalUi(this IEndpointRouteBuilder endpoints)

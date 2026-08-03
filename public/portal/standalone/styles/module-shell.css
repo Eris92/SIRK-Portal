@@ -117,3 +117,48 @@
 
 #sirkPortalRoot .sirk-center{ flex: 1 1 auto; justify-content: center; }
 #sirkPortalRoot .sirk-right{ margin-left: auto; }
+
+
+/* Canonical icon and toolbar rendering. This stylesheet is loaded last. */
+#sirkPortalRoot .sirk-standalone-nav button[data-view] > span > svg use,
+#sirkPortalRoot .sirk-standalone-controls [data-action="sidebar"] svg use{
+    fill:none!important;stroke:currentColor!important;stroke-width:1.8!important;
+    stroke-linecap:round!important;stroke-linejoin:round!important;opacity:1!important;
+}
+#sirkPortalRoot .sirk-toolbar-host{
+    display:flex!important;align-items:center!important;min-height:50px!important;padding:7px 10px!important;
+    margin:0!important;border-bottom:1px solid var(--sirk-border,#dce3ec)!important;
+    background:var(--sirk-panel,#fff)!important;box-sizing:border-box!important;
+}
+#sirkPortalRoot .sirk-toolbar-button{
+    appearance:none!important;display:inline-grid!important;place-items:center!important;
+    width:36px!important;min-width:36px!important;height:36px!important;min-height:36px!important;
+    padding:0!important;border:1px solid var(--sirk-border,#dce3ec)!important;border-radius:8px!important;
+    background:var(--sirk-panel,#fff)!important;color:var(--sirk-text,#172033)!important;
+    box-shadow:none!important;font-size:0!important;line-height:1!important;
+}
+#sirkPortalRoot .sirk-toolbar-button:hover,
+#sirkPortalRoot .sirk-toolbar-button.is-active{
+    border-color:#75a7ff!important;background:#edf3ff!important;color:#214fbd!important;
+}
+#sirkPortalRoot .sirk-toolbar-icon{
+    display:inline-grid!important;place-items:center!important;width:20px!important;height:20px!important;
+    color:inherit!important;font-size:0!important;overflow:visible!important;
+}
+#sirkPortalRoot .sirk-toolbar-icon > svg{
+    display:block!important;width:20px!important;height:20px!important;overflow:visible!important;
+    fill:none!important;stroke:currentColor!important;stroke-width:1.8!important;
+    stroke-linecap:round!important;stroke-linejoin:round!important;opacity:1!important;
+}
+#sirkPortalRoot .sirk-toolbar-icon > svg :is(path,rect,circle,line,polyline,polygon,ellipse,use){
+    fill:none!important;stroke:currentColor!important;stroke-width:1.8!important;
+    stroke-linecap:round!important;stroke-linejoin:round!important;opacity:1!important;
+}
+#sirkPortalRoot .sirk-one-time-token code{
+    display:block;margin:10px 0;padding:10px;border:1px solid #f0c36d;border-radius:6px;
+    background:#fff8e7;overflow-wrap:anywhere;font-family:Consolas,monospace;
+}
+#sirkPortalRoot .sirk-status-grid{display:grid;gap:6px;margin:10px 0 14px}
+#sirkPortalRoot .sirk-history-row{display:grid;grid-template-columns:150px 190px minmax(220px,1fr);gap:10px;padding:9px 0;border-bottom:1px solid var(--sirk-border,#dce3ec)}
+#sirkPortalRoot .sirk-error{color:#b42318}
+@media(max-width:900px){#sirkPortalRoot .sirk-history-row{grid-template-columns:1fr}}
