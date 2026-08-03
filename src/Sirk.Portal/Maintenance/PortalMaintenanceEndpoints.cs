@@ -51,7 +51,9 @@ internal sealed class PortalMaintenanceStore
         _stateFile = Path.Combine(paths.DataRoot, "maintenance.json");
         var sirkRoot = Path.GetDirectoryName(paths.DataRoot)
                        ?? throw new InvalidOperationException("Portal data root has no parent directory.");
-        _backupRoot = Path.Combine(sirkRoot, "Portal Backups");
+        _backupRoot = OperatingSystem.IsWindows()
+            ? Path.Combine(sirkRoot, "Portal Backups")
+            : Path.Combine(paths.DataRoot, "backups");
         Directory.CreateDirectory(_backupRoot);
         AtomicJsonFile.SecureDirectory(_backupRoot);
         _document = File.Exists(_stateFile)
@@ -115,6 +117,7 @@ internal sealed class PortalMaintenanceStore
         lock (_sync)
         {
             AppendHistory("check", "Sprawdzono kanał aktualizacji.", null);
+            Save();
             return Snapshot();
         }
     }
@@ -152,14 +155,12 @@ internal sealed class PortalMaintenanceStore
                      Guid.NewGuid().ToString("N")[..8];
             var fileName = id + ".zip";
             var destination = Path.Combine(_backupRoot, fileName);
-            var temporary = destination + ".tmp-" + Environment.ProcessId;
+            var temporary = Path.Combine(
+                Path.GetTempPath(),
+                fileName + ".tmp-" + Environment.ProcessId + "-" + Guid.NewGuid().ToString("N"));
             try
             {
-                ZipFile.CreateFromDirectory(
-                    _paths.DataRoot,
-                    temporary,
-                    CompressionLevel.Optimal,
-                    includeBaseDirectory: false);
+                CreateDataArchive(temporary);
                 File.Move(temporary, destination, overwrite: true);
                 AtomicJsonFile.SecureFile(destination);
                 var record = new PortalBackupRecord(
@@ -254,6 +255,48 @@ internal sealed class PortalMaintenanceStore
             Save();
         }
         return new { accepted = true, action = "restore", id = normalized };
+    }
+
+    private void CreateDataArchive(string destination)
+    {
+        var dataRoot = Path.GetFullPath(_paths.DataRoot)
+            .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        var backupRoot = Path.GetFullPath(_backupRoot)
+            .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        var backupPrefix = backupRoot + Path.DirectorySeparatorChar;
+
+        using var output = new FileStream(
+            destination,
+            FileMode.CreateNew,
+            FileAccess.ReadWrite,
+            FileShare.None,
+            128 * 1024,
+            FileOptions.WriteThrough);
+        using var archive = new ZipArchive(output, ZipArchiveMode.Create, leaveOpen: false);
+        foreach (var path in Directory.EnumerateFiles(dataRoot, "*", SearchOption.AllDirectories))
+        {
+            var fullPath = Path.GetFullPath(path);
+            if (string.Equals(fullPath, backupRoot, StringComparison.OrdinalIgnoreCase) ||
+                fullPath.StartsWith(backupPrefix, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var relative = Path.GetRelativePath(dataRoot, fullPath).Replace('\\', '/');
+            if (relative.StartsWith("../", StringComparison.Ordinal) || relative == "..")
+                continue;
+
+            var entry = archive.CreateEntry(relative, CompressionLevel.Optimal);
+            using var source = new FileStream(
+                fullPath,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.ReadWrite | FileShare.Delete,
+                128 * 1024,
+                FileOptions.SequentialScan);
+            using var target = entry.Open();
+            source.CopyTo(target);
+        }
     }
 
     private void StartHelperScript(string action, string scriptBody)
@@ -386,7 +429,7 @@ internal static class PortalMaintenanceEndpoints
         IAntiforgery antiforgery,
         PortalMaintenanceStore store,
         PortalAuditLog audit) =>
-        MutateAsync(context, antiforgery, audit, "maintenance.check", "check", () => store.Check());
+        MutateAsync(context, antiforgery, audit, "maintenance.check", "check", store.Check);
 
     private static async Task<IResult> BackupAsync(
         PortalMaintenanceMutation request,
