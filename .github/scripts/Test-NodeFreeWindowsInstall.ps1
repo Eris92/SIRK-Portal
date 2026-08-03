@@ -152,6 +152,39 @@ try {
         if ($portal -notmatch [regex]::Escape($marker)) { throw "Portal UI marker missing: $marker" }
     }
 
+    $dataRoot = 'C:\ProgramData\SIRK\Portal'
+    $manualScript = Join-Path $dataRoot 'Files\management\Preserved\Manual test.ps1'
+    New-Item -ItemType Directory -Path (Split-Path -Parent $manualScript) -Force | Out-Null
+    Set-Content -LiteralPath $manualScript -Value '#PL Zachowany skrypt | Test reinstalacji danych.' -Encoding UTF8
+    $identityPath = Join-Path $dataRoot 'identity.json'
+    $identityHashBefore = (Get-FileHash -LiteralPath $identityPath -Algorithm SHA256).Hash
+    $accessCodeBefore = (Get-Content (Join-Path $dataRoot 'security\break-glass-access-code.txt') -Raw).Trim()
+    Remove-Item Env:SIRK_INSTALL_BREAKGLASS_PASSWORD -ErrorAction SilentlyContinue
+
+    $reinstallOutput = @(& $installer -Branch $Branch -NonInteractive -PortalFqdn $Fqdn -HttpsPort $Port -TrustCertificate -SkipUpdater 6>&1)
+    $reinstallOutput | Out-Host
+    $reinstallText = (($reinstallOutput | Out-String) -replace '\s+', ' ').Trim()
+    if (-not $reinstallText.Contains("Tryb: aktualizacja programu z zachowaniem $dataRoot")) {
+        throw 'Reinstallation did not enter preserve-data mode.'
+    }
+    if (-not $reinstallText.Contains('SIRK_PORTAL_DOTNET10_INSTALL_OK')) {
+        throw 'Preserve-data reinstallation did not complete successfully.'
+    }
+    if (-not (Test-Path -LiteralPath $manualScript -PathType Leaf)) {
+        throw 'Manual Management script was removed during reinstallation.'
+    }
+    $identityHashAfter = (Get-FileHash -LiteralPath $identityPath -Algorithm SHA256).Hash
+    if ($identityHashAfter -ne $identityHashBefore) {
+        throw 'Portal identity changed during preserve-data reinstallation.'
+    }
+    $accessCodeAfter = (Get-Content (Join-Path $dataRoot 'security\break-glass-access-code.txt') -Raw).Trim()
+    if ($accessCodeAfter -ne $accessCodeBefore) {
+        throw 'Break-Glass Access Code changed during preserve-data reinstallation.'
+    }
+    if ((Invoke-RestMethod "$baseUrl/readyz").status -ne 'ready') {
+        throw 'Portal is not ready after preserve-data reinstallation.'
+    }
+
     Restart-Service SirkPortal -Force
     (Get-Service SirkPortal).WaitForStatus('Running',[TimeSpan]::FromSeconds(60))
     $deadline = (Get-Date).AddMinutes(2)
