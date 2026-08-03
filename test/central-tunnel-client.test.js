@@ -44,8 +44,9 @@ async function run() {
     try {
         assert.strictEqual(tunnel.configured(), true);
         var updater = tunnel.updaterSummary();
+        var expectedUpdaterRunning = process.platform !== "win32";
         assert.strictEqual(updater.installed, true);
-        assert.strictEqual(updater.running, true);
+        assert.strictEqual(updater.running, expectedUpdaterRunning);
         assert.strictEqual(updater.channel, "dev");
         assert.strictEqual(updater.targetVersion, "2.0.0-dev.30");
         assert.strictEqual(updater.phase, "Completed");
@@ -63,11 +64,11 @@ async function run() {
         tunnel.connect();
         var socket = await connected;
         var heartbeat = tunnel.heartbeatBody();
-        assert.strictEqual(heartbeat.health, "ok");
+        assert.strictEqual(heartbeat.health, expectedUpdaterRunning ? "ok" : "warning");
         assert.strictEqual(heartbeat.updateChannel, "dev");
         assert.strictEqual(heartbeat.availableVersion, "2.0.0-dev.30");
         assert.ok(heartbeat.capabilities.includes("shared-updater"));
-        assert.ok(heartbeat.capabilities.includes("shared-updater-running"));
+        assert.strictEqual(heartbeat.capabilities.includes("shared-updater-running"), expectedUpdaterRunning);
         assert.ok(heartbeat.capabilities.includes("shared-updater-phase:completed"));
 
         var response = new Promise(function (resolve) {
