@@ -46,9 +46,10 @@ async function run() {
                 asset("SIRK-Agent-Setup.exe.sha256"),
                 asset("SIRK-Agent-1.0.16-dev.100-win-x64.msi", 5 * 1024 * 1024),
                 asset("SIRK-Agent-1.0.16-dev.100-win-x64.msi.sha256"),
-                asset("SIRK-Agent-1.0.16-dev.100-win-x64-framework-dependent.zip", 10 * 1024 * 1024),
-                asset("SIRK-Agent-1.0.16-dev.100-win-x64-framework-dependent.zip.sha256"),
-                asset("installer-manifest.json")
+                asset("SIRK-Agent-1.0.16-dev.100-net10-win-x64-framework-dependent.zip", 10 * 1024 * 1024),
+                asset("SIRK-Agent-1.0.16-dev.100-net10-win-x64-framework-dependent.zip.sha256"),
+                asset("installer-manifest.json"),
+                asset("runtime-manifest.json")
             ]
         }
     ];
@@ -111,9 +112,12 @@ async function run() {
         var release = await service.request("agent-installers", { body: {} });
         assert.strictEqual(release.version, "v1.0.16-dev.100");
         assert.strictEqual(release.prerelease, true);
+        assert.strictEqual(release.targetFramework, "net10.0-windows");
         assert.ok(release.installers.exe.checksumUrl);
         assert.ok(release.installers.msi.checksumUrl);
         assert.ok(release.installers.zip.checksumUrl);
+        assert.ok(release.installers.installerManifest.downloadUrl);
+        assert.ok(release.installers.runtimeManifest.downloadUrl);
 
         var deployment = await service.request("agent-deployment", {
             body: { groupId: "default", portalOrigin: "https://portal.example", channel: "stable" }
