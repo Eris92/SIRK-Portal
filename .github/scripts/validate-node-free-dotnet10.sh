@@ -32,7 +32,7 @@ $updater = Get-Content "tools/installer/Ensure-SirkUpdater.ps1" -Raw -Encoding U
 if ($updater -match "Get-CimInstance\s+Win32_Service") {
   throw "SIRK Updater integration must not depend on the Win32_Service CIM provider."
 }
-if ($updater -notmatch "Get-Service\s+-Name\s+\$PortalServiceName") {
+if (-not $updater.Contains("Get-Service -Name `$PortalServiceName")) {
   throw "Sandbox-safe SirkPortal service detection is missing."
 }'
 
