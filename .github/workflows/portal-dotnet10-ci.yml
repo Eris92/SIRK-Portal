@@ -18,6 +18,22 @@ jobs:
         shell: bash
         run: |
           sed -n "/python3 - <<'PY'/,/^          PY$/p" .github/workflows/apply-group-installer.yml | sed '1d;$d;s/^          //' > /tmp/apply-group-installer.py
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('/tmp/apply-group-installer.py')
+          value = path.read_text(encoding='utf-8')
+          start = value.index("old = '''                        deviceCount = _document.Devices.Count")
+          end = value.index("old = '''    private void Save", start)
+          line_start = value.rfind('\n', 0, start) + 1
+          indent = value[line_start:start]
+          replacement = indent + '''old = "                        deviceCount = _document.Devices.Count(device => device.GroupId == value.Id),"
+          new = old + "\\n" + "                        activeInstallerCount = (_document.InstallerTickets ?? []).Count(ticket =>" + "\\n" + "                            ticket.GroupId == value.Id &&" + "\\n" + "                            ticket.UsedAtUtc is null &&" + "\\n" + "                            ticket.ExpiresAtUtc > now),"
+          if text.count(old) != 1: raise SystemExit('Snapshot deviceCount marker mismatch.')
+          text = text.replace(old, new)
+
+          '''
+          path.write_text(value[:line_start] + replacement + value[end:], encoding='utf-8', newline='\n')
+          PY
           python3 /tmp/apply-group-installer.py
           rm -f .github/workflows/apply-group-installer.yml
           cat > .github/workflows/portal-dotnet10-ci.yml <<'YAML'
