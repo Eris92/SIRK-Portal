@@ -1,0 +1,2 @@
+Validation trigger for the complete Node-free ASP.NET Core .NET 10 rewrite.
+Run 5 - current validated product head.
