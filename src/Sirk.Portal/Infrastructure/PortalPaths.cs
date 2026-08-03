@@ -11,6 +11,7 @@ internal sealed class PortalPaths
         IdentityFile = Path.Combine(DataRoot, "identity.json");
         SettingsFile = Path.Combine(DataRoot, "settings.json");
         AgentsFile = Path.Combine(DataRoot, "agents.json");
+        AgentInstallerTicketsFile = Path.Combine(DataRoot, "agent-installer-tickets.json");
         AgentCommandsFile = Path.Combine(DataRoot, "agent-commands.json");
         PoliciesFile = Path.Combine(DataRoot, "agent-policies.json");
         AuditFile = Path.Combine(DataRoot, "audit.jsonl");
@@ -33,6 +34,7 @@ internal sealed class PortalPaths
     public string IdentityFile { get; }
     public string SettingsFile { get; }
     public string AgentsFile { get; }
+    public string AgentInstallerTicketsFile { get; }
     public string AgentCommandsFile { get; }
     public string PoliciesFile { get; }
     public string AuditFile { get; }
