@@ -117,14 +117,27 @@ for path in Path('.').rglob('*'):
         if value in content:
             raise SystemExit(f'Legacy/duplicated shell class {value!r} remains in {path}.')
 
-for path in (
-    Path('public/portal/standalone/scripts/app.js'),
-    Path('public/portal/standalone/scripts/settings-native-v2.js'),
-    Path('public/portal/management.js'),
-    Path('public/shared/ui/page.js'),
-):
+component_markers = {
+    Path('public/portal/standalone/scripts/app.js'): (
+        'sirk-view-shell', 'sirk-toolbar-host', 'sirk-layout-host',
+    ),
+    Path('public/portal/standalone/scripts/settings-native-v2.js'): (
+        'sirk-view-shell', 'sirk-toolbar-host', 'sirk-layout-host',
+        'sirk-column-primary', 'sirk-column-secondary', 'sirk-column-details',
+    ),
+    Path('public/portal/management.js'): (
+        'sirk-view-shell', 'sirk-toolbar-host', 'sirk-layout-host',
+    ),
+    Path('public/shared/ui/page.js'): (
+        'sirk-view-shell', 'sirk-tabs-host', 'sirk-toolbar-host', 'sirk-layout-host',
+    ),
+    Path('public/shared/ui/layout.js'): (
+        'sirk-layout-host', 'sirk-column-primary', 'sirk-column-secondary', 'sirk-column-details',
+    ),
+}
+for path, markers in component_markers.items():
     content = path.read_text(encoding='utf-8')
-    for marker in ('sirk-view-shell', 'sirk-toolbar-host', 'sirk-layout-host', 'sirk-column-details'):
+    for marker in markers:
         if marker not in content:
             raise SystemExit(f'Unified view-shell marker {marker!r} is missing from {path}.')
 
