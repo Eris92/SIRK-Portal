@@ -41,11 +41,7 @@ internal static class PortalUiEndpoints
             .Replace("__VERSION__", Uri.EscapeDataString(version), StringComparison.Ordinal);
         html = html.Replace(
             "</head>",
-            $"<link rel=\"stylesheet\" href=\"/assets/portal-management-frame.css?v={Uri.EscapeDataString(version)}\"><link rel=\"stylesheet\" href=\"/assets/system-updates.css?v={Uri.EscapeDataString(version)}\"></head>",
-            StringComparison.Ordinal);
-        html = html.Replace(
-            "</body>",
-            $"<script src=\"/assets/system-updates.js?v={Uri.EscapeDataString(version)}\"></script></body>",
+            $"<link rel=\"stylesheet\" href=\"/assets/portal-management-frame.css?v={Uri.EscapeDataString(version)}\"></head>",
             StringComparison.Ordinal);
         return Results.Content(html, "text/html; charset=utf-8", Encoding.UTF8);
     }
@@ -124,9 +120,7 @@ internal static class PortalUiEndpoints
             ["portal-module-shell.css"] = "portal/standalone/styles/module-shell.css",
             ["portal-management-frame.css"] = "portal/standalone/styles/management-frame.css",
             ["portal-cleanup.css"] = "portal/standalone/styles/cleanup.css",
-            ["system-updates.js"] = "portal/system-updates.js",
-            ["system-updates.css"] = "portal/system-updates.css",
-            ["settings.js"] = "portal/settings.js",
+            ["settings.js"] = "portal/standalone/scripts/settings-native.js",
             ["main.css"] = "shared/styles/main.css",
             ["shared/icon-registry.js"] = "shared/icon-registry.js",
             ["myscripts.css"] = "modules/automation/style.css",
