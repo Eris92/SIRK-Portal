@@ -1,0 +1,31 @@
+name: Apply Preserve-Data Reinstall Repair
+
+on:
+  push:
+    branches: [ fix/preserve-data-on-reinstall ]
+    paths:
+      - '.github/scripts/apply-preserve-data-reinstall.py'
+      - '.github/workflows/apply-preserve-data-reinstall.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/preserve-data-on-reinstall
+          fetch-depth: 0
+      - name: Apply repair
+        run: python3 .github/scripts/apply-preserve-data-reinstall.py
+      - name: Commit product changes
+        run: |
+          rm -f .github/scripts/apply-preserve-data-reinstall.py .github/workflows/apply-preserve-data-reinstall.yml
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A
+          git diff --cached --check
+          git commit -m "Preserve Portal data during reinstall"
+          git push origin HEAD:fix/preserve-data-on-reinstall
