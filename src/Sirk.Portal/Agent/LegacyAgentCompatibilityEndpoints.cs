@@ -338,11 +338,13 @@ internal static class LegacyAgentCompatibilityEndpoints
             body.CopyTo(signed.AsSpan(prefix.Length));
             using var key = ECDsa.Create();
             key.ImportSubjectPublicKeyInfo(Convert.FromBase64String(publicKeyBase64), out _);
-            return key.KeySize == 256 && key.VerifyData(
+            var valid = key.KeySize == 256 && key.VerifyData(
                 signed,
                 signature,
                 HashAlgorithmName.SHA256,
                 DSASignatureFormat.IeeeP1363FixedFieldConcatenation);
+            if (!valid) Nonces.TryRemove(replayKey, out _);
+            return valid;
         }
         catch (Exception exception) when (
             exception is FormatException or CryptographicException)
@@ -394,7 +396,7 @@ internal static class LegacyAgentCompatibilityEndpoints
         int maximumBytes,
         CancellationToken cancellationToken)
     {
-        if (request.ContentLength is > maximumBytes)
+        if (request.ContentLength is { } contentLength && contentLength > maximumBytes)
             throw new InvalidDataException("Request body is too large.");
         await using var memory = new MemoryStream();
         var buffer = new byte[64 * 1024];
