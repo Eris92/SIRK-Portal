@@ -167,7 +167,7 @@ def main() -> int:
             native_settings = asset_values["/assets/settings.js"].decode("utf-8")
             require(native_settings, "data-portal-settings-native", "Native settings UI")
             require(native_settings, "/api/v1/admin/maintenance/status", "Native settings UI")
-            require(native_settings, '"BreakGlass"', "Native settings RBAC")
+            require(native_settings, '"Break-Glass"', "Native settings RBAC")
             if "/api/admin/settings" in native_settings or "plugin-operation" in native_settings:
                 raise RuntimeError("Legacy settings API is still exposed by the active settings asset.")
 
@@ -224,7 +224,7 @@ def main() -> int:
                 raise RuntimeError("Native settings API returned an incomplete snapshot.")
 
             identity = browser.json("GET", "/api/v1/admin/identity/")
-            if identity.get("value", {}).get("users", [])[0].get("role") != "BreakGlass":
+            if identity.get("value", {}).get("users", [])[0].get("role") != "Break-Glass":
                 raise RuntimeError("Native identity API returned an invalid Break-Glass role.")
 
             csrf_value = browser.json("GET", "/api/v1/auth/csrf").get("requestToken")
