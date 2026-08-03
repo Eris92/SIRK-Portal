@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [string]$Branch = 'rewrite/dotnet10-clean',
+    [string]$Branch = 'main',
     [string]$InstallRoot = 'C:\Program Files\SIRK\Portal',
     [string]$DataRoot = 'C:\ProgramData\SIRK\Portal',
     [int]$HttpsPort = 443,
@@ -231,6 +231,7 @@ try {
 
     Write-Step 'Konfiguracja HTTPS i trwałych danych'
     $publicUrl = if ($HttpsPort -eq 443) { "https://$portalFqdn" } else { "https://$portalFqdn`:$HttpsPort" }
+    $localOrigin = if ($HttpsPort -eq 443) { 'https://localhost/' } else { "https://localhost`:$HttpsPort/" }
     $appSettings = @{
         Logging = @{ LogLevel = @{ Default = 'Information'; 'Microsoft.AspNetCore' = 'Warning' } }
         AllowedHosts = '*'
@@ -261,7 +262,7 @@ try {
             }
             CentralTunnel = @{
                 Enabled = $false
-                LocalOrigin = ($publicUrl + '/')
+                LocalOrigin = $localOrigin
                 PollIntervalMilliseconds = 750
                 MaximumConcurrency = 8
                 MaximumBodyBytes = 8388608
@@ -307,7 +308,7 @@ try {
     $readyRaw = & curl.exe -sS --max-time 10 "$publicUrl/readyz"
     $ready = $readyRaw | ConvertFrom-Json
     if ($ready.status -ne 'ready') { throw 'Portal nie przeszedł readiness check.' }
-    $loginHtml = & curl.exe -sS --max-time 10 "$publicUrl/login"
+    $loginHtml = (& curl.exe -sS --max-time 10 "$publicUrl/login" | Out-String)
     if ($loginHtml -notmatch 'sirk-login-page' -or $loginHtml -notmatch '/assets/portal-login.css') {
         throw 'Pełny frontend logowania nie został opublikowany.'
     }
