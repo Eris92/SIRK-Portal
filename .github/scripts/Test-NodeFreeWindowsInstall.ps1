@@ -29,6 +29,17 @@ try {
     $installer = [scriptblock]::Create($source)
     & $installer -Branch $Branch -NonInteractive -RemoveData -PortalFqdn $Fqdn -HttpsPort $Port -TrustCertificate
 
+    $systemDotNet = Join-Path $env:ProgramFiles 'dotnet\dotnet.exe'
+    if (-not (Test-Path -LiteralPath $systemDotNet -PathType Leaf)) {
+        throw 'System-wide dotnet.exe is missing.'
+    }
+    $runtimes = @(& $systemDotNet --list-runtimes)
+    foreach ($runtimeName in @('Microsoft.NETCore.App','Microsoft.AspNetCore.App')) {
+        if (-not ($runtimes | Where-Object { $_ -match ('^' + [regex]::Escape($runtimeName) + ' 10\.0\.') })) {
+            throw "Required shared runtime is missing: $runtimeName 10.0"
+        }
+    }
+
     foreach ($name in @('SirkPortal','SirkUpdater')) {
         $service = Get-Service $name
         if ($service.Status -ne 'Running' -or $service.StartType -ne 'Automatic') {
@@ -42,6 +53,18 @@ try {
     }
     if ($portalService.PathName -match 'node|npm|winsw') {
         throw "Legacy runtime detected in service command: $($portalService.PathName)"
+    }
+
+    $portalRoot = 'C:\Program Files\SIRK\Portal'
+    foreach ($required in @('Sirk.Portal.exe','Sirk.Portal.dll','Sirk.Portal.runtimeconfig.json')) {
+        if (-not (Test-Path -LiteralPath (Join-Path $portalRoot $required) -PathType Leaf)) {
+            throw "Framework-dependent Portal file is missing: $required"
+        }
+    }
+    foreach ($forbidden in @('coreclr.dll','hostfxr.dll','hostpolicy.dll','clrjit.dll','System.Private.CoreLib.dll')) {
+        if (Test-Path -LiteralPath (Join-Path $portalRoot $forbidden)) {
+            throw "Private runtime file must not be deployed with Portal: $forbidden"
+        }
     }
 
     $certificate = Get-ChildItem Cert:\LocalMachine\My |
@@ -62,6 +85,7 @@ try {
         '/assets/portal-login.css',
         '/assets/portal-login.js',
         '/assets/portal-standalone.css',
+        '/assets/portal-management-frame.css',
         '/assets/standalone-core.js',
         '/assets/portal-standalone.js',
         '/assets/settings.js',
@@ -70,6 +94,18 @@ try {
         $response = Invoke-WebRequest ($baseUrl + $asset) -UseBasicParsing
         if ($response.StatusCode -ne 200 -or $response.RawContentLength -lt 10) {
             throw "Frontend asset failed: $asset"
+        }
+    }
+
+    $shellIconCss = (Invoke-WebRequest "$baseUrl/assets/portal-management-frame.css" -UseBasicParsing).Content
+    foreach ($marker in @(
+        '[data-action="sidebar"] svg',
+        '.sirk-standalone-nav button > span > svg',
+        'stroke: currentColor !important',
+        'visibility: visible !important'
+    )) {
+        if ($shellIconCss -notmatch [regex]::Escape($marker)) {
+            throw "Sidebar icon CSS marker missing: $marker"
         }
     }
 
