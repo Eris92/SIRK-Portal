@@ -75,7 +75,9 @@ internal static class PortalUiCompatibilityEndpoints
 
     private static object DeviceInventoryValue(AgentStore agents)
     {
-        var snapshot = JsonSerializer.SerializeToElement(agents.Snapshot());
+        var snapshot = JsonSerializer.SerializeToElement(
+            agents.Snapshot(),
+            new JsonSerializerOptions(JsonSerializerDefaults.Web));
         var groups = snapshot.GetProperty("groups").EnumerateArray()
             .Select(group => new
             {
@@ -162,7 +164,9 @@ internal static class PortalUiCompatibilityEndpoints
 
     private static IResult LegacyAgentGroups(AgentStore agents)
     {
-        var snapshot = JsonSerializer.SerializeToElement(agents.Snapshot());
+        var snapshot = JsonSerializer.SerializeToElement(
+            agents.Snapshot(),
+            new JsonSerializerOptions(JsonSerializerDefaults.Web));
         return Results.Ok(new
         {
             ok = true,
