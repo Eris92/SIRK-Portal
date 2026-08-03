@@ -231,6 +231,7 @@ try {
 
     Write-Step 'Konfiguracja HTTPS i trwałych danych'
     $publicUrl = if ($HttpsPort -eq 443) { "https://$portalFqdn" } else { "https://$portalFqdn`:$HttpsPort" }
+    $localOrigin = "https://localhost:$HttpsPort/"
     $appSettings = @{
         Logging = @{ LogLevel = @{ Default = 'Information'; 'Microsoft.AspNetCore' = 'Warning' } }
         AllowedHosts = '*'
@@ -261,7 +262,7 @@ try {
             }
             CentralTunnel = @{
                 Enabled = $false
-                LocalOrigin = ($publicUrl + '/')
+                LocalOrigin = $localOrigin
                 PollIntervalMilliseconds = 750
                 MaximumConcurrency = 8
                 MaximumBodyBytes = 8388608
