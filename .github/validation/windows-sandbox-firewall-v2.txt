@@ -1,0 +1,1 @@
+Validation marker for the canonical Windows Sandbox firewall fallback.
