@@ -650,6 +650,9 @@
         loadDevices(force).then(function (inventory) {
             if (!isCurrent(sequence) || activeView !== "devices") return;
             renderDevices(inventory);
+            if (window.SirkPlatformDeviceTabs && typeof window.SirkPlatformDeviceTabs.mount === "function") {
+                window.SirkPlatformDeviceTabs.mount();
+            }
         }).catch(function (reason) {
             if (isCurrent(sequence)) showError(viewName("devices") + ": " + t("loadFailed"), reason && (reason.stack || reason.message) || reason);
         });
@@ -683,6 +686,9 @@
 
     function disposeView(view) {
         var module;
+        if (view === "devices" && window.SirkPlatformDeviceTabs && typeof window.SirkPlatformDeviceTabs.unmount === "function") {
+            window.SirkPlatformDeviceTabs.unmount();
+        }
         if (view === "management") {
             if (window.SirkPlatformPortalManagement && typeof window.SirkPlatformPortalManagement.unmount === "function") {
                 window.SirkPlatformPortalManagement.unmount();

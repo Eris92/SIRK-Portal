@@ -67,7 +67,10 @@
         restoreActive: "all",
         bound: false,
         observer: null,
-        resizeObserver: null
+        resizeObserver: null,
+        viewObserver: null,
+        syncScheduled: false,
+        started: false
     };
 
     function currentView() {
@@ -367,17 +370,70 @@
         updateLayerBounds();
     }
 
-    function start() {
-        ensureInfrastructure();
-        state.observer = new MutationObserver(function () {
-            window.setTimeout(function () { ensureInfrastructure(); sync(); }, 0);
+    function suspend() {
+        if (state.observer) {
+            state.observer.disconnect();
+            state.observer = null;
+        }
+        Object.keys(state.panes).forEach(function (key) {
+            var pane = state.panes[key];
+            if (!pane || !pane.element) return;
+            pane.element.querySelectorAll("iframe").forEach(function (frame) {
+                frame.src = "about:blank";
+            });
+            pane.element.remove();
+            pane.element = null;
         });
-        state.observer.observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ["class", "hidden", "data-active-view"] });
-        window.setInterval(sync, 500);
+        if (state.layer) {
+            state.layer.remove();
+            state.layer = null;
+        }
+        if (state.bar) {
+            state.bar.remove();
+            state.bar = null;
+        }
+        if (state.content) {
+            state.content.style.visibility = "";
+            state.content.style.pointerEvents = "";
+        }
+        state.active = "all";
+    }
+
+    function scheduleSync() {
+        if (state.syncScheduled) return;
+        state.syncScheduled = true;
+        window.requestAnimationFrame(function () {
+            state.syncScheduled = false;
+            if (devicesActive()) {
+                ensureInfrastructure();
+                sync();
+            } else {
+                suspend();
+            }
+        });
+    }
+
+    function start() {
+        if (state.started) {
+            scheduleSync();
+            return;
+        }
+        state.started = true;
+        var content = document.getElementById("sirkStandaloneContent");
+        if (content) {
+            state.viewObserver = new MutationObserver(scheduleSync);
+            state.viewObserver.observe(content, {
+                attributes: true,
+                attributeFilter: ["data-active-view"]
+            });
+        }
+        window.addEventListener("hashchange", scheduleSync);
+        scheduleSync();
     }
 
     window.SirkPlatformDeviceTabs = {
-        mount: ensureInfrastructure,
+        mount: function () { start(); scheduleSync(); return true; },
+        unmount: suspend,
         activateAll: activateAll,
         activate: activate,
         close: closeTab,

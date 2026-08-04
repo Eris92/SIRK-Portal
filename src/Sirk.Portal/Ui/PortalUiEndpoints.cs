@@ -7,7 +7,7 @@ namespace Sirk.Portal.Ui;
 
 internal static class PortalUiEndpoints
 {
-    private const string AssetRevision = "native-agent-installer-20260804-1";
+    private const string AssetRevision = "device-tabs-lifecycle-20260804-1";
     private const string ProxyPrefixHeader = "X-SIRK-Proxy-Prefix";
     private static readonly IReadOnlyDictionary<string, string> Assets = BuildAssets();
 
