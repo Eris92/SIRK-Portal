@@ -40,7 +40,7 @@ function Test-PowerShellScript([string]$Path) {
 }
 
 function Write-Utf8Bom([string]$Path, [string]$Text) {
-    $encoding = New-Object System.Text.UTF8Encoding($true)
+    $encoding = New-Object System.Text.UTF8Encoding -ArgumentList $true
     [IO.File]::WriteAllText($Path, $Text, $encoding)
 }
 
@@ -83,21 +83,22 @@ try {
     # Windows PowerShell 5.1 interprets UTF-8 without BOM as the active ANSI
     # code page. Normalize the downloaded script and patch the canonical
     # installer download so install-dotnet10.ps1 is also saved with a BOM.
-    $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+    $utf8NoBom = New-Object System.Text.UTF8Encoding -ArgumentList $false
     $source = [IO.File]::ReadAllText($installer, $utf8NoBom).Replace("`r`n", "`n")
-    $needle = (@'
+    $needle = @'
     Invoke-WebRequest -UseBasicParsing -Uri $installerUrl -OutFile $installerPath
     if ((Get-Item -LiteralPath $installerPath).Length -lt 10000) {
-'@).Replace("`r`n", "`n")
-    $replacement = (@'
+'@
+    $needle = $needle.Replace("`r`n", "`n")
+    $replacement = @'
     Invoke-WebRequest -UseBasicParsing -Uri $installerUrl -OutFile $installerPath
     $canonicalSource = [IO.File]::ReadAllText(
         $installerPath,
-        (New-Object System.Text.UTF8Encoding($false)))
+        (New-Object System.Text.UTF8Encoding -ArgumentList $false))
     [IO.File]::WriteAllText(
         $installerPath,
         $canonicalSource,
-        (New-Object System.Text.UTF8Encoding($true)))
+        (New-Object System.Text.UTF8Encoding -ArgumentList $true))
     $canonicalTokens = $null
     $canonicalErrors = $null
     [System.Management.Automation.Language.Parser]::ParseFile(
@@ -109,7 +110,8 @@ try {
         throw "Pobrany kanoniczny instalator ma blad skladni: $canonicalMessage"
     }
     if ((Get-Item -LiteralPath $installerPath).Length -lt 10000) {
-'@).Replace("`r`n", "`n")
+'@
+    $replacement = $replacement.Replace("`r`n", "`n")
     if (-not $source.Contains($needle)) {
         throw 'Nie rozpoznano kontraktu pobierania kanonicznego instalatora.'
     }
