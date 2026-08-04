@@ -92,7 +92,8 @@ internal sealed class PortalCentralIdentityMapper
     private static string Normalize(string? value, int maximum, string field)
     {
         var normalized = (value ?? string.Empty).Trim();
-        if (normalized.Length is < 1 or > maximum ||
+        if (normalized.Length < 1 ||
+            normalized.Length > maximum ||
             normalized.Any(character => character is '\r' or '\n' or '\0'))
         {
             throw new InvalidDataException($"{field} is invalid.");
