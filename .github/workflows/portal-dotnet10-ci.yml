@@ -44,6 +44,39 @@ jobs:
           if ($installer -notmatch 'CentralTunnel\s*=\s*@\{\s*Enabled\s*=\s*\$true') {
             throw 'Portal installer does not enable the protected Central reverse tunnel.'
           }
+      - name: Validate Central-connected installer on Windows PowerShell 5.1
+        shell: powershell
+        run: |
+          $tokens = $null
+          $errors = $null
+          [void][System.Management.Automation.Language.Parser]::ParseFile(
+            (Resolve-Path .\install-connected-dotnet10.ps1),
+            [ref]$tokens,
+            [ref]$errors)
+          if ($errors.Count -gt 0) {
+            $errors | ForEach-Object { Write-Error $_.Message }
+            throw 'install-connected-dotnet10.ps1 contains PowerShell syntax errors.'
+          }
+
+          $fixture = Join-Path $env:RUNNER_TEMP 'SIRK-Portal-ci-connection.json'
+          [ordered]@{
+            schemaVersion = 1
+            centralUrl = 'https://central.example.test'
+            tunnelUrl = 'wss://central.example.test/tunnel'
+            portalId = 'ci-portal'
+            portalName = 'CI Portal'
+            portalToken = ('A' * 64)
+            publicUrl = ''
+            updatedAtUtc = [DateTimeOffset]::UtcNow.ToString('O')
+          } | ConvertTo-Json | Set-Content -LiteralPath $fixture -Encoding UTF8
+
+          .\install-connected-dotnet10.ps1 `
+            -ConnectionFile $fixture `
+            -PortalFqdn 'portal.example.test' `
+            -ValidateOnly
+          if ($LASTEXITCODE -ne 0) {
+            throw "Connected installer validation failed with exit code $LASTEXITCODE."
+          }
       - name: Validate single-use ticket and IExpress EXE contracts
         shell: pwsh
         run: dotnet run --project tests/Sirk.Portal.ProtocolTests/Sirk.Portal.ProtocolTests.csproj --configuration Release
