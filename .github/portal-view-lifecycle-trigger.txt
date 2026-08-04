@@ -1,0 +1,1 @@
+Trigger Portal view lifecycle validation.
