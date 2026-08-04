@@ -53,7 +53,7 @@
 
     function issueCsrf() {
         if (state.csrf) return Promise.resolve(state.csrf);
-        return fetch("/api/v1/auth/csrf", { credentials: "same-origin", cache: "no-store" })
+        return fetch(portalApiPath("auth/csrf"), { credentials: "same-origin", cache: "no-store" })
             .then(parse).then(function (payload) {
                 state.csrf = String(payload.requestToken || "");
                 if (!state.csrf) throw new Error("CSRF token could not be issued.");
@@ -78,6 +78,114 @@
             }).then(parse);
         }
         return /^(GET|HEAD|OPTIONS)$/.test(method) ? send() : issueCsrf().then(send);
+    }
+
+    function portalApiPath(path) {
+        var base = String(window.__SIRK_PLATFORM_API_BASE__ || "/api/v1").replace(/\/+$/, "");
+        return base + "/" + String(path || "").replace(/^\/+/, "");
+    }
+
+    function installerFileName(response, fallback) {
+        var disposition = response.headers.get("Content-Disposition") || "";
+        var match = /filename\*?=(?:UTF-8''|\")?([^\";]+)/i.exec(disposition);
+        return match
+            ? decodeURIComponent(match[1].replace(/^\"|\"$/g, ""))
+            : fallback;
+    }
+
+    function downloadAgentInstaller(groupId, channel, validMinutes, status, control) {
+        control.disabled = true;
+        status.textContent = "Generowanie jednorazowego instalatora EXE…";
+        issueCsrf().then(function (token) {
+            return fetch(
+                portalApiPath("admin/agent-groups/" + encodeURIComponent(groupId) + "/installer"),
+                {
+                    method: "POST",
+                    credentials: "same-origin",
+                    cache: "no-store",
+                    headers: {
+                        Accept: "application/vnd.microsoft.portable-executable, application/json",
+                        "Content-Type": "application/json; charset=UTF-8",
+                        "X-SIRK-CSRF": token
+                    },
+                    body: JSON.stringify({ channel: channel, validMinutes: validMinutes })
+                });
+        }).then(function (response) {
+            if (!response.ok) {
+                return response.text().then(function (text) {
+                    var payload = {};
+                    try { payload = text ? JSON.parse(text) : {}; } catch (_) {}
+                    throw new Error(payload.error || payload.title || ("HTTP " + response.status));
+                });
+            }
+            var expires = response.headers.get("X-SIRK-Installer-Expires-At");
+            var name = installerFileName(response, "SIRK-Agent-" + groupId + "-Installer.exe");
+            return response.blob().then(function (blob) {
+                if (blob.size < 4096) throw new Error("Wygenerowany instalator jest nieprawidłowo mały.");
+                return { blob: blob, name: name, expires: expires };
+            });
+        }).then(function (download) {
+            var url = URL.createObjectURL(download.blob);
+            var link = el("a");
+            link.href = url;
+            link.download = download.name;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+            status.textContent = "Pobrano " + download.name + ". Bilet jest jednorazowy" +
+                (download.expires ? " i ważny do " + new Date(download.expires).toLocaleString() : "") + ".";
+        }).catch(function (error) {
+            status.textContent = error && error.message || "Nie udało się wygenerować instalatora.";
+            status.classList.add("sirk-error");
+        }).then(function () {
+            control.disabled = false;
+        });
+    }
+
+    function renderAgentInstaller(host) {
+        var snapshot = state.computerGroups || { groups: [] };
+        var groups = (snapshot.groups || []).filter(function (item) { return item.enabled !== false; });
+        var cardNode = el("section", "sirk-card sirk-agent-installer-panel");
+        cardNode.setAttribute("data-sirk-agent-installer-panel", "1");
+        cardNode.appendChild(el("h2", "", "Instalator SIRK Agent EXE"));
+        cardNode.appendChild(el(
+            "p",
+            "sirk-muted",
+            "Pobierz gotowy instalator przypisany do grupy. EXE zawiera krótkotrwały, jednorazowy bilet zamiast stałego tokenu grupy."));
+
+        if (!groups.length) {
+            cardNode.appendChild(el("p", "sirk-muted", "Najpierw utwórz aktywną grupę komputerów."));
+            host.appendChild(cardNode);
+            return;
+        }
+
+        var group = field("Grupa komputerów", groups[0].id, "select", groups.map(function (item) {
+            return [item.id, item.name + " (" + item.id + ")"];
+        }));
+        var channel = field("Kanał Agenta", "dev", "select", [["stable", "Stable"], ["dev", "Dev"]]);
+        var lifetime = field("Ważność przed pierwszym użyciem", "1440", "select", [
+            ["60", "1 godzina"], ["480", "8 godzin"], ["1440", "24 godziny"], ["10080", "7 dni"]
+        ]);
+        cardNode.appendChild(group.wrapper);
+        cardNode.appendChild(channel.wrapper);
+        cardNode.appendChild(lifetime.wrapper);
+
+        var actions = actionRow();
+        var status = el("span", "sirk-muted", "Każdy wygenerowany plik rejestruje tylko jedno urządzenie.");
+        var download = button("Pobierz instalator EXE", function () {
+            status.classList.remove("sirk-error");
+            downloadAgentInstaller(
+                group.input.value,
+                channel.input.value,
+                Number(lifetime.input.value),
+                status,
+                download);
+        });
+        actions.appendChild(download);
+        actions.appendChild(status);
+        cardNode.appendChild(actions);
+        host.appendChild(cardNode);
     }
 
     function load() {
@@ -618,6 +726,7 @@
     function renderComputerGroups(host) {
         var snapshot = state.computerGroups || { groups: [], devices: [] };
         var node = card("Grupy komputerów", "Grupy urządzeń SIRK Agent. Token rejestracyjny jest wyświetlany tylko po utworzeniu grupy lub jego rotacji.");
+        renderAgentInstaller(node);
         if (state.issuedEnrollment) {
             var tokenCard = el("section", "sirk-card sirk-one-time-token");
             tokenCard.appendChild(el("strong", "", "Token jednorazowy dla grupy " + state.issuedEnrollment.groupId));

@@ -142,9 +142,9 @@ def main() -> int:
                 "/assets/portal-login.css": "text/css",
                 "/assets/portal-login.js": "text/javascript",
                 "/assets/portal-standalone.css": "text/css",
-                "/assets/standalone-core.js": "text/javascript",
-                "/assets/portal-standalone.js": "text/javascript",
-                "/assets/settings.js": "text/javascript",
+                "/assets/bundles/portal-shell.bundle.js": "text/javascript",
+                "/assets/bundles/portal-devices.bundle.js": "text/javascript",
+                "/assets/bundles/portal-modules.bundle.js": "text/javascript",
                 "/assets/shared-ui/shared-ui.css": "text/css",
                 "/assets/icons/sirk-ui.svg": "image/svg+xml",
             }
@@ -219,7 +219,7 @@ def main() -> int:
                 'data-view="security"',
                 'data-view="settings"',
                 '/assets/portal-standalone.css',
-                '/assets/portal-standalone.js',
+                '/assets/bundles/portal-shell.bundle.js',
             ):
                 require(portal, marker, "Full Portal shell")
             for placeholder in ("__API_BASE_JSON__", "__ASSET_BASE__", "__VERSION__"):

@@ -27,15 +27,24 @@
   </ItemGroup>
   <PropertyGroup>
     <PortalPublicSource>$(MSBuildProjectDirectory)/../../public</PortalPublicSource>
+    <PortalBundleHostDll>$(MSBuildProjectDirectory)/bin/$(Configuration)/$(TargetFramework)/$(AssemblyName).dll</PortalBundleHostDll>
   </PropertyGroup>
 
   <Target Name="GeneratePortalBuildBundles"
           AfterTargets="Build"
-          Condition="'$(DesignTimeBuild)' != 'true'">
+          Condition="'$(DesignTimeBuild)' != 'true' and '$(SkipPortalBundleGeneration)' != 'true' and '$(RuntimeIdentifier)' == ''">
     <Exec Command="dotnet &quot;$(TargetPath)&quot; --bundle-assets &quot;$(PortalPublicSource)&quot; &quot;$(TargetDir)public/assets/bundles&quot;" />
   </Target>
 
+  <Target Name="PreparePortalPublishBundleHost"
+          BeforeTargets="GeneratePortalPublishBundles"
+          Condition="'$(RuntimeIdentifier)' != ''">
+    <MSBuild Projects="$(MSBuildProjectFullPath)"
+             Targets="Build"
+             Properties="Configuration=$(Configuration);TargetFramework=$(TargetFramework);RuntimeIdentifier=;SelfContained=false;PublishReadyToRun=false;SkipPortalBundleGeneration=true" />
+  </Target>
+
   <Target Name="GeneratePortalPublishBundles" AfterTargets="Publish">
-    <Exec Command="dotnet &quot;$(PublishDir)$(AssemblyName).dll&quot; --bundle-assets &quot;$(PortalPublicSource)&quot; &quot;$(PublishDir)public/assets/bundles&quot;" />
+    <Exec Command="dotnet &quot;$(PortalBundleHostDll)&quot; --bundle-assets &quot;$(PortalPublicSource)&quot; &quot;$(PublishDir)public/assets/bundles&quot;" />
   </Target>
 </Project>
