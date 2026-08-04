@@ -1,0 +1,65 @@
+name: Temporary Portal view lifecycle cleanup
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: write
+
+jobs:
+  lifecycle:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Apply lifecycle cleanup
+        run: python3 tools/apply-portal-view-lifecycle.py
+
+      - name: Validate lifecycle contracts
+        shell: bash
+        run: |
+          grep -Fq 'disposeView(activeView);' public/portal/standalone/scripts/app.js
+          grep -Fq 'unmount: function (mode) { disposePage(mode || "embedded"); }' public/shared/module-shell.js
+          grep -Fq 'window.SirkPortalSettings = { mount: mount, unmount: unmount };' public/portal/standalone/scripts/settings-native-v2.js
+          grep -Fq 'unmount: unmount,' public/portal/management.js
+          grep -Fq 'observer.observe(observerRoot, { childList: true, subtree: true });' public/portal/standalone/scripts/agent-installer-ui.js
+          ! grep -Fq 'attributes: true' public/portal/standalone/scripts/agent-installer-ui.js
+
+      - name: Verify product remains Node-free
+        shell: bash
+        run: |
+          test -z "$(find . -type f \( -name package.json -o -name package-lock.json -o -name npm-shrinkwrap.json -o -name yarn.lock -o -name pnpm-lock.yaml -o -name .nvmrc \) -print -quit)"
+          test -z "$(find . -type d -name node_modules -print -quit)"
+          test ! -e tools/Test-DesktopWebSocket.js
+
+      - name: Build publish and test .NET 10 Portal
+        shell: bash
+        run: |
+          rm -rf /tmp/sirk-portal-publish
+          dotnet build src/Sirk.Portal/Sirk.Portal.csproj -c Release --nologo
+          dotnet build tools/Sirk.Portal.DesktopProbe/Sirk.Portal.DesktopProbe.csproj -c Release --nologo
+          dotnet publish src/Sirk.Portal/Sirk.Portal.csproj -c Release --no-restore --nologo -o /tmp/sirk-portal-publish
+          test -s /tmp/sirk-portal-publish/public/assets/bundles/portal-shell.bundle.js
+          test -s /tmp/sirk-portal-publish/public/assets/bundles/portal-devices.bundle.js
+          test -s /tmp/sirk-portal-publish/public/assets/bundles/portal-modules.bundle.js
+          while IFS= read -r project; do
+            dotnet test "$project" -c Release --nologo
+          done < <(find tests -name '*.csproj' -type f | sort)
+
+      - name: Commit final lifecycle cleanup
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/temp-portal-view-lifecycle.yml tools/apply-portal-view-lifecycle.py
+          git add public/portal/standalone/scripts/app.js public/shared/module-shell.js public/portal/standalone/scripts/settings-native-v2.js public/portal/management.js public/portal/standalone/scripts/agent-installer-ui.js
+          git commit -m "fix: dispose inactive Portal views and retained DOM"
+          git push origin HEAD:main
