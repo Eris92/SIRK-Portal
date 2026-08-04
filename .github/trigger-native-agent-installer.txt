@@ -1,1 +1,1 @@
-trigger
+trigger-rid-safe
