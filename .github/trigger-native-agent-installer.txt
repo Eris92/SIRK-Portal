@@ -1,1 +1,1 @@
-trigger-rid-safe
+trigger-bundle-contract
