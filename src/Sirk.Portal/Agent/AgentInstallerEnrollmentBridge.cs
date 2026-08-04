@@ -60,13 +60,29 @@ internal sealed class AgentInstallerTicketMiddleware(
 
     public async Task InvokeAsync(HttpContext context)
     {
-        if (!HttpMethods.IsPost(context.Request.Method) ||
-            !context.Request.Path.Equals("/api/v1/agent/enroll"))
+        if (!HttpMethods.IsPost(context.Request.Method))
         {
             await next(context);
             return;
         }
 
+        if (context.Request.Path.Equals("/api/v1/agent/enroll"))
+        {
+            await InvokeCanonicalAsync(context);
+            return;
+        }
+
+        if (context.Request.Path.Equals("/api/agent/v1/enroll"))
+        {
+            await InvokeSignedAgentV1Async(context);
+            return;
+        }
+
+        await next(context);
+    }
+
+    private async Task InvokeCanonicalAsync(HttpContext context)
+    {
         context.Request.EnableBuffering(64 * 1024, 256 * 1024);
         AgentEnrollmentRequest? request = null;
         try
@@ -95,6 +111,37 @@ internal sealed class AgentInstallerTicketMiddleware(
         using var validation = AgentInstallerTicketValidationScope.Enter(
             request.GroupId,
             request.EnrollmentToken);
+        await next(context);
+    }
+
+    private async Task InvokeSignedAgentV1Async(HttpContext context)
+    {
+        var authorization = context.Request.Headers.Authorization.ToString();
+        if (!authorization.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+        {
+            await next(context);
+            return;
+        }
+
+        var compoundToken = authorization[7..].Trim();
+        var separator = compoundToken.IndexOf('.');
+        if (separator is < 3 || separator == compoundToken.Length - 1)
+        {
+            await next(context);
+            return;
+        }
+
+        var groupId = compoundToken[..separator].Trim().ToLowerInvariant();
+        var enrollmentTicket = compoundToken[(separator + 1)..].Trim();
+        if (!tickets.TryConsume(groupId, enrollmentTicket))
+        {
+            await next(context);
+            return;
+        }
+
+        using var validation = AgentInstallerTicketValidationScope.Enter(
+            groupId,
+            enrollmentTicket);
         await next(context);
     }
 }

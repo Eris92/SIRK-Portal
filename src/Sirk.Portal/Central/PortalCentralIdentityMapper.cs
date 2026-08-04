@@ -8,6 +8,18 @@ namespace Sirk.Portal.Central;
 internal sealed class PortalCentralIdentityMapper
 {
     private static readonly object Sync = new();
+    private static readonly IReadOnlyDictionary<string, string> CentralRoleMap =
+        new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["BreakGlass"] = PortalRoles.SecAdmin,
+            ["SecAdmin"] = PortalRoles.SecAdmin,
+            ["Admin"] = PortalRoles.Admin,
+            ["Auditor"] = PortalRoles.Auditor,
+            ["OperatorL1"] = PortalRoles.OperatorL1,
+            ["SupportL2"] = PortalRoles.SupportL2,
+            ["EngineerL3"] = PortalRoles.EngineerL3
+        };
+
     private readonly PortalIdentityStore _identities;
 
     public PortalCentralIdentityMapper(PortalIdentityStore identities)
@@ -68,19 +80,20 @@ internal sealed class PortalCentralIdentityMapper
         }
     }
 
-    private static string MapRole(string value)
+    internal static string MapRole(string? value)
     {
         var normalized = (value ?? string.Empty).Trim();
-        if (normalized == PortalRoles.BreakGlass) return PortalRoles.SecAdmin;
-        if (!PortalRoles.All.Contains(normalized, StringComparer.Ordinal))
-            throw new UnauthorizedAccessException("Central role is not supported by this Portal.");
-        return normalized;
+        return CentralRoleMap.TryGetValue(normalized, out var mapped)
+            ? mapped
+            : throw new UnauthorizedAccessException(
+                "Central role is not supported by this Portal.");
     }
 
     private static string Normalize(string? value, int maximum, string field)
     {
         var normalized = (value ?? string.Empty).Trim();
-        if (normalized.Length is < 1 || normalized.Length > maximum ||
+        if (normalized.Length < 1 ||
+            normalized.Length > maximum ||
             normalized.Any(character => character is '\r' or '\n' or '\0'))
         {
             throw new InvalidDataException($"{field} is invalid.");
