@@ -85,11 +85,11 @@ try {
     # installer download so install-dotnet10.ps1 is also saved with a BOM.
     $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
     $source = [IO.File]::ReadAllText($installer, $utf8NoBom).Replace("`r`n", "`n")
-    $needle = @'
+    $needle = (@'
     Invoke-WebRequest -UseBasicParsing -Uri $installerUrl -OutFile $installerPath
     if ((Get-Item -LiteralPath $installerPath).Length -lt 10000) {
-'@
-    $replacement = @'
+'@).Replace("`r`n", "`n")
+    $replacement = (@'
     Invoke-WebRequest -UseBasicParsing -Uri $installerUrl -OutFile $installerPath
     $canonicalSource = [IO.File]::ReadAllText(
         $installerPath,
@@ -109,7 +109,7 @@ try {
         throw "Pobrany kanoniczny instalator ma blad skladni: $canonicalMessage"
     }
     if ((Get-Item -LiteralPath $installerPath).Length -lt 10000) {
-'@
+'@).Replace("`r`n", "`n")
     if (-not $source.Contains($needle)) {
         throw 'Nie rozpoznano kontraktu pobierania kanonicznego instalatora.'
     }
