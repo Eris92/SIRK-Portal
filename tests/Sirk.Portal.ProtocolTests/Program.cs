@@ -239,7 +239,24 @@ finally
     if (Directory.Exists(agentRoot)) Directory.Delete(agentRoot, recursive: true);
 }
 
-Console.WriteLine("SIRK Portal signed heartbeat, protected config, filesystem script and single-use Agent installer contracts: OK");
+using var legacyMetadataDocument = JsonDocument.Parse("""
+{
+  "status": "Healthy",
+  "nested": {
+    "value": 1
+  }
+}
+""");
+var compactLegacyMetadata = LegacyAgentCompatibilityEndpoints.Summarize(
+    legacyMetadataDocument.RootElement.Clone());
+Assert(
+    compactLegacyMetadata == "{\"status\":\"Healthy\",\"nested\":{\"value\":1}}",
+    "Legacy Agent check-in metadata must be serialized as compact JSON.");
+Assert(
+    !compactLegacyMetadata.Any(char.IsControl),
+    "Legacy Agent check-in metadata must not contain control characters.");
+
+Console.WriteLine("SIRK Portal signed heartbeat, protected config, filesystem script, Agent check-in metadata and single-use Agent installer contracts: OK");
 
 static byte[] Base64UrlDecode(string value)
 {

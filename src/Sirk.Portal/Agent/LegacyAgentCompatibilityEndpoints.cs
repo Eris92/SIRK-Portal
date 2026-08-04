@@ -383,11 +383,11 @@ internal static class LegacyAgentCompatibilityEndpoints
         return value.Length <= 4096 ? value : value[..4096];
     }
 
-    private static string Summarize(JsonElement? value)
+    internal static string Summarize(JsonElement? value)
     {
         if (value is null || value.Value.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined)
             return string.Empty;
-        var text = value.Value.GetRawText();
+        var text = JsonSerializer.Serialize(value.Value, JsonOptions);
         return text.Length <= 1000 ? text : text[..1000];
     }
 
