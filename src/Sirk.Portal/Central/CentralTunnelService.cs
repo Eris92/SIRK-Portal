@@ -200,6 +200,34 @@ internal sealed class CentralTunnelService : BackgroundService
             throw new InvalidDataException("Central tunnel request is missing delegated identity headers.");
         }
 
+        // The connect probe validates the signed Portal poll/response channel itself.
+        // It must not depend on public ASP.NET compatibility routes, cookies or CSRF.
+        if (request.Method == "GET" &&
+            request.Path.Equals("/api/v1/system/info", StringComparison.Ordinal))
+        {
+            var handshakeBody = JsonSerializer.SerializeToUtf8Bytes(new
+            {
+                ok = true,
+                product = "SIRK Portal",
+                runtime = ".NET 10",
+                version = VersionInfo.Current,
+                delegated = true,
+                portalId = request.PortalId,
+                identity = new
+                {
+                    id = actorId,
+                    name = actorName,
+                    role = actorRole,
+                    source = "central"
+                }
+            }, JsonOptions);
+            return new CentralTunnelResponseInput(
+                StatusCodes.Status200OK,
+                "application/json; charset=utf-8",
+                new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase),
+                Convert.ToBase64String(handshakeBody));
+        }
+
         var handler = new HttpClientHandler
         {
             AllowAutoRedirect = false,
