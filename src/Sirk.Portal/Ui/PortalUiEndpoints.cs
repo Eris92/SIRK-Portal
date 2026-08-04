@@ -38,7 +38,7 @@ internal static class PortalUiEndpoints
         NoStore(context);
         var prefix = ResolveProxyPrefix(context);
         if (context.User.Identity?.IsAuthenticated != true)
-            return Results.Redirect(WithPrefix(prefix, "/login"), permanent: false, preserveMethod: false);
+            return Results.Redirect("/login", permanent: false, preserveMethod: false);
 
         var path = Path.Combine(environment.WebRootPath, "portal", "standalone", "index.html");
         var html = await File.ReadAllTextAsync(path, Encoding.UTF8, context.RequestAborted);
@@ -76,7 +76,7 @@ internal static class PortalUiEndpoints
         NoStore(context);
         var prefix = ResolveProxyPrefix(context);
         if (context.User.Identity?.IsAuthenticated == true)
-            return Results.Redirect(WithPrefix(prefix, "/"), permanent: false, preserveMethod: false);
+            return Results.Redirect("/", permanent: false, preserveMethod: false);
 
         var path = Path.Combine(environment.WebRootPath, "portal", "standalone", "login.html");
         var html = await File.ReadAllTextAsync(path, Encoding.UTF8, context.RequestAborted);
@@ -116,10 +116,9 @@ internal static class PortalUiEndpoints
     private static async Task<IResult> LogoutAsync(HttpContext context)
     {
         NoStore(context);
-        var prefix = ResolveProxyPrefix(context);
         if (context.User.Identity?.IsAuthenticated == true)
             await context.SignOutAsync(PortalAuthenticationSchemes.Session);
-        return Results.Redirect(WithPrefix(prefix, "/login"), permanent: false, preserveMethod: false);
+        return Results.Redirect("/login", permanent: false, preserveMethod: false);
     }
 
     private static string ResolveProxyPrefix(HttpContext context)
