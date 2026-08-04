@@ -189,7 +189,8 @@
         window.clearTimeout(observer.timer);
         observer.timer = window.setTimeout(mount, 50);
     });
-    observer.observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ["class"] });
+    var observerRoot = document.getElementById("sirkStandaloneContent") || document.body;
+    if (observerRoot) observer.observe(observerRoot, { childList: true, subtree: true });
     window.addEventListener("hashchange", mount);
     window.addEventListener("popstate", mount);
     mount();

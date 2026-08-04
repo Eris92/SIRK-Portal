@@ -24,7 +24,8 @@
         collapsed: loadCollapsedState(),
         editMode: false,
         host: null,
-        output: Object.create(null)
+        output: Object.create(null),
+        mountGeneration: 0
     };
 
     function loadCollapsedState() {
@@ -587,9 +588,25 @@
         });
     }
 
+    function unmount() {
+        state.mountGeneration += 1;
+        if (state.host) state.host.replaceChildren();
+        state.host = null;
+        state.tree = null;
+        state.root = "";
+        state.script = "";
+        state.search = "";
+        state.results = false;
+        state.status = "";
+        state.output = Object.create(null);
+    }
+
     function mount(host) {
+        unmount();
+        var generation = ++state.mountGeneration;
         state.host = host;
         return api("tree").then(function (response) {
+            if (generation !== state.mountGeneration || state.host !== host || !host.isConnected) return;
             state.tree = response.tree;
             var available = roots();
             var linkedPath = consumeDeepLink();
@@ -609,6 +626,7 @@
             if (linkedScript && linkedScript.type === "script") openScript(linkedPath, true);
             else if (linkedPath) showMessage("Script link", "Nie znaleziono skryptu wskazanego w linku.", true);
         }).catch(function (error) {
+            if (generation !== state.mountGeneration || state.host !== host || !host.isConnected) return;
             host.innerHTML = "";
             host.appendChild(el("div", "sirk-card sirk-error", error.message || String(error)));
         });
@@ -616,6 +634,7 @@
 
     window.SirkPlatformPortalManagement = {
         mount: mount,
+        unmount: unmount,
         refresh: function () {
             if (!state.host) return;
             api("tree").then(function (response) {

@@ -681,7 +681,33 @@
         if (window.location.hash !== "#" + view) history.replaceState(null, "", "#" + view);
     }
 
+    function disposeView(view) {
+        var module;
+        if (view === "management") {
+            if (window.SirkPlatformPortalManagement && typeof window.SirkPlatformPortalManagement.unmount === "function") {
+                window.SirkPlatformPortalManagement.unmount();
+            }
+            return;
+        }
+        if (view === "settings") {
+            if (window.SirkPortalSettings && typeof window.SirkPortalSettings.unmount === "function") {
+                window.SirkPortalSettings.unmount();
+            }
+            return;
+        }
+        if (view === "approvals") {
+            module = window.SirkPlatformModules && window.SirkPlatformModules.approvals;
+            if (module && typeof module.unmount === "function") module.unmount("sirk-standalone-approval");
+            return;
+        }
+        if (moduleViews[view]) {
+            module = window.SirkPlatformModules && window.SirkPlatformModules[moduleViews[view]];
+            if (module && typeof module.unmount === "function") module.unmount("sirk-standalone-" + view);
+        }
+    }
+
     function render(view) {
+        disposeView(activeView);
         view = VIEW_KEYS.indexOf(view) >= 0 && viewEnabled(view) ? view : firstEnabledView();
         activeView = view;
         var sequence = ++renderSequence;

@@ -14,7 +14,8 @@
         issuedAccessCode: null,
         csrf: "",
         host: null,
-        page: null
+        page: null,
+        mountGeneration: 0
     };
     var roleOptions = [
         ["Break-Glass", "Break-Glass"],
@@ -794,7 +795,25 @@
         renderDetails();
     }
 
+    function unmount() {
+        state.mountGeneration += 1;
+        if (state.host) clear(state.host);
+        state.host = null;
+        state.page = null;
+        state.settings = null;
+        state.identity = null;
+        state.runtime = null;
+        state.maintenance = null;
+        state.central = null;
+        state.computerGroups = null;
+        state.issuedEnrollment = null;
+        state.issuedAccessCode = null;
+        state.csrf = "";
+    }
+
     function mount(host) {
+        unmount();
+        var generation = ++state.mountGeneration;
         clear(host);
         var root = el("section", "sirk-view-shell");
         root.setAttribute("data-sirk-view-shell", "settings");
@@ -829,11 +848,15 @@
         state.host = host;
         state.page = { root: root, toolbar: toolbar, layout: layout, primary: primary, secondary: secondary, details: details };
         renderAll();
-        load().then(renderAll).catch(function (error) {
+        load().then(function () {
+            if (generation !== state.mountGeneration || state.host !== host || !host.isConnected) return;
+            renderAll();
+        }).catch(function (error) {
+            if (generation !== state.mountGeneration || state.host !== host || !host.isConnected) return;
             clear(details);
             details.appendChild(card("Błąd", error.message));
         });
     }
 
-    window.SirkPortalSettings = { mount: mount };
+    window.SirkPortalSettings = { mount: mount, unmount: unmount };
 }());

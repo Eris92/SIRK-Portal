@@ -155,7 +155,20 @@
                 page.toolbar.setTitle("collapse", collapsed ? "Expand" : "Collapse");
             }
 
+            function disposePage(mode) {
+                var page = state.pages[mode];
+                if (!page) return;
+                if (page.root) {
+                    page.root.replaceChildren();
+                    page.root.removeAttribute("data-sirk-view-shell");
+                    page.root.removeAttribute("data-frontend");
+                }
+                delete state.pages[mode];
+                if (state.page === page) state.page = null;
+            }
+
             function mountPage(host, mode) {
+                disposePage(mode);
                 host.innerHTML = "";
                 var page = window.SharedPage.mount({
                     container: host,
@@ -238,6 +251,7 @@
                 },
                 open: open,
                 mount: function (host, mode) { return mountPage(host, mode || "embedded"); },
+                unmount: function (mode) { disposePage(mode || "embedded"); },
                 render: api.render,
                 api: api,
                 onDeviceRefreshEnd: function (nodeId) { state.nodeId = String(nodeId || ""); if (device) device.onDeviceRefreshEnd(nodeId); },
