@@ -71,10 +71,7 @@
     window.__SIRK_PLATFORM_DEFAULT_USER_IMAGE_URL__ = __DEFAULT_USER_IMAGE_URL_JSON__;
     window.__SIRK_PLATFORM_PORTAL_VERSION__ = __VERSION_JSON__;
   </script>
-  <script src="__ASSET_BASE__/standalone-core.js?v=__VERSION__"></script>
-  <script src="__ASSET_BASE__/portal-standalone.js?v=__VERSION__"></script>
-  <script src="__ASSET_BASE__/portal-device-workspace.js?v=__VERSION__"></script>
-  <script src="__ASSET_BASE__/portal-device-tabs.js?v=__VERSION__"></script>
+  <script src="__ASSET_BASE__/bundles/portal-shell.bundle.js?v=__VERSION__"></script>
   <script>
   (function(){
     "use strict";
@@ -106,7 +103,6 @@
   }());
   </script>
 
-  <script src="__ASSET_BASE__/portal-view-mode.js?v=__VERSION__"></script>
-  <script src="__ASSET_BASE__/portal-standalone-nav.js?v=__VERSION__"></script>
+  <!-- Devices and administration modules are loaded lazily by portal-shell.bundle.js. -->
 </body>
 </html>

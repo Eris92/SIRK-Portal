@@ -145,6 +145,10 @@ internal static class PortalUiEndpoints
         {
             ["icons/sirk-ui.svg"] = "assets/icons/sirk-ui.svg",
             ["standalone-core.js"] = "portal/standalone/scripts/core.js",
+            ["bundles/portal-shell.bundle.js"] = "assets/bundles/portal-shell.bundle.js",
+            ["bundles/portal-devices.bundle.js"] = "assets/bundles/portal-devices.bundle.js",
+            ["bundles/portal-modules.bundle.js"] = "assets/bundles/portal-modules.bundle.js",
+            ["bundles/portal-bundles.json"] = "assets/bundles/portal-bundles.json",
             ["portal-standalone.js"] = "portal/standalone/scripts/app.js",
             ["portal-standalone-nav.js"] = "portal/standalone/scripts/navigation.js",
             ["portal-device-workspace.js"] = "portal/standalone/scripts/device-workspace.js",

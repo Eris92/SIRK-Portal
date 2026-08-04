@@ -24,6 +24,12 @@ if (RuntimeHealthProbe.IsRequested(args))
     return;
 }
 
+if (PortalAssetBundler.IsRequested(args))
+{
+    Environment.ExitCode = await PortalAssetBundler.RunAsync(args);
+    return;
+}
+
 var builder = WebApplication.CreateBuilder(new WebApplicationOptions
 {
     Args = args,

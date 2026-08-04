@@ -25,4 +25,17 @@
              CopyToOutputDirectory="PreserveNewest"
              CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
+  <PropertyGroup>
+    <PortalPublicSource>$(MSBuildProjectDirectory)/../../public</PortalPublicSource>
+  </PropertyGroup>
+
+  <Target Name="GeneratePortalBuildBundles"
+          AfterTargets="Build"
+          Condition="'$(DesignTimeBuild)' != 'true'">
+    <Exec Command="dotnet &quot;$(TargetPath)&quot; --bundle-assets &quot;$(PortalPublicSource)&quot; &quot;$(TargetDir)public/assets/bundles&quot;" />
+  </Target>
+
+  <Target Name="GeneratePortalPublishBundles" AfterTargets="Publish">
+    <Exec Command="dotnet &quot;$(PublishDir)$(AssemblyName).dll&quot; --bundle-assets &quot;$(PortalPublicSource)&quot; &quot;$(PublishDir)public/assets/bundles&quot;" />
+  </Target>
 </Project>

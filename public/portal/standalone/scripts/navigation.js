@@ -39,8 +39,6 @@
     function loadUiContract() {
         loadStyle("sirk-platform-portal-ui-contract-style", "vendor/sirk-portal/portal-ui-contract.css");
         loadStyle("sirk-platform-portal-cleanup-style", "portal-cleanup.css");
-        loadScript("sirk-platform-portal-ui-contract-script", "vendor/sirk-portal/portal-ui-contract.js");
-        loadScript("sirk-platform-portal-cleanup-script", "portal-cleanup.js");
     }
 
     function replacePortalIcons() {
@@ -387,11 +385,8 @@
     loadUiContract();
     loadStyle("sirk-platform-system-updates-style", "system-updates.css");
     loadStyle("sirk-platform-settings-style", "settings.css");
-    loadScript("sirk-platform-system-updates-script", "system-updates.js");
-    loadScript("sirk-platform-settings-script", "settings.js");
-    loadScript("sirk-platform-icon-registry", "shared/icon-registry.js", replacePortalIcons);
+    replacePortalIcons();
     observeDeviceWorkspace();
-    loadScript("sirk-platform-portal-terminal-connect", "portal-terminal-connect.js");
 
     if (!bind()) {
         var attempts = 0;

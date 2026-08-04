@@ -15,6 +15,7 @@
     var selectedDeviceId = "";
     var deviceSearch = "";
     var deviceFilter = "all";
+    var bundlePromises = Object.create(null);
 
     var TEXT = {
         pl: {
@@ -91,6 +92,14 @@
 
     var moduleViews = { assets: "jira", security: "security" };
     var VIEW_KEYS = ["overview", "devices", "approvals", "automation", "monitoring", "assets", "management", "reports", "security", "settings"];
+    var VIEW_BUNDLES = {
+        devices: "devices",
+        approvals: "modules",
+        assets: "modules",
+        management: "modules",
+        security: "modules",
+        settings: "modules"
+    };
     var THEME_ICONS = {
         moon: '<svg class="sirk-theme-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.7 15.1A8.5 8.5 0 0 1 8.9 3.4a8.7 8.7 0 1 0 11.8 11.7Z"/><path class="sirk-theme-star" d="m17.5 3 .55 1.45L19.5 5l-1.45.55L17.5 7l-.55-1.45L15.5 5l1.45-.55Z"/></svg>',
         sun: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.42-1.42M17.66 6.34l1.41-1.41"/></svg>'
@@ -290,6 +299,16 @@
     }
 
     function load(id, name) { return core.loadScript(id, asset(name)); }
+    function loadBundle(name) {
+        if (!name) return Promise.resolve();
+        if (!bundlePromises[name]) {
+            bundlePromises[name] = load(
+                "sirk-portal-bundle-" + name,
+                "bundles/portal-" + name + ".bundle.js");
+        }
+        return bundlePromises[name];
+    }
+    function ensureViewBundle(view) { return loadBundle(VIEW_BUNDLES[view]); }
     function moduleState(key) { return bootstrap && bootstrap.modules && bootstrap.modules[key] || null; }
     function accessAllowed(state) {
         if (!state || state.enabled !== true || state.ready === false) return false;
@@ -647,6 +666,21 @@
         page.details.innerHTML = '<div class="sirk-content"><h2>' + escapeHtml(viewName("automation")) + '</h2><div class="sirk-card"><h3>Harmonogram serwera</h3><p class="sirk-muted">Automatyzacje zarządzają zadaniami serwera w katalogu harmonogramu <strong>SIRK</strong>. Polecenia urządzeń są dostępne w widoku Urządzenia.</p></div></div>';
     }
 
+    function renderLoaded(view, sequence) {
+        if (!isCurrent(sequence)) return;
+        if (view === "overview") overview(sequence);
+        else if (view === "management") management(sequence);
+        else if (view === "approvals") approvals(sequence);
+        else if (view === "settings") settings();
+        else if (view === "devices") devices(sequence, false);
+        else if (view === "automation") automation(sequence);
+        else if (moduleViews[view]) mountModule(view, moduleViews[view], sequence);
+        else if (view === "monitoring") placeholder(view, t("monitoringPlaceholder"));
+        else if (view === "reports") placeholder(view, t("reportsPlaceholder"));
+        else placeholder(view, t("genericPlaceholder"));
+        if (window.location.hash !== "#" + view) history.replaceState(null, "", "#" + view);
+    }
+
     function render(view) {
         view = VIEW_KEYS.indexOf(view) >= 0 && viewEnabled(view) ? view : firstEnabledView();
         activeView = view;
@@ -659,17 +693,16 @@
             button.classList.toggle("is-active", active);
             button.setAttribute("aria-current", active ? "page" : "false");
         });
-        if (view === "overview") overview(sequence);
-        else if (view === "management") management(sequence);
-        else if (view === "approvals") approvals(sequence);
-        else if (view === "settings") settings();
-        else if (view === "devices") devices(sequence, false);
-        else if (view === "automation") automation(sequence);
-        else if (moduleViews[view]) mountModule(view, moduleViews[view], sequence);
-        else if (view === "monitoring") placeholder(view, t("monitoringPlaceholder"));
-        else if (view === "reports") placeholder(view, t("reportsPlaceholder"));
-        else placeholder(view, t("genericPlaceholder"));
-        if (window.location.hash !== "#" + view) history.replaceState(null, "", "#" + view);
+        if (VIEW_BUNDLES[view]) loading(t("loadingModules"));
+        ensureViewBundle(view).then(function () {
+            renderLoaded(view, sequence);
+        }).catch(function (reason) {
+            if (isCurrent(sequence)) {
+                showError(
+                    viewName(view) + ": " + t("loadFailed"),
+                    reason && (reason.stack || reason.message) || reason);
+            }
+        });
     }
 
     function setTheme(dark) {
@@ -757,29 +790,6 @@
         });
     }
 
-    function loadDependencies() {
-        var files = [
-            ["sirk-shared-toolbar-config", "shared-ui/toolbar-config.js"], ["sirk-shared-toolbar-api", "shared-ui/toolbar-api.js"],
-            ["sirk-shared-toolbar", "shared-ui/toolbar.js"], ["sirk-shared-tabs", "shared-ui/tabs.js"],
-            ["sirk-shared-layout", "shared-ui/layout.js"], ["sirk-shared-settings", "shared-ui/settings.js"],
-            ["sirk-shared-status-nav", "shared-ui/status-nav.js"], ["sirk-shared-page", "shared-ui/page.js"],
-            ["sirk-shared-tree", "shared-ui/tree.js"], ["sirk-shared-catalog", "shared-ui/catalog.js"], ["sirk-shared-results", "shared-ui/results.js"],
-            ["sirk-shared-result-layout", "shared-ui/result-layout.js"], ["sirk-shared-script-tools", "shared-ui/script-tools.js"],
-            ["sirk-shared-script-definition", "shared-ui/script-definition-form.js"], ["sirk-shared-confirm", "shared-ui/confirm-execution-form.js"],
-            ["sirk-shared-edit-actions", "shared-ui/script-edit-actions.js"], ["sirk-shared-system-credentials", "shared-ui/system-credentials-form.js"],
-            ["sirk-module-shell", "module-shell.js"], ["sirk-icon-data", "portal-icon-data.js"],
-            ["sirk-approval-module", "approvals.js"], ["sirk-move-module", "move-requests.js"],
-            ["sirk-commands-module", "commands.js"], ["sirk-jira-module", "jira.js"],
-            ["sirk-defender-module", "security.js"], ["sirk-management-renderer", "management.js"],
-            ["sirk-subfolder-icons", "portal-subfolder-icons.js"], ["sirk-folder-collapse", "portal-folder-collapse.js"]
-        ];
-        // core.loadScript sets async=false. Starting every download now lets the
-        // browser fetch in parallel while preserving deterministic execution order.
-        return Promise.all(files.map(function (entry) {
-            return load(entry[0], entry[1]);
-        }));
-    }
-
     function start() {
         bind();
         loading(t("loadingModules"));
@@ -791,7 +801,6 @@
             bootstrap.access = bootstrap.access || (bootstrap.modules && bootstrap.modules.portal && bootstrap.modules.portal.access) || {};
             applyUserProfile();
             applyShellLanguage();
-            return loadDependencies();
         }).then(function () {
             var requested = location.hash.slice(1);
             render(requested || portalConfig().defaultView || "overview");

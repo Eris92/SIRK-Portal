@@ -1,25 +1,3 @@
-from pathlib import Path
-import textwrap
-
-legacy = Path("tools/Test-DesktopWebSocket.js")
-if not legacy.exists():
-    raise SystemExit("Legacy Node desktop WebSocket probe is missing.")
-legacy.unlink()
-
-project = Path("tools/Sirk.Portal.DesktopProbe/Sirk.Portal.DesktopProbe.csproj")
-project.parent.mkdir(parents=True, exist_ok=True)
-project.write_text(textwrap.dedent('''
-<Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup>
-    <OutputType>Exe</OutputType>
-    <AssemblyName>Sirk.Portal.DesktopProbe</AssemblyName>
-    <RootNamespace>Sirk.Portal.DesktopProbe</RootNamespace>
-  </PropertyGroup>
-</Project>
-''').lstrip(), encoding="utf-8", newline="\n")
-
-program = Path("tools/Sirk.Portal.DesktopProbe/Program.cs")
-program.write_text(textwrap.dedent(r'''
 using System.Buffers.Binary;
 using System.Diagnostics;
 using System.Net;
@@ -316,6 +294,3 @@ internal sealed class ProbeResult
     public List<double> SessionSamples { get; } = [];
     public List<double> AgeSamples { get; } = [];
 }
-''').lstrip(), encoding="utf-8", newline="\n")
-
-print("Legacy Node desktop probe replaced with .NET 10.")
