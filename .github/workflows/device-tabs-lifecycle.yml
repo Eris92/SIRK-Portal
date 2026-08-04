@@ -26,8 +26,8 @@ jobs:
         run: |
           set -euo pipefail
           git fetch origin fix/device-tabs-lifecycle
-          git show origin/fix/device-tabs-lifecycle:.github/scripts/apply-device-tabs-lifecycle.py > /tmp/apply-device-tabs-lifecycle.py
-          python3 /tmp/apply-device-tabs-lifecycle.py
+          git show origin/fix/device-tabs-lifecycle:.github/scripts/apply-device-tabs-lifecycle.py > .github/scripts/apply-device-tabs-lifecycle.py
+          python3 .github/scripts/apply-device-tabs-lifecycle.py
       - name: Validate bounded lifecycle
         shell: bash
         run: |
@@ -46,6 +46,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          rm -f .github/scripts/apply-device-tabs-lifecycle.py
           rm -f .github/workflows/device-tabs-lifecycle.yml
           rm -f .github/scripts/device-tabs-lifecycle-marker.txt
           git config user.name github-actions[bot]
