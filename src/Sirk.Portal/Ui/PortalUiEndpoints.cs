@@ -1,4 +1,6 @@
+using System.Security.Claims;
 using System.Text;
+using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Authentication;
 using Sirk.Portal.Security;
 
@@ -7,6 +9,7 @@ namespace Sirk.Portal.Ui;
 internal static class PortalUiEndpoints
 {
     private const string AssetRevision = "group-bound-agent-installer-20260803-1";
+    private const string ProxyPrefixHeader = "X-SIRK-Proxy-Prefix";
     private static readonly IReadOnlyDictionary<string, string> Assets = BuildAssets();
 
     public static IEndpointRouteBuilder MapPortalUi(this IEndpointRouteBuilder endpoints)
@@ -16,13 +19,38 @@ internal static class PortalUiEndpoints
         endpoints.MapGet("/login", LoginAsync).AllowAnonymous();
         endpoints.MapGet("/assets/{**asset}", AssetAsync).AllowAnonymous();
         endpoints.MapGet("/auth/logout", (Delegate)LogoutAsync).AllowAnonymous();
-        endpoints.MapGet("/maintenance.json", () => Results.Json(new
+        endpoints.MapGet("/maintenance.json", (HttpContext context) =>
         {
-            enabled = false,
-            native = true,
-            api = "/api/v1/admin/maintenance/status"
-        })).AllowAnonymous();
+            var prefix = ResolveProxyPrefix(context);
+            return Results.Json(new
+            {
+                enabled = false,
+                native = true,
+                api = WithPrefix(prefix, "/api/v1/admin/maintenance/status")
+            });
+        }).AllowAnonymous();
+        endpoints.MapGet("/api/v1/system/info", SystemInfo)
+            .RequireAuthorization(PortalPolicies.DeviceRead);
         return endpoints;
+    }
+
+    private static IResult SystemInfo(HttpContext context)
+    {
+        NoStore(context);
+        return Results.Ok(new
+        {
+            product = "SIRK Portal",
+            runtime = ".NET 10",
+            version = VersionInfo.Current,
+            delegated = context.Items["Sirk.InternalTunnel"] is true,
+            identity = new
+            {
+                id = context.User.FindFirstValue(ClaimTypes.NameIdentifier) ?? string.Empty,
+                name = context.User.Identity?.Name ?? string.Empty,
+                role = context.User.FindFirstValue(ClaimTypes.Role) ?? string.Empty,
+                source = context.User.FindFirstValue("sirk:identity_source") ?? string.Empty
+            }
+        });
     }
 
     private static async Task<IResult> PortalAsync(
@@ -30,30 +58,35 @@ internal static class PortalUiEndpoints
         IWebHostEnvironment environment)
     {
         NoStore(context);
+        var prefix = ResolveProxyPrefix(context);
         if (context.User.Identity?.IsAuthenticated != true)
-            return Results.Redirect("/login", permanent: false, preserveMethod: false);
+            return Results.Redirect(WithPrefix(prefix, "/login"), permanent: false, preserveMethod: false);
 
         var path = Path.Combine(environment.WebRootPath, "portal", "standalone", "index.html");
         var html = await File.ReadAllTextAsync(path, Encoding.UTF8, context.RequestAborted);
         var version = VersionInfo.Current;
         var assetVersion = ResolveAssetVersion(version);
+        var apiBase = WithPrefix(prefix, "/api/v1");
+        var assetBase = WithPrefix(prefix, "/assets");
+        var logoutUrl = WithPrefix(prefix, "/auth/logout");
+        var userImageUrl = WithPrefix(prefix, "/assets/icons/sirk-ui.svg");
         html = html
-            .Replace("__API_BASE_JSON__", "\"/api/v1\"", StringComparison.Ordinal)
-            .Replace("__ASSET_BASE_JSON__", "\"/assets\"", StringComparison.Ordinal)
+            .Replace("__API_BASE_JSON__", System.Text.Json.JsonSerializer.Serialize(apiBase), StringComparison.Ordinal)
+            .Replace("__ASSET_BASE_JSON__", System.Text.Json.JsonSerializer.Serialize(assetBase), StringComparison.Ordinal)
             .Replace("__NATIVE_URL_JSON__", "null", StringComparison.Ordinal)
-            .Replace("__LOGOUT_URL_JSON__", "\"/auth/logout\"", StringComparison.Ordinal)
-            .Replace("__USER_IMAGE_URL_JSON__", "\"/assets/icons/sirk-ui.svg\"", StringComparison.Ordinal)
-            .Replace("__DEFAULT_USER_IMAGE_URL_JSON__", "\"/assets/icons/sirk-ui.svg\"", StringComparison.Ordinal)
+            .Replace("__LOGOUT_URL_JSON__", System.Text.Json.JsonSerializer.Serialize(logoutUrl), StringComparison.Ordinal)
+            .Replace("__USER_IMAGE_URL_JSON__", System.Text.Json.JsonSerializer.Serialize(userImageUrl), StringComparison.Ordinal)
+            .Replace("__DEFAULT_USER_IMAGE_URL_JSON__", System.Text.Json.JsonSerializer.Serialize(userImageUrl), StringComparison.Ordinal)
             .Replace("__VERSION_JSON__", System.Text.Json.JsonSerializer.Serialize(assetVersion), StringComparison.Ordinal)
-            .Replace("__ASSET_BASE__", "/assets", StringComparison.Ordinal)
+            .Replace("__ASSET_BASE__", assetBase, StringComparison.Ordinal)
             .Replace("__VERSION__", Uri.EscapeDataString(assetVersion), StringComparison.Ordinal);
         html = html.Replace(
             "</head>",
-            $"<link rel=\"stylesheet\" href=\"/assets/portal-management-frame.css?v={Uri.EscapeDataString(assetVersion)}\"></head>",
+            $"<link rel=\"stylesheet\" href=\"{assetBase}/portal-management-frame.css?v={Uri.EscapeDataString(assetVersion)}\"></head>",
             StringComparison.Ordinal);
         html = html.Replace(
             "</body>",
-            $"<script src=\"/assets/agent-installer-ui.js?v={Uri.EscapeDataString(assetVersion)}\"></script></body>",
+            $"<script src=\"{assetBase}/agent-installer-ui.js?v={Uri.EscapeDataString(assetVersion)}\"></script></body>",
             StringComparison.Ordinal);
         return Results.Content(html, "text/html; charset=utf-8", Encoding.UTF8);
     }
@@ -63,18 +96,21 @@ internal static class PortalUiEndpoints
         IWebHostEnvironment environment)
     {
         NoStore(context);
+        var prefix = ResolveProxyPrefix(context);
         if (context.User.Identity?.IsAuthenticated == true)
-            return Results.Redirect("/", permanent: false, preserveMethod: false);
+            return Results.Redirect(WithPrefix(prefix, "/"), permanent: false, preserveMethod: false);
 
         var path = Path.Combine(environment.WebRootPath, "portal", "standalone", "login.html");
         var html = await File.ReadAllTextAsync(path, Encoding.UTF8, context.RequestAborted);
         var version = VersionInfo.Current;
         var assetVersion = ResolveAssetVersion(version);
+        var assetBase = WithPrefix(prefix, "/assets");
+        var portalUrl = WithPrefix(prefix, "/");
         html = html
-            .Replace("__ASSET_BASE_JSON__", "\"/assets\"", StringComparison.Ordinal)
-            .Replace("__PORTAL_URL_JSON__", "\"/\"", StringComparison.Ordinal)
+            .Replace("__ASSET_BASE_JSON__", System.Text.Json.JsonSerializer.Serialize(assetBase), StringComparison.Ordinal)
+            .Replace("__PORTAL_URL_JSON__", System.Text.Json.JsonSerializer.Serialize(portalUrl), StringComparison.Ordinal)
             .Replace("__VERSION_JSON__", System.Text.Json.JsonSerializer.Serialize(assetVersion), StringComparison.Ordinal)
-            .Replace("__ASSET_BASE__", "/assets", StringComparison.Ordinal)
+            .Replace("__ASSET_BASE__", assetBase, StringComparison.Ordinal)
             .Replace("__VERSION__", Uri.EscapeDataString(assetVersion), StringComparison.Ordinal);
         return Results.Content(html, "text/html; charset=utf-8", Encoding.UTF8);
     }
@@ -102,10 +138,26 @@ internal static class PortalUiEndpoints
     private static async Task<IResult> LogoutAsync(HttpContext context)
     {
         NoStore(context);
+        var prefix = ResolveProxyPrefix(context);
         if (context.User.Identity?.IsAuthenticated == true)
             await context.SignOutAsync(PortalAuthenticationSchemes.Session);
-        return Results.Redirect("/login", permanent: false, preserveMethod: false);
+        return Results.Redirect(WithPrefix(prefix, "/login"), permanent: false, preserveMethod: false);
     }
+
+    private static string ResolveProxyPrefix(HttpContext context)
+    {
+        if (context.Items["Sirk.InternalTunnel"] is not true) return string.Empty;
+        var value = context.Request.Headers[ProxyPrefixHeader].ToString().Trim();
+        return Regex.IsMatch(
+            value,
+            "^/connect/[a-z0-9][a-z0-9-]{2,62}$",
+            RegexOptions.CultureInvariant)
+            ? value
+            : string.Empty;
+    }
+
+    private static string WithPrefix(string prefix, string path) =>
+        string.IsNullOrEmpty(prefix) ? path : prefix + path;
 
     private static string ResolveAssetVersion(string productVersion) =>
         productVersion + "-" + AssetRevision;
