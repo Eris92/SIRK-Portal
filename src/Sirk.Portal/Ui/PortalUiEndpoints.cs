@@ -30,25 +30,40 @@ internal static class PortalUiEndpoints
             });
         }).AllowAnonymous();
         endpoints.MapGet("/api/v1/system/info", SystemInfo)
-            .RequireAuthorization(PortalPolicies.DeviceRead);
+            .AllowAnonymous();
         return endpoints;
     }
 
     private static IResult SystemInfo(HttpContext context)
     {
         NoStore(context);
+        var delegated = context.Items["Sirk.InternalTunnel"] is true;
+        var authenticated = context.User.Identity?.IsAuthenticated == true;
+        var source = context.User.FindFirstValue("sirk:identity_source") ?? string.Empty;
+        if (!delegated || !authenticated || !source.Equals("central", StringComparison.Ordinal))
+        {
+            return Results.Json(
+                new
+                {
+                    ok = false,
+                    code = "DELEGATED_TUNNEL_REQUIRED",
+                    error = "A verified delegated Central tunnel identity is required."
+                },
+                statusCode: StatusCodes.Status401Unauthorized);
+        }
+
         return Results.Ok(new
         {
             product = "SIRK Portal",
             runtime = ".NET 10",
             version = VersionInfo.Current,
-            delegated = context.Items["Sirk.InternalTunnel"] is true,
+            delegated = true,
             identity = new
             {
                 id = context.User.FindFirstValue(ClaimTypes.NameIdentifier) ?? string.Empty,
                 name = context.User.Identity?.Name ?? string.Empty,
                 role = context.User.FindFirstValue(ClaimTypes.Role) ?? string.Empty,
-                source = context.User.FindFirstValue("sirk:identity_source") ?? string.Empty
+                source
             }
         });
     }
