@@ -23,7 +23,10 @@ jobs:
           dotnet-version: 10.0.x
 
       - name: Apply compatibility patch
-        run: python3 .github/scripts/apply-agent-remote-transport.py
+        shell: bash
+        run: |
+          python3 .github/scripts/apply-agent-remote-transport.py
+          sed -i 's/private static async Task ReceiveViewerInputAsync/private async Task ReceiveViewerInputAsync/' src/Sirk.Portal/Agent/DesktopRelayHub.cs
 
       - name: Validate transport contracts
         shell: bash
@@ -36,6 +39,7 @@ jobs:
           grep -F 'deviceId = device.GetProperty("id")' src/Sirk.Portal/Ui/PortalUiCompatibilityEndpoints.cs
           grep -F 'usesHttpTunnel()' public/portal/standalone/scripts/device-workspace.js
           grep -F '"/api/v1/desktop/stream?deviceId="' public/portal/standalone/scripts/device-workspace.js
+          grep -F 'private async Task ReceiveViewerInputAsync' src/Sirk.Portal/Agent/DesktopRelayHub.cs
           ! grep -F '"/api/agent-desktop/stream?' public/portal/standalone/scripts/device-workspace.js
           ! grep -F '"/api/agent-desktop/input-stream?' public/portal/standalone/scripts/device-workspace.js
 
