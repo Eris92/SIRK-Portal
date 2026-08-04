@@ -228,6 +228,20 @@ try
     Assert(permanent.Device.GroupId == "installer-group",
         "Existing permanent group-token enrollment regressed.");
 
+    var longAgentVersion = "1.0.16-dev.13+" + new string('a', 80);
+    var heartbeat = agents.Heartbeat(
+        first.Device.Id,
+        new AgentHeartbeatRequest(
+            "Device Installer One",
+            "device-installer-one",
+            "windows",
+            longAgentVersion,
+            "online",
+            new Dictionary<string, string>()),
+        "127.0.0.1");
+    Assert(heartbeat.AgentVersion == longAgentVersion,
+        "Agent check-in rejected a valid informational version longer than 64 characters.");
+
     var ticketStoreText = File.ReadAllText(paths.AgentInstallerTicketsFile, Encoding.UTF8);
     Assert(!ticketStoreText.Contains(ticket.EnrollmentTicket, StringComparison.Ordinal),
         "Installer ticket store exposes the plaintext ticket.");
