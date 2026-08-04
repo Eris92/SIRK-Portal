@@ -773,9 +773,11 @@
             ["sirk-defender-module", "security.js"], ["sirk-management-renderer", "management.js"],
             ["sirk-subfolder-icons", "portal-subfolder-icons.js"], ["sirk-folder-collapse", "portal-folder-collapse.js"]
         ];
-        var chain = Promise.resolve();
-        files.forEach(function (entry) { chain = chain.then(function () { return load(entry[0], entry[1]); }); });
-        return chain;
+        // core.loadScript sets async=false. Starting every download now lets the
+        // browser fetch in parallel while preserving deterministic execution order.
+        return Promise.all(files.map(function (entry) {
+            return load(entry[0], entry[1]);
+        }));
     }
 
     function start() {

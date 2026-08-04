@@ -51,6 +51,7 @@ internal sealed class CentralTunnelService : BackgroundService
     private readonly ILogger<CentralTunnelService> _logger;
     private readonly SemaphoreSlim _concurrency;
     private readonly Uri _localOrigin;
+    private readonly HttpClient _localClient;
 
     public CentralTunnelService(
         IHttpClientFactory httpClientFactory,
@@ -70,6 +71,33 @@ internal sealed class CentralTunnelService : BackgroundService
         _localOrigin = _options.Enabled
             ? ValidateLocalOrigin(_options.LocalOrigin)
             : new Uri("http://127.0.0.1/", UriKind.Absolute);
+
+        var localHandler = new SocketsHttpHandler
+        {
+            AllowAutoRedirect = false,
+            AutomaticDecompression = DecompressionMethods.GZip |
+                                     DecompressionMethods.Deflate |
+                                     DecompressionMethods.Brotli,
+            UseCookies = false,
+            MaxConnectionsPerServer = 32,
+            ConnectTimeout = TimeSpan.FromSeconds(5),
+            PooledConnectionIdleTimeout = TimeSpan.FromMinutes(2),
+            PooledConnectionLifetime = TimeSpan.FromMinutes(10),
+            EnableMultipleHttp2Connections = true
+        };
+        _localClient = new HttpClient(localHandler, disposeHandler: true)
+        {
+            BaseAddress = _localOrigin,
+            Timeout = TimeSpan.FromSeconds(45),
+            DefaultRequestVersion = HttpVersion.Version20,
+            DefaultVersionPolicy = HttpVersionPolicy.RequestVersionOrLower
+        };
+    }
+
+    public override void Dispose()
+    {
+        _localClient.Dispose();
+        base.Dispose();
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -228,73 +256,90 @@ internal sealed class CentralTunnelService : BackgroundService
                 Convert.ToBase64String(handshakeBody));
         }
 
-        var handler = new HttpClientHandler
+        var unsafeRequest = IsUnsafe(request.Method);
+        HttpClient? disposableClient = null;
+        var client = _localClient;
+        if (unsafeRequest)
         {
-            AllowAutoRedirect = false,
-            AutomaticDecompression = DecompressionMethods.GZip |
-                                     DecompressionMethods.Deflate |
-                                     DecompressionMethods.Brotli,
-            UseCookies = true,
-            CookieContainer = new CookieContainer()
-        };
-        using var client = new HttpClient(handler)
-        {
-            BaseAddress = _localOrigin,
-            Timeout = TimeSpan.FromSeconds(45)
-        };
-
-        PortalCsrfResponse? csrf = null;
-        if (IsUnsafe(request.Method))
-        {
-            using var csrfRequest = new HttpRequestMessage(HttpMethod.Get, "/api/v1/auth/csrf");
-            ApplyDelegatedIdentity(csrfRequest, actorId, actorName, actorRole, request.PortalId);
-            using var csrfResponse = await client.SendAsync(csrfRequest, cancellationToken);
-            if (!csrfResponse.IsSuccessStatusCode)
-                throw new InvalidDataException("Portal CSRF token could not be issued for the delegated request.");
-            var csrfBody = await ReadLimitedAsync(csrfResponse.Content, 64 * 1024, cancellationToken);
-            csrf = JsonSerializer.Deserialize<PortalCsrfResponse>(csrfBody, JsonOptions)
-                   ?? throw new JsonException("Portal CSRF response is empty.");
-        }
-
-        using var localRequest = new HttpRequestMessage(
-            new HttpMethod(request.Method),
-            request.Path);
-        ApplyDelegatedIdentity(localRequest, actorId, actorName, actorRole, request.PortalId);
-        CopyRequestHeaders(request.Headers, localRequest);
-        if (csrf is not null)
-            localRequest.Headers.TryAddWithoutValidation(csrf.HeaderName, csrf.RequestToken);
-
-        var requestBody = DecodeBody(request.BodyBase64, _options.MaximumBodyBytes);
-        if (requestBody.Length > 0 || IsUnsafe(request.Method))
-        {
-            localRequest.Content = new ByteArrayContent(requestBody);
-            var contentType = Header(request.Headers, "content-type");
-            if (!string.IsNullOrWhiteSpace(contentType) &&
-                MediaTypeHeaderValue.TryParse(contentType, out var parsed))
+            var handler = new HttpClientHandler
             {
-                localRequest.Content.Headers.ContentType = parsed;
-            }
+                AllowAutoRedirect = false,
+                AutomaticDecompression = DecompressionMethods.GZip |
+                                         DecompressionMethods.Deflate |
+                                         DecompressionMethods.Brotli,
+                UseCookies = true,
+                CookieContainer = new CookieContainer(),
+                MaxConnectionsPerServer = 8
+            };
+            disposableClient = new HttpClient(handler)
+            {
+                BaseAddress = _localOrigin,
+                Timeout = TimeSpan.FromSeconds(45),
+                DefaultRequestVersion = HttpVersion.Version20,
+                DefaultVersionPolicy = HttpVersionPolicy.RequestVersionOrLower
+            };
+            client = disposableClient;
         }
 
-        using var localResponse = await client.SendAsync(
-            localRequest,
-            HttpCompletionOption.ResponseHeadersRead,
-            cancellationToken);
-        var responseBody = await ReadLimitedAsync(
-            localResponse.Content,
-            _options.MaximumBodyBytes,
-            cancellationToken);
-        var contentTypeValue = localResponse.Content.Headers.ContentType?.ToString()
-                               ?? "application/octet-stream";
-        var headers = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase);
-        AddResponseHeader(localResponse, headers, "location");
-        AddResponseHeader(localResponse, headers, "etag");
-        AddResponseHeader(localResponse, headers, "last-modified");
-        return new CentralTunnelResponseInput(
-            (int)localResponse.StatusCode,
-            contentTypeValue,
-            headers,
-            Convert.ToBase64String(responseBody));
+        try
+        {
+            PortalCsrfResponse? csrf = null;
+            if (unsafeRequest)
+            {
+                using var csrfRequest = new HttpRequestMessage(HttpMethod.Get, "/api/v1/auth/csrf");
+                ApplyDelegatedIdentity(csrfRequest, actorId, actorName, actorRole, request.PortalId);
+                using var csrfResponse = await client.SendAsync(csrfRequest, cancellationToken);
+                if (!csrfResponse.IsSuccessStatusCode)
+                    throw new InvalidDataException("Portal CSRF token could not be issued for the delegated request.");
+                var csrfBody = await ReadLimitedAsync(csrfResponse.Content, 64 * 1024, cancellationToken);
+                csrf = JsonSerializer.Deserialize<PortalCsrfResponse>(csrfBody, JsonOptions)
+                       ?? throw new JsonException("Portal CSRF response is empty.");
+            }
+
+            using var localRequest = new HttpRequestMessage(
+                new HttpMethod(request.Method),
+                request.Path);
+            ApplyDelegatedIdentity(localRequest, actorId, actorName, actorRole, request.PortalId);
+            CopyRequestHeaders(request.Headers, localRequest);
+            if (csrf is not null)
+                localRequest.Headers.TryAddWithoutValidation(csrf.HeaderName, csrf.RequestToken);
+
+            var requestBody = DecodeBody(request.BodyBase64, _options.MaximumBodyBytes);
+            if (requestBody.Length > 0 || unsafeRequest)
+            {
+                localRequest.Content = new ByteArrayContent(requestBody);
+                var contentType = Header(request.Headers, "content-type");
+                if (!string.IsNullOrWhiteSpace(contentType) &&
+                    MediaTypeHeaderValue.TryParse(contentType, out var parsed))
+                {
+                    localRequest.Content.Headers.ContentType = parsed;
+                }
+            }
+
+            using var localResponse = await client.SendAsync(
+                localRequest,
+                HttpCompletionOption.ResponseHeadersRead,
+                cancellationToken);
+            var responseBody = await ReadLimitedAsync(
+                localResponse.Content,
+                _options.MaximumBodyBytes,
+                cancellationToken);
+            var contentTypeValue = localResponse.Content.Headers.ContentType?.ToString()
+                                   ?? "application/octet-stream";
+            var headers = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase);
+            AddResponseHeader(localResponse, headers, "location");
+            AddResponseHeader(localResponse, headers, "etag");
+            AddResponseHeader(localResponse, headers, "last-modified");
+            return new CentralTunnelResponseInput(
+                (int)localResponse.StatusCode,
+                contentTypeValue,
+                headers,
+                Convert.ToBase64String(responseBody));
+        }
+        finally
+        {
+            disposableClient?.Dispose();
+        }
     }
 
     private async Task CompleteAsync(
