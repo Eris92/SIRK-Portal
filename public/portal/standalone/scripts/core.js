@@ -193,10 +193,18 @@
         });
     }
 
+    function apiBase() {
+        return String(window.__SIRK_PLATFORM_API_BASE__ || "/api/v1").replace(/\/$/, "");
+    }
+
+    function legacyApiBase() {
+        return apiBase().replace(/\/v1$/, "");
+    }
+
     function issueCsrfToken() {
         if (csrfState.requestToken) return Promise.resolve(csrfState);
         if (csrfState.pending) return csrfState.pending;
-        csrfState.pending = window.fetch("/api/v1/auth/csrf", {
+        csrfState.pending = window.fetch(apiBase() + "/auth/csrf", {
             method: "GET",
             credentials: "same-origin",
             cache: "no-store",
@@ -212,9 +220,9 @@
 
     core.csrf = issueCsrfToken;
     core.assetUrl = function (moduleName, assetName, parameters) {
-        var base = String(window.__SIRK_PLATFORM_API_BASE__ || "/api/v1").replace(/\/$/, "");
+        var base = apiBase();
         var endpoint = !moduleName && assetName === "bootstrap"
-            ? new URL(base + "/bootstrap", window.location.href)
+            ? new URL(legacyApiBase() + "/bootstrap", window.location.href)
             : new URL(base + "/modules/" + encodeURIComponent(moduleName || "_runtime") + "/" + encodeURIComponent(assetName || "index"), window.location.href);
         endpoint.searchParams.set("v", core.assetVersion);
         Object.keys(parameters || {}).forEach(function (key) {
