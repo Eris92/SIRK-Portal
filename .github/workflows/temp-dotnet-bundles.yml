@@ -61,3 +61,5 @@ jobs:
           git add src/Sirk.Portal/Program.cs src/Sirk.Portal/Sirk.Portal.csproj src/Sirk.Portal/Ui/PortalAssetBundler.cs src/Sirk.Portal/Ui/PortalUiEndpoints.cs public/portal/standalone/index.html public/portal/standalone/scripts/app.js public/portal/standalone/scripts/navigation.js
           git commit -m "perf: add .NET-built lazy Portal bundles"
           git push origin HEAD:main
+
+# run: 2
