@@ -21,35 +21,32 @@ jobs:
           dotnet-version: 10.0.x
 
       - name: Apply performance fixes
-        shell: python
+        shell: bash
         run: |
+          python3 <<'PY'
           from pathlib import Path
-          import re
 
           app_path = Path('public/portal/standalone/scripts/app.js')
           app = app_path.read_text(encoding='utf-8')
           old_loader = '''        var chain = Promise.resolve();
           files.forEach(function (entry) { chain = chain.then(function () { return load(entry[0], entry[1]); }); });
-          return chain;'''
+          return chain;'''.replace('          files', '        files').replace('          return', '        return')
           new_loader = '''        // core.loadScript sets async=false. Starting every download now lets the
           // browser fetch in parallel while preserving deterministic execution order.
           return Promise.all(files.map(function (entry) {
               return load(entry[0], entry[1]);
-          }));'''
-          if old_loader not in app:
-              raise SystemExit('Serial dependency loader pattern was not found.')
+          }));'''.replace('          // browser', '        // browser').replace('          return Promise', '        return Promise')
+          if app.count(old_loader) != 1:
+              raise SystemExit(f'Expected one serial dependency loader, found {app.count(old_loader)}.')
           app_path.write_text(app.replace(old_loader, new_loader, 1), encoding='utf-8', newline='\n')
 
           tunnel_path = Path('src/Sirk.Portal/Central/CentralTunnelService.cs')
           tunnel = tunnel_path.read_text(encoding='utf-8')
 
-          field_old = '''    private readonly SemaphoreSlim _concurrency;
-              private readonly Uri _localOrigin;'''
-          field_new = '''    private readonly SemaphoreSlim _concurrency;
-              private readonly Uri _localOrigin;
-              private readonly HttpClient _localClient;'''
-          if field_old not in tunnel:
-              raise SystemExit('CentralTunnelService field insertion point was not found.')
+          field_old = '    private readonly SemaphoreSlim _concurrency;\n    private readonly Uri _localOrigin;'
+          field_new = field_old + '\n    private readonly HttpClient _localClient;'
+          if tunnel.count(field_old) != 1:
+              raise SystemExit(f'Expected one field insertion point, found {tunnel.count(field_old)}.')
           tunnel = tunnel.replace(field_old, field_new, 1)
 
           constructor_old = '''        _localOrigin = _options.Enabled
@@ -57,7 +54,7 @@ jobs:
               : new Uri("http://127.0.0.1/", UriKind.Absolute);
           }
 
-          protected override async Task ExecuteAsync'''
+          protected override async Task ExecuteAsync'''.replace('          }', '    }').replace('          protected', '    protected')
           constructor_new = '''        _localOrigin = _options.Enabled
               ? ValidateLocalOrigin(_options.LocalOrigin)
               : new Uri("http://127.0.0.1/", UriKind.Absolute);
@@ -92,103 +89,109 @@ jobs:
           }
 
           protected override async Task ExecuteAsync'''
-          if constructor_old not in tunnel:
-              raise SystemExit('CentralTunnelService constructor insertion point was not found.')
+          constructor_new = '\n'.join(line[6:] if line.startswith('      ') else line for line in constructor_new.splitlines())
+          if tunnel.count(constructor_old) != 1:
+              raise SystemExit(f'Expected one constructor insertion point, found {tunnel.count(constructor_old)}.')
           tunnel = tunnel.replace(constructor_old, constructor_new, 1)
 
-          dispatch_pattern = re.compile(
-              r'''        var handler = new HttpClientHandler\n        \{.*?\n        return new CentralTunnelResponseInput\(\n            \(int\)localResponse\.StatusCode,\n            contentTypeValue,\n            headers,\n            Convert\.ToBase64String\(responseBody\)\);\n''',
-              re.S)
+          dispatch_start = tunnel.index(
+              '        var handler = new HttpClientHandler\n        {',
+              tunnel.index('private async Task<CentralTunnelResponseInput> DispatchAsync'))
+          dispatch_end_marker = '''        return new CentralTunnelResponseInput(
+              (int)localResponse.StatusCode,
+              contentTypeValue,
+              headers,
+              Convert.ToBase64String(responseBody));'''.replace('          (int)', '            (int)').replace('          content', '            content').replace('          headers', '            headers').replace('          Convert', '            Convert')
+          dispatch_end = tunnel.index(dispatch_end_marker, dispatch_start) + len(dispatch_end_marker)
+
           dispatch_new = '''        var unsafeRequest = IsUnsafe(request.Method);
-              HttpClient? disposableClient = null;
-              var client = _localClient;
+          HttpClient? disposableClient = null;
+          var client = _localClient;
+          if (unsafeRequest)
+          {
+              var handler = new HttpClientHandler
+              {
+                  AllowAutoRedirect = false,
+                  AutomaticDecompression = DecompressionMethods.GZip |
+                                           DecompressionMethods.Deflate |
+                                           DecompressionMethods.Brotli,
+                  UseCookies = true,
+                  CookieContainer = new CookieContainer(),
+                  MaxConnectionsPerServer = 8
+              };
+              disposableClient = new HttpClient(handler)
+              {
+                  BaseAddress = _localOrigin,
+                  Timeout = TimeSpan.FromSeconds(45),
+                  DefaultRequestVersion = HttpVersion.Version20,
+                  DefaultVersionPolicy = HttpVersionPolicy.RequestVersionOrLower
+              };
+              client = disposableClient;
+          }
+
+          try
+          {
+              PortalCsrfResponse? csrf = null;
               if (unsafeRequest)
               {
-                  var handler = new HttpClientHandler
-                  {
-                      AllowAutoRedirect = false,
-                      AutomaticDecompression = DecompressionMethods.GZip |
-                                               DecompressionMethods.Deflate |
-                                               DecompressionMethods.Brotli,
-                      UseCookies = true,
-                      CookieContainer = new CookieContainer(),
-                      MaxConnectionsPerServer = 8
-                  };
-                  disposableClient = new HttpClient(handler)
-                  {
-                      BaseAddress = _localOrigin,
-                      Timeout = TimeSpan.FromSeconds(45),
-                      DefaultRequestVersion = HttpVersion.Version20,
-                      DefaultVersionPolicy = HttpVersionPolicy.RequestVersionOrLower
-                  };
-                  client = disposableClient;
+                  using var csrfRequest = new HttpRequestMessage(HttpMethod.Get, "/api/v1/auth/csrf");
+                  ApplyDelegatedIdentity(csrfRequest, actorId, actorName, actorRole, request.PortalId);
+                  using var csrfResponse = await client.SendAsync(csrfRequest, cancellationToken);
+                  if (!csrfResponse.IsSuccessStatusCode)
+                      throw new InvalidDataException("Portal CSRF token could not be issued for the delegated request.");
+                  var csrfBody = await ReadLimitedAsync(csrfResponse.Content, 64 * 1024, cancellationToken);
+                  csrf = JsonSerializer.Deserialize<PortalCsrfResponse>(csrfBody, JsonOptions)
+                         ?? throw new JsonException("Portal CSRF response is empty.");
               }
 
-              try
+              using var localRequest = new HttpRequestMessage(
+                  new HttpMethod(request.Method),
+                  request.Path);
+              ApplyDelegatedIdentity(localRequest, actorId, actorName, actorRole, request.PortalId);
+              CopyRequestHeaders(request.Headers, localRequest);
+              if (csrf is not null)
+                  localRequest.Headers.TryAddWithoutValidation(csrf.HeaderName, csrf.RequestToken);
+
+              var requestBody = DecodeBody(request.BodyBase64, _options.MaximumBodyBytes);
+              if (requestBody.Length > 0 || unsafeRequest)
               {
-                  PortalCsrfResponse? csrf = null;
-                  if (unsafeRequest)
+                  localRequest.Content = new ByteArrayContent(requestBody);
+                  var contentType = Header(request.Headers, "content-type");
+                  if (!string.IsNullOrWhiteSpace(contentType) &&
+                      MediaTypeHeaderValue.TryParse(contentType, out var parsed))
                   {
-                      using var csrfRequest = new HttpRequestMessage(HttpMethod.Get, "/api/v1/auth/csrf");
-                      ApplyDelegatedIdentity(csrfRequest, actorId, actorName, actorRole, request.PortalId);
-                      using var csrfResponse = await client.SendAsync(csrfRequest, cancellationToken);
-                      if (!csrfResponse.IsSuccessStatusCode)
-                          throw new InvalidDataException("Portal CSRF token could not be issued for the delegated request.");
-                      var csrfBody = await ReadLimitedAsync(csrfResponse.Content, 64 * 1024, cancellationToken);
-                      csrf = JsonSerializer.Deserialize<PortalCsrfResponse>(csrfBody, JsonOptions)
-                             ?? throw new JsonException("Portal CSRF response is empty.");
+                      localRequest.Content.Headers.ContentType = parsed;
                   }
-
-                  using var localRequest = new HttpRequestMessage(
-                      new HttpMethod(request.Method),
-                      request.Path);
-                  ApplyDelegatedIdentity(localRequest, actorId, actorName, actorRole, request.PortalId);
-                  CopyRequestHeaders(request.Headers, localRequest);
-                  if (csrf is not null)
-                      localRequest.Headers.TryAddWithoutValidation(csrf.HeaderName, csrf.RequestToken);
-
-                  var requestBody = DecodeBody(request.BodyBase64, _options.MaximumBodyBytes);
-                  if (requestBody.Length > 0 || unsafeRequest)
-                  {
-                      localRequest.Content = new ByteArrayContent(requestBody);
-                      var contentType = Header(request.Headers, "content-type");
-                      if (!string.IsNullOrWhiteSpace(contentType) &&
-                          MediaTypeHeaderValue.TryParse(contentType, out var parsed))
-                      {
-                          localRequest.Content.Headers.ContentType = parsed;
-                      }
-                  }
-
-                  using var localResponse = await client.SendAsync(
-                      localRequest,
-                      HttpCompletionOption.ResponseHeadersRead,
-                      cancellationToken);
-                  var responseBody = await ReadLimitedAsync(
-                      localResponse.Content,
-                      _options.MaximumBodyBytes,
-                      cancellationToken);
-                  var contentTypeValue = localResponse.Content.Headers.ContentType?.ToString()
-                                         ?? "application/octet-stream";
-                  var headers = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase);
-                  AddResponseHeader(localResponse, headers, "location");
-                  AddResponseHeader(localResponse, headers, "etag");
-                  AddResponseHeader(localResponse, headers, "last-modified");
-                  return new CentralTunnelResponseInput(
-                      (int)localResponse.StatusCode,
-                      contentTypeValue,
-                      headers,
-                      Convert.ToBase64String(responseBody));
               }
-              finally
-              {
-                  disposableClient?.Dispose();
-              }
-'''
-          tunnel, count = dispatch_pattern.subn(dispatch_new, tunnel, count=1)
-          if count != 1:
-              raise SystemExit(f'Expected one DispatchAsync transport block, replaced {count}.')
 
+              using var localResponse = await client.SendAsync(
+                  localRequest,
+                  HttpCompletionOption.ResponseHeadersRead,
+                  cancellationToken);
+              var responseBody = await ReadLimitedAsync(
+                  localResponse.Content,
+                  _options.MaximumBodyBytes,
+                  cancellationToken);
+              var contentTypeValue = localResponse.Content.Headers.ContentType?.ToString()
+                                     ?? "application/octet-stream";
+              var headers = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase);
+              AddResponseHeader(localResponse, headers, "location");
+              AddResponseHeader(localResponse, headers, "etag");
+              AddResponseHeader(localResponse, headers, "last-modified");
+              return new CentralTunnelResponseInput(
+                  (int)localResponse.StatusCode,
+                  contentTypeValue,
+                  headers,
+                  Convert.ToBase64String(responseBody));
+          }
+          finally
+          {
+              disposableClient?.Dispose();
+          }'''
+          dispatch_new = '\n'.join(line[2:] if line.startswith('  ') else line for line in dispatch_new.splitlines())
+          tunnel = tunnel[:dispatch_start] + dispatch_new + tunnel[dispatch_end:]
           tunnel_path.write_text(tunnel, encoding='utf-8', newline='\n')
+          PY
 
       - name: Build Portal
         run: dotnet build src/Sirk.Portal/Sirk.Portal.csproj -c Release --nologo
