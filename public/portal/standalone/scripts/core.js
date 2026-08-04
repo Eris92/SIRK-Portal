@@ -6,6 +6,57 @@
     var core = window.SirkPlatformCore;
     var csrfState = { headerName: "X-SIRK-CSRF", requestToken: "", pending: null };
 
+    (function keepPortalRequestsInsideTunnel() {
+        var nativeFetch = window.fetch.bind(window);
+
+        function proxyPrefix() {
+            var base = String(window.__SIRK_PLATFORM_API_BASE__ || "").replace(/\/$/, "");
+            var match = base.match(/^(\/connect\/[a-z0-9][a-z0-9-]{2,62})(?:\/api\/v1)?$/);
+            return match ? match[1] : "";
+        }
+
+        function rewriteUrl(value) {
+            var prefix = proxyPrefix();
+            if (!prefix) return value;
+
+            var url;
+            try {
+                url = new URL(String(value), window.location.href);
+            } catch (error) {
+                return value;
+            }
+
+            if (url.origin !== window.location.origin ||
+                url.pathname === prefix ||
+                url.pathname.indexOf(prefix + "/") === 0) {
+                return value;
+            }
+
+            if (!/^\/(?:api(?:\/|$)|assets(?:\/|$)|auth(?:\/|$)|maintenance\.json$)/.test(url.pathname)) {
+                return value;
+            }
+
+            url.pathname = prefix + url.pathname;
+            return url.href;
+        }
+
+        core.portalUrl = rewriteUrl;
+        window.fetch = function (input, init) {
+            if (input instanceof Request) {
+                var requestUrl = rewriteUrl(input.url);
+                return nativeFetch(
+                    requestUrl === input.url ? input : new Request(requestUrl, input),
+                    init);
+            }
+
+            if (typeof input === "string" || input instanceof URL) {
+                return nativeFetch(rewriteUrl(input), init);
+            }
+
+            return nativeFetch(input, init);
+        };
+    }());
+
     (function prepareInitialView() {
         var root = document.getElementById("sirkStandaloneRoot");
         var content = document.getElementById("sirkStandaloneContent");
