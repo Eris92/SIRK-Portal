@@ -308,6 +308,8 @@
         }
         return bundlePromises[name];
     }
+    window.SirkPortalBundles = window.SirkPortalBundles || {};
+    window.SirkPortalBundles.load = loadBundle;
     function ensureViewBundle(view) { return loadBundle(VIEW_BUNDLES[view]); }
     function moduleState(key) { return bootstrap && bootstrap.modules && bootstrap.modules[key] || null; }
     function accessAllowed(state) {

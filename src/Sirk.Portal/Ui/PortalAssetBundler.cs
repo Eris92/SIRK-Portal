@@ -20,7 +20,6 @@ internal static class PortalAssetBundler
         new(
             "portal-devices.bundle.js",
             [
-                "modules/commands/index.js",
                 "portal/standalone/scripts/device-workspace.js",
                 "portal/standalone/scripts/device-tabs.js",
                 "portal/standalone/scripts/terminal-connect.js"

@@ -149,6 +149,15 @@
         return endpoint.href;
     }
 
+    function portalWebSocketUrl(pathAndQuery) {
+        var rewritten = core && typeof core.portalUrl === "function"
+            ? core.portalUrl(pathAndQuery)
+            : new URL(pathAndQuery, window.location.href).href;
+        var endpoint = new URL(rewritten, window.location.href);
+        endpoint.protocol = endpoint.protocol === "https:" ? "wss:" : "ws:";
+        return endpoint.href;
+    }
+
     function waitForAgentOperation(node, commandId, status) {
         var deadline = Date.now() + 150000;
         return new Promise(function (resolve, reject) {
@@ -552,15 +561,14 @@
         function startDesktopSocket(generation) {
             if (desktopSocket) { try { desktopSocket.close(); } catch (error) {} }
             if (desktopInputSocket) { try { desktopInputSocket.close(); } catch (error) {} }
-            var scheme = location.protocol === "https:" ? "wss:" : "ws:";
             var identityQuery = "tenantId=" + encodeURIComponent(node.tenantId) +
                 "&deviceId=" + encodeURIComponent(node.deviceId);
-            var url = scheme + "//" + location.host + "/api/agent-desktop/stream?" + identityQuery +
-                "&after=" + encodeURIComponent(snapshot.sequence || 0);
+            var url = portalWebSocketUrl("/api/agent-desktop/stream?" + identityQuery +
+                "&after=" + encodeURIComponent(snapshot.sequence || 0));
             var socket = new WebSocket(url);
             desktopSocket = socket;
-            var inputSocket = new WebSocket(scheme + "//" + location.host +
-                "/api/agent-desktop/input-stream?" + identityQuery);
+            var inputSocket = new WebSocket(portalWebSocketUrl(
+                "/api/agent-desktop/input-stream?" + identityQuery));
             desktopInputSocket = inputSocket;
             inputSocket.onmessage = handleInputSocketMessage;
             inputSocket.onclose = function () {
@@ -1018,7 +1026,21 @@
     function renderCommandsTab(host, node) {
         var module = commandModule();
         if (!module || typeof module.mount !== "function") {
-            host.innerHTML = '<div class="sirk-device-command-error">' + esc(t("noCommands")) + '</div>';
+            host.innerHTML = '<div class="sirk-device-command-loading">' + esc(t("loadingCommands")) + '</div>';
+            var loader = window.SirkPortalBundles && window.SirkPortalBundles.load;
+            if (typeof loader !== "function") {
+                host.innerHTML = '<div class="sirk-device-command-error">' + esc(t("noCommands")) + '</div>';
+                return;
+            }
+            Promise.resolve(loader("modules")).then(function () {
+                if (!host.isConnected || activeTab !== "commands") return;
+                var loaded = commandModule();
+                if (!loaded || typeof loaded.mount !== "function") throw new Error(t("noCommands"));
+                renderCommandsTab(host, node);
+            }).catch(function (error) {
+                if (!host.isConnected) return;
+                host.innerHTML = '<div class="sirk-device-command-error">' + esc(error && error.message || t("noCommands")) + '</div>';
+            });
             return;
         }
         host.innerHTML = '<div class="sirk-device-commands-host"></div>';
