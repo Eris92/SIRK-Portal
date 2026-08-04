@@ -12,8 +12,8 @@ internal sealed class CentralTunnelOptions
 
     public bool Enabled { get; init; } = true;
     public string LocalOrigin { get; init; } = "http://127.0.0.1:8080";
-    public int PollIntervalMilliseconds { get; init; } = 750;
-    public int MaximumConcurrency { get; init; } = 8;
+    public int PollIntervalMilliseconds { get; init; } = 100;
+    public int MaximumConcurrency { get; init; } = 32;
     public int MaximumBodyBytes { get; init; } = 8 * 1024 * 1024;
 }
 
@@ -104,7 +104,8 @@ internal sealed class CentralTunnelService : BackgroundService
     {
         while (!stoppingToken.IsCancellationRequested)
         {
-            var delay = Math.Clamp(_options.PollIntervalMilliseconds, 250, 10_000);
+            var delay = Math.Clamp(_options.PollIntervalMilliseconds, 50, 10_000);
+            var shouldDelay = true;
             try
             {
                 var resolved = _resolver.Resolve();
@@ -115,6 +116,7 @@ internal sealed class CentralTunnelService : BackgroundService
                 }
 
                 var requests = await PollAsync(resolved.Options, stoppingToken);
+                shouldDelay = requests.Count == 0;
                 foreach (var request in requests)
                 {
                     await _concurrency.WaitAsync(stoppingToken);
@@ -136,6 +138,8 @@ internal sealed class CentralTunnelService : BackgroundService
             {
                 _logger.LogWarning(exception, "SIRK Central tunnel polling failed.");
             }
+
+            if (!shouldDelay) continue;
 
             try
             {
