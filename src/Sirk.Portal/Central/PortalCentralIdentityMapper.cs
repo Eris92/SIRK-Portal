@@ -8,6 +8,8 @@ namespace Sirk.Portal.Central;
 internal sealed class PortalCentralIdentityMapper
 {
     private static readonly object Sync = new();
+    private static readonly JsonSerializerOptions SnapshotJsonOptions =
+        new(JsonSerializerDefaults.Web);
     private static readonly IReadOnlyDictionary<string, string> CentralRoleMap =
         new Dictionary<string, string>(StringComparer.Ordinal)
         {
@@ -41,13 +43,21 @@ internal sealed class PortalCentralIdentityMapper
 
         lock (Sync)
         {
-            var snapshot = JsonSerializer.SerializeToElement(_identities.Snapshot());
-            var existing = snapshot.GetProperty("users")
+            var snapshot = JsonSerializer.SerializeToElement(
+                _identities.Snapshot(),
+                SnapshotJsonOptions);
+            if (!snapshot.TryGetProperty("users", out var users) ||
+                users.ValueKind != JsonValueKind.Array)
+            {
+                throw new InvalidDataException(
+                    "Portal identity snapshot does not contain a valid users array.");
+            }
+
+            var existing = users
                 .EnumerateArray()
-                .FirstOrDefault(value => string.Equals(
-                    value.GetProperty("userName").GetString(),
-                    userName,
-                    StringComparison.Ordinal));
+                .FirstOrDefault(value =>
+                    TryReadString(value, "userName", out var existingUserName) &&
+                    string.Equals(existingUserName, userName, StringComparison.Ordinal));
 
             if (existing.ValueKind == JsonValueKind.Undefined)
             {
@@ -58,11 +68,19 @@ internal sealed class PortalCentralIdentityMapper
                     role);
             }
 
-            var id = existing.GetProperty("id").GetString()
-                     ?? throw new InvalidDataException("Mapped Central identity has no ID.");
-            var currentRole = existing.GetProperty("role").GetString() ?? string.Empty;
-            var currentDisplayName = existing.GetProperty("displayName").GetString() ?? string.Empty;
-            var enabled = existing.GetProperty("enabled").GetBoolean();
+            var id = ReadRequiredString(existing, "id", "Mapped Central identity has no ID.");
+            var currentRole = ReadRequiredString(
+                existing,
+                "role",
+                "Mapped Central identity has no role.");
+            var currentDisplayName = ReadRequiredString(
+                existing,
+                "displayName",
+                "Mapped Central identity has no display name.");
+            var enabled = ReadRequiredBoolean(
+                existing,
+                "enabled",
+                "Mapped Central identity has no enabled state.");
             if (!enabled ||
                 !string.Equals(currentRole, role, StringComparison.Ordinal) ||
                 !string.Equals(currentDisplayName, normalizedDisplayName, StringComparison.Ordinal))
@@ -76,7 +94,8 @@ internal sealed class PortalCentralIdentityMapper
             }
 
             return _identities.Get(id)
-                   ?? throw new InvalidDataException("Mapped Central identity could not be loaded.");
+                   ?? throw new InvalidDataException(
+                       "Mapped Central identity could not be loaded.");
         }
     }
 
@@ -87,6 +106,50 @@ internal sealed class PortalCentralIdentityMapper
             ? mapped
             : throw new UnauthorizedAccessException(
                 "Central role is not supported by this Portal.");
+    }
+
+    private static bool TryReadString(
+        JsonElement value,
+        string propertyName,
+        out string result)
+    {
+        result = string.Empty;
+        if (!value.TryGetProperty(propertyName, out var property) ||
+            property.ValueKind != JsonValueKind.String)
+        {
+            return false;
+        }
+
+        result = property.GetString() ?? string.Empty;
+        return true;
+    }
+
+    private static string ReadRequiredString(
+        JsonElement value,
+        string propertyName,
+        string error)
+    {
+        if (!TryReadString(value, propertyName, out var result) ||
+            string.IsNullOrWhiteSpace(result))
+        {
+            throw new InvalidDataException(error);
+        }
+
+        return result;
+    }
+
+    private static bool ReadRequiredBoolean(
+        JsonElement value,
+        string propertyName,
+        string error)
+    {
+        if (!value.TryGetProperty(propertyName, out var property) ||
+            property.ValueKind is not (JsonValueKind.True or JsonValueKind.False))
+        {
+            throw new InvalidDataException(error);
+        }
+
+        return property.GetBoolean();
     }
 
     private static string Normalize(string? value, int maximum, string field)
