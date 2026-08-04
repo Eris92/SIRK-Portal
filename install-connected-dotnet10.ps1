@@ -165,7 +165,7 @@ function Set-JsonProperty($Document, [string]$Name, $Value) {
 
 function Write-JsonNoBom($Document, [string]$Path) {
     $json = $Document | ConvertTo-Json -Depth 16
-    $encoding = New-Object Text.UTF8Encoding($false)
+    $encoding = [System.Text.UTF8Encoding]::new($false)
     [IO.File]::WriteAllText($Path, $json, $encoding)
 }
 
@@ -254,7 +254,8 @@ if ($ValidateOnly) {
 
 if (-not (Test-Administrator)) { throw 'Uruchom PowerShell jako Administrator.' }
 
-$existingIdentity = Test-Path -LiteralPath (Join-Path $DataRoot 'identity.json') -PathType Leaf
+$existingIdentity = (-not $RemoveData) -and
+    (Test-Path -LiteralPath (Join-Path $DataRoot 'identity.json') -PathType Leaf)
 $plainPassword = $null
 if (-not $existingIdentity) {
     $plainPassword = [Environment]::GetEnvironmentVariable('SIRK_INSTALL_BREAKGLASS_PASSWORD', 'Process')
@@ -333,21 +334,37 @@ try {
 
     Write-Step 'Import chronionego polaczenia SIRK Central'
     $serviceName = 'SirkPortal'
-    Stop-Service -Name $serviceName -Force -ErrorAction Stop
-    (Get-Service -Name $serviceName).WaitForStatus('Stopped', [TimeSpan]::FromSeconds(30))
-
-    New-Item -ItemType Directory -Path $DataRoot -Force | Out-Null
+    $serviceWasStopped = $false
+    $temporary = $null
     $destination = Join-Path $DataRoot 'central-connection.json'
-    $temporary = Join-Path $DataRoot ('central-connection.tmp-' + [guid]::NewGuid().ToString('N') + '.json')
+    try {
+        Stop-Service -Name $serviceName -Force -ErrorAction Stop
+        (Get-Service -Name $serviceName).WaitForStatus('Stopped', [TimeSpan]::FromSeconds(30))
+        $serviceWasStopped = $true
 
-    Set-JsonProperty $connectionDocument 'publicUrl' $PortalPublicUrl
-    Set-JsonProperty $connectionDocument 'updatedAtUtc' ([DateTimeOffset]::UtcNow.ToString('O'))
-    Write-JsonNoBom $connectionDocument $temporary
-    Protect-FileAcl $temporary
-    Move-Item -LiteralPath $temporary -Destination $destination -Force
-    Protect-FileAcl $destination
+        New-Item -ItemType Directory -Path $DataRoot -Force | Out-Null
+        $temporary = Join-Path $DataRoot ('central-connection.tmp-' + [guid]::NewGuid().ToString('N') + '.json')
 
-    Start-Service -Name $serviceName
+        Set-JsonProperty $connectionDocument 'publicUrl' $PortalPublicUrl
+        Set-JsonProperty $connectionDocument 'updatedAtUtc' ([DateTimeOffset]::UtcNow.ToString('O'))
+        Write-JsonNoBom $connectionDocument $temporary
+        Protect-FileAcl $temporary
+        Move-Item -LiteralPath $temporary -Destination $destination -Force
+        $temporary = $null
+        Protect-FileAcl $destination
+    }
+    finally {
+        if ($temporary -and (Test-Path -LiteralPath $temporary -PathType Leaf)) {
+            Remove-Item -LiteralPath $temporary -Force -ErrorAction SilentlyContinue
+        }
+        if ($serviceWasStopped) {
+            $service = Get-Service -Name $serviceName -ErrorAction SilentlyContinue
+            if ($service -and $service.Status -ne 'Running') {
+                Start-Service -Name $serviceName
+            }
+        }
+    }
+
     (Get-Service -Name $serviceName).WaitForStatus('Running', [TimeSpan]::FromSeconds(60))
 
     Write-Step 'Weryfikacja heartbeat SIRK Portal -> SIRK Central'
@@ -360,6 +377,7 @@ try {
     $status = Wait-PortalCentralConnection $statusUrl ([string]$connectionDocument.portalId)
 
     if (-not $KeepSourceConnectionFile -and
+        (Test-Path -LiteralPath $sourceConnectionFile -PathType Leaf) -and
         -not [IO.Path]::GetFullPath($sourceConnectionFile).Equals(
             [IO.Path]::GetFullPath($destination),
             [StringComparison]::OrdinalIgnoreCase)) {
