@@ -121,8 +121,12 @@ internal sealed class InternalTunnelAuthenticationMiddleware
         await _next(context);
     }
 
-    private static bool IsLoopback(IPAddress? address) =>
-        address is not null && IPAddress.IsLoopback(address);
+    private static bool IsLoopback(IPAddress? address)
+    {
+        if (address is null) return false;
+        if (address.IsIPv4MappedToIPv6) address = address.MapToIPv4();
+        return IPAddress.IsLoopback(address);
+    }
 
     private static string Normalize(string? value, int maximum)
     {
