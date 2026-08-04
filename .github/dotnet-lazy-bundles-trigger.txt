@@ -1,0 +1,1 @@
+Trigger the PR-based .NET 10 lazy bundle migration.
