@@ -22,7 +22,9 @@ jobs:
         with:
           dotnet-version: 10.0.x
       - name: Apply native Agent installer panel
-        run: python3 .github/scripts/apply-native-agent-installer.py
+        run: |
+          python3 .github/scripts/apply-native-agent-installer.py
+          python3 .github/scripts/fix-bundler-rid.py
       - name: Validate installer integration
         shell: bash
         run: |
@@ -32,6 +34,8 @@ jobs:
           grep -Fq 'native-agent-installer-20260804-1' src/Sirk.Portal/Ui/PortalUiEndpoints.cs
           ! grep -Fq 'agent-installer-ui.js' src/Sirk.Portal/Ui/PortalUiEndpoints.cs
           test ! -e public/portal/standalone/scripts/agent-installer-ui.js
+          grep -Fq 'PreparePortalPublishBundleHost' src/Sirk.Portal/Sirk.Portal.csproj
+          grep -Fq '$(PortalBundleHostDll)' src/Sirk.Portal/Sirk.Portal.csproj
       - name: Build publish and test .NET 10 Portal
         shell: bash
         run: bash .github/scripts/validate-node-free-dotnet10.sh
@@ -40,6 +44,7 @@ jobs:
         run: |
           set -euo pipefail
           rm -f .github/scripts/apply-native-agent-installer.py
+          rm -f .github/scripts/fix-bundler-rid.py
           rm -f .github/workflows/native-agent-installer.yml
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
