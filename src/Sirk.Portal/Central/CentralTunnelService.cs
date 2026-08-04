@@ -42,6 +42,7 @@ internal sealed record PortalCsrfResponse(
 
 internal sealed class CentralTunnelService : BackgroundService
 {
+    private const string ProxyPrefixHeader = "X-SIRK-Proxy-Prefix";
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly CentralConnectionResolver _resolver;
@@ -218,7 +219,7 @@ internal sealed class CentralTunnelService : BackgroundService
         if (IsUnsafe(request.Method))
         {
             using var csrfRequest = new HttpRequestMessage(HttpMethod.Get, "/api/v1/auth/csrf");
-            ApplyDelegatedIdentity(csrfRequest, actorId, actorName, actorRole);
+            ApplyDelegatedIdentity(csrfRequest, actorId, actorName, actorRole, request.PortalId);
             using var csrfResponse = await client.SendAsync(csrfRequest, cancellationToken);
             if (!csrfResponse.IsSuccessStatusCode)
                 throw new InvalidDataException("Portal CSRF token could not be issued for the delegated request.");
@@ -230,7 +231,7 @@ internal sealed class CentralTunnelService : BackgroundService
         using var localRequest = new HttpRequestMessage(
             new HttpMethod(request.Method),
             request.Path);
-        ApplyDelegatedIdentity(localRequest, actorId, actorName, actorRole);
+        ApplyDelegatedIdentity(localRequest, actorId, actorName, actorRole, request.PortalId);
         CopyRequestHeaders(request.Headers, localRequest);
         if (csrf is not null)
             localRequest.Headers.TryAddWithoutValidation(csrf.HeaderName, csrf.RequestToken);
@@ -300,7 +301,8 @@ internal sealed class CentralTunnelService : BackgroundService
         HttpRequestMessage request,
         string actorId,
         string actorName,
-        string actorRole)
+        string actorRole,
+        string portalId)
     {
         request.Headers.TryAddWithoutValidation(
             "X-SIRK-Internal-Tunnel",
@@ -308,6 +310,7 @@ internal sealed class CentralTunnelService : BackgroundService
         request.Headers.TryAddWithoutValidation("X-SIRK-Actor-Id", actorId);
         request.Headers.TryAddWithoutValidation("X-SIRK-Actor-Name", actorName);
         request.Headers.TryAddWithoutValidation("X-SIRK-Actor-Role", actorRole);
+        request.Headers.TryAddWithoutValidation(ProxyPrefixHeader, ProxyPrefix(portalId));
     }
 
     private static void ApplyPortalAuthentication(
@@ -352,6 +355,14 @@ internal sealed class CentralTunnelService : BackgroundService
     {
         if (string.IsNullOrWhiteSpace(request.Id) || request.Id.Length > 80)
             throw new InvalidDataException("Central tunnel request ID is invalid.");
+        if (request.PortalId is null ||
+            !System.Text.RegularExpressions.Regex.IsMatch(
+                request.PortalId,
+                "^[a-z0-9][a-z0-9-]{2,62}$",
+                System.Text.RegularExpressions.RegexOptions.CultureInvariant))
+        {
+            throw new InvalidDataException("Central tunnel portal ID is invalid.");
+        }
         if (request.ExpiresAtUtc <= DateTimeOffset.UtcNow)
             throw new InvalidDataException("Central tunnel request has expired.");
         if (request.Method is not ("GET" or "HEAD" or "POST" or "PUT" or "PATCH" or "DELETE" or "OPTIONS"))
@@ -372,6 +383,9 @@ internal sealed class CentralTunnelService : BackgroundService
             throw new InvalidDataException("Central tunnel path is not permitted.");
         }
     }
+
+    private static string ProxyPrefix(string portalId) =>
+        "/connect/" + Uri.EscapeDataString(portalId);
 
     private static Uri ValidateLocalOrigin(string value)
     {
