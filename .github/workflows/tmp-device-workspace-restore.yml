@@ -1,0 +1,200 @@
+name: Temporary device workspace restoration
+
+on:
+  pull_request:
+    paths:
+      - '.github/triggers/device-workspace-restore.txt'
+
+permissions:
+  contents: write
+
+jobs:
+  device-workspace:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore full device workspace
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          bundler_path = Path('src/Sirk.Portal/Ui/PortalAssetBundler.cs')
+          bundler = bundler_path.read_text(encoding='utf-8')
+          old_devices = '''        new(
+              "portal-devices.bundle.js",
+              [
+                  "modules/commands/index.js",
+                  "portal/standalone/scripts/device-workspace.js",
+                  "portal/standalone/scripts/device-tabs.js",
+                  "portal/standalone/scripts/terminal-connect.js"
+              ]),'''
+          new_devices = '''        new(
+              "portal-devices.bundle.js",
+              [
+                  "portal/standalone/scripts/device-workspace.js",
+                  "portal/standalone/scripts/device-tabs.js",
+                  "portal/standalone/scripts/terminal-connect.js"
+              ]),'''
+          if old_devices not in bundler:
+              raise SystemExit('Portal devices bundle definition was not found.')
+          bundler = bundler.replace(old_devices, new_devices, 1)
+          bundler_path.write_text(bundler, encoding='utf-8')
+
+          app_path = Path('public/portal/standalone/scripts/app.js')
+          app = app_path.read_text(encoding='utf-8')
+          old_loader = '''    function loadBundle(name) {
+          if (!name) return Promise.resolve();
+          if (!bundlePromises[name]) {
+              bundlePromises[name] = load(
+                  "sirk-portal-bundle-" + name,
+                  "bundles/portal-" + name + ".bundle.js");
+          }
+          return bundlePromises[name];
+      }
+      function ensureViewBundle(view) { return loadBundle(VIEW_BUNDLES[view]); }'''
+          new_loader = '''    function loadBundle(name) {
+          if (!name) return Promise.resolve();
+          if (!bundlePromises[name]) {
+              bundlePromises[name] = load(
+                  "sirk-portal-bundle-" + name,
+                  "bundles/portal-" + name + ".bundle.js");
+          }
+          return bundlePromises[name];
+      }
+      window.SirkPortalBundles = window.SirkPortalBundles || {};
+      window.SirkPortalBundles.load = loadBundle;
+      function ensureViewBundle(view) { return loadBundle(VIEW_BUNDLES[view]); }'''
+          if old_loader not in app:
+              raise SystemExit('Portal bundle loader marker was not found.')
+          app = app.replace(old_loader, new_loader, 1)
+          app_path.write_text(app, encoding='utf-8')
+
+          workspace_path = Path('public/portal/standalone/scripts/device-workspace.js')
+          workspace = workspace_path.read_text(encoding='utf-8')
+
+          old_commands = '''    function renderCommandsTab(host, node) {
+          var module = commandModule();
+          if (!module || typeof module.mount !== "function") {
+              host.innerHTML = '<div class="sirk-device-command-error">' + esc(t("noCommands")) + '</div>';
+              return;
+          }
+          host.innerHTML = '<div class="sirk-device-commands-host"></div>';
+          var moduleHost = host.firstElementChild;
+          if (typeof module.mountDeviceCommands === "function") module.mountDeviceCommands(moduleHost, String(node.id || node._id || ""));
+          else {
+              if (typeof module.onDeviceRefreshEnd === "function") module.onDeviceRefreshEnd(String(node.id || node._id || ""));
+              module.mount(moduleHost, "sirk-device-commands");
+          }
+      }'''
+          new_commands = '''    function renderCommandsTab(host, node) {
+          var module = commandModule();
+          if (!module || typeof module.mount !== "function") {
+              host.innerHTML = '<div class="sirk-device-command-loading">' + esc(t("loadingCommands")) + '</div>';
+              var loader = window.SirkPortalBundles && window.SirkPortalBundles.load;
+              if (typeof loader !== "function") {
+                  host.innerHTML = '<div class="sirk-device-command-error">' + esc(t("noCommands")) + '</div>';
+                  return;
+              }
+              Promise.resolve(loader("modules")).then(function () {
+                  if (!host.isConnected || activeTab !== "commands") return;
+                  var loaded = commandModule();
+                  if (!loaded || typeof loaded.mount !== "function") throw new Error(t("noCommands"));
+                  renderCommandsTab(host, node);
+              }).catch(function (error) {
+                  if (!host.isConnected) return;
+                  host.innerHTML = '<div class="sirk-device-command-error">' + esc(error && error.message || t("noCommands")) + '</div>';
+              });
+              return;
+          }
+          host.innerHTML = '<div class="sirk-device-commands-host"></div>';
+          var moduleHost = host.firstElementChild;
+          if (typeof module.mountDeviceCommands === "function") module.mountDeviceCommands(moduleHost, String(node.id || node._id || ""));
+          else {
+              if (typeof module.onDeviceRefreshEnd === "function") module.onDeviceRefreshEnd(String(node.id || node._id || ""));
+              module.mount(moduleHost, "sirk-device-commands");
+          }
+      }'''
+          if old_commands not in workspace:
+              raise SystemExit('Device commands renderer marker was not found.')
+          workspace = workspace.replace(old_commands, new_commands, 1)
+
+          operation_marker = '''    function agentOperationUrl(action, parameters) {
+          var endpoint = new URL("/api/agent-operations", window.location.href);
+          Object.keys(parameters || {}).forEach(function (key) {
+              endpoint.searchParams.set(key, parameters[key]);
+          });
+          return endpoint.href;
+      }
+'''
+          websocket_helper = operation_marker + '''
+      function portalWebSocketUrl(pathAndQuery) {
+          var rewritten = core && typeof core.portalUrl === "function"
+              ? core.portalUrl(pathAndQuery)
+              : new URL(pathAndQuery, window.location.href).href;
+          var endpoint = new URL(rewritten, window.location.href);
+          endpoint.protocol = endpoint.protocol === "https:" ? "wss:" : "ws:";
+          return endpoint.href;
+      }
+'''
+          if operation_marker not in workspace:
+              raise SystemExit('Agent operation URL marker was not found.')
+          workspace = workspace.replace(operation_marker, websocket_helper, 1)
+
+          old_socket = '''            var scheme = location.protocol === "https:" ? "wss:" : "ws:";
+              var identityQuery = "tenantId=" + encodeURIComponent(node.tenantId) +
+                  "&deviceId=" + encodeURIComponent(node.deviceId);
+              var url = scheme + "//" + location.host + "/api/agent-desktop/stream?" + identityQuery +
+                  "&after=" + encodeURIComponent(snapshot.sequence || 0);
+              var socket = new WebSocket(url);
+              desktopSocket = socket;
+              var inputSocket = new WebSocket(scheme + "//" + location.host +
+                  "/api/agent-desktop/input-stream?" + identityQuery);'''
+          new_socket = '''            var identityQuery = "tenantId=" + encodeURIComponent(node.tenantId) +
+                  "&deviceId=" + encodeURIComponent(node.deviceId);
+              var url = portalWebSocketUrl("/api/agent-desktop/stream?" + identityQuery +
+                  "&after=" + encodeURIComponent(snapshot.sequence || 0));
+              var socket = new WebSocket(url);
+              desktopSocket = socket;
+              var inputSocket = new WebSocket(portalWebSocketUrl(
+                  "/api/agent-desktop/input-stream?" + identityQuery));'''
+          if old_socket not in workspace:
+              raise SystemExit('Desktop WebSocket marker was not found.')
+          workspace = workspace.replace(old_socket, new_socket, 1)
+          workspace_path.write_text(workspace, encoding='utf-8')
+          PY
+
+      - name: Validate device workspace contract
+        shell: bash
+        run: |
+          ! sed -n '/"portal-devices.bundle.js"/,/]),/p' src/Sirk.Portal/Ui/PortalAssetBundler.cs | grep -F 'modules/commands/index.js'
+          grep -F 'window.SirkPortalBundles.load = loadBundle;' public/portal/standalone/scripts/app.js
+          grep -F 'Promise.resolve(loader("modules"))' public/portal/standalone/scripts/device-workspace.js
+          grep -F 'portalWebSocketUrl("/api/agent-desktop/stream?' public/portal/standalone/scripts/device-workspace.js
+          grep -F '"portal/standalone/scripts/device-workspace.js"' src/Sirk.Portal/Ui/PortalAssetBundler.cs
+          grep -F '"portal/standalone/scripts/device-tabs.js"' src/Sirk.Portal/Ui/PortalAssetBundler.cs
+
+      - name: Build publish and test Node-free .NET 10 Portal
+        shell: bash
+        run: bash .github/scripts/validate-node-free-dotnet10.sh
+
+      - name: Commit final device workspace restoration
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm .github/workflows/tmp-device-workspace-restore.yml
+          git add src/Sirk.Portal/Ui/PortalAssetBundler.cs \
+                  public/portal/standalone/scripts/app.js \
+                  public/portal/standalone/scripts/device-workspace.js
+          git commit -m 'fix: restore full device workspace and tunneled desktop'
+          git push origin HEAD:main
