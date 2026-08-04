@@ -1,4 +1,3 @@
-using System.Security.Claims;
 using System.Text;
 using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Authentication;
@@ -29,43 +28,7 @@ internal static class PortalUiEndpoints
                 api = WithPrefix(prefix, "/api/v1/admin/maintenance/status")
             });
         }).AllowAnonymous();
-        endpoints.MapGet("/api/v1/system/info", SystemInfo)
-            .AllowAnonymous();
         return endpoints;
-    }
-
-    private static IResult SystemInfo(HttpContext context)
-    {
-        NoStore(context);
-        var delegated = context.Items["Sirk.InternalTunnel"] is true;
-        var authenticated = context.User.Identity?.IsAuthenticated == true;
-        var source = context.User.FindFirstValue("sirk:identity_source") ?? string.Empty;
-        if (!delegated || !authenticated || !source.Equals("central", StringComparison.Ordinal))
-        {
-            return Results.Json(
-                new
-                {
-                    ok = false,
-                    code = "DELEGATED_TUNNEL_REQUIRED",
-                    error = "A verified delegated Central tunnel identity is required."
-                },
-                statusCode: StatusCodes.Status401Unauthorized);
-        }
-
-        return Results.Ok(new
-        {
-            product = "SIRK Portal",
-            runtime = ".NET 10",
-            version = VersionInfo.Current,
-            delegated = true,
-            identity = new
-            {
-                id = context.User.FindFirstValue(ClaimTypes.NameIdentifier) ?? string.Empty,
-                name = context.User.Identity?.Name ?? string.Empty,
-                role = context.User.FindFirstValue(ClaimTypes.Role) ?? string.Empty,
-                source
-            }
-        });
     }
 
     private static async Task<IResult> PortalAsync(
@@ -75,7 +38,7 @@ internal static class PortalUiEndpoints
         NoStore(context);
         var prefix = ResolveProxyPrefix(context);
         if (context.User.Identity?.IsAuthenticated != true)
-            return Results.Redirect("/login", permanent: false, preserveMethod: false);
+            return Results.Redirect(WithPrefix(prefix, "/login"), permanent: false, preserveMethod: false);
 
         var path = Path.Combine(environment.WebRootPath, "portal", "standalone", "index.html");
         var html = await File.ReadAllTextAsync(path, Encoding.UTF8, context.RequestAborted);
@@ -113,7 +76,7 @@ internal static class PortalUiEndpoints
         NoStore(context);
         var prefix = ResolveProxyPrefix(context);
         if (context.User.Identity?.IsAuthenticated == true)
-            return Results.Redirect("/", permanent: false, preserveMethod: false);
+            return Results.Redirect(WithPrefix(prefix, "/"), permanent: false, preserveMethod: false);
 
         var path = Path.Combine(environment.WebRootPath, "portal", "standalone", "login.html");
         var html = await File.ReadAllTextAsync(path, Encoding.UTF8, context.RequestAborted);
@@ -153,9 +116,10 @@ internal static class PortalUiEndpoints
     private static async Task<IResult> LogoutAsync(HttpContext context)
     {
         NoStore(context);
+        var prefix = ResolveProxyPrefix(context);
         if (context.User.Identity?.IsAuthenticated == true)
             await context.SignOutAsync(PortalAuthenticationSchemes.Session);
-        return Results.Redirect("/login", permanent: false, preserveMethod: false);
+        return Results.Redirect(WithPrefix(prefix, "/login"), permanent: false, preserveMethod: false);
     }
 
     private static string ResolveProxyPrefix(HttpContext context)
