@@ -504,7 +504,8 @@ internal static class AgentEndpoints
         AgentStore agents,
         DesktopRelayHub desktop)
     {
-        if (!context.WebSockets.IsWebSocketRequest || !ValidSameOrigin(context))
+        if (!context.WebSockets.IsWebSocketRequest ||
+            (!ValidSameOrigin(context) && context.Items["Sirk.InternalTunnel"] is not true))
         {
             context.Response.StatusCode = StatusCodes.Status400BadRequest;
             return;

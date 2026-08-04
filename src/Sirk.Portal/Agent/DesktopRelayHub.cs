@@ -1,12 +1,22 @@
+using System.Buffers.Binary;
 using System.Collections.Concurrent;
 using System.Net.WebSockets;
+using System.Text;
+using System.Text.Json;
 
 namespace Sirk.Portal.Agent;
+
+internal sealed record DesktopFrameSnapshot(
+    long Sequence,
+    byte[] Payload,
+    string ContentType,
+    string MetadataBase64);
 
 internal sealed class DesktopRelayHub
 {
     private const int MaximumFrameBytes = 8 * 1024 * 1024;
     private const int MaximumInputBytes = 64 * 1024;
+    private static readonly TimeSpan HttpViewerLease = TimeSpan.FromSeconds(40);
     private readonly ConcurrentDictionary<string, DesktopSession> _sessions =
         new(StringComparer.Ordinal);
 
@@ -19,8 +29,10 @@ internal sealed class DesktopRelayHub
         var previous = Interlocked.Exchange(ref session.Agent, socket);
         if (previous is not null && previous.State is WebSocketState.Open or WebSocketState.CloseReceived)
         {
-            await SafeCloseAsync(previous, WebSocketCloseStatus.PolicyViolation, "Agent stream replaced.", cancellationToken);
+            await SafeCloseAsync(previous, WebSocketCloseStatus.PolicyViolation,
+                "Agent stream replaced.", cancellationToken);
         }
+        Signal(session.ViewerSignal);
 
         try
         {
@@ -30,6 +42,7 @@ internal sealed class DesktopRelayHub
         {
             Interlocked.CompareExchange(ref session.Agent, null, socket);
             await CloseViewersAsync(session, "Agent stream closed.", cancellationToken);
+            Signal(session.ViewerSignal);
             RemoveIfEmpty(session);
         }
     }
@@ -42,6 +55,7 @@ internal sealed class DesktopRelayHub
         var session = _sessions.GetOrAdd(deviceId, static id => new DesktopSession(id));
         var viewerId = Guid.NewGuid();
         session.Viewers[viewerId] = socket;
+        Signal(session.ViewerSignal);
         try
         {
             await ReceiveViewerInputAsync(session, socket, cancellationToken);
@@ -49,19 +63,88 @@ internal sealed class DesktopRelayHub
         finally
         {
             session.Viewers.TryRemove(viewerId, out _);
+            Signal(session.ViewerSignal);
             RemoveIfEmpty(session);
+        }
+    }
+
+    public async Task<bool> WaitForViewerAsync(
+        string deviceId,
+        TimeSpan timeout,
+        CancellationToken cancellationToken)
+    {
+        var session = _sessions.GetOrAdd(deviceId, static id => new DesktopSession(id));
+        if (ViewerActive(session)) return true;
+        Drain(session.ViewerSignal);
+        if (ViewerActive(session)) return true;
+        try
+        {
+            await session.ViewerSignal.WaitAsync(timeout, cancellationToken);
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+        }
+        return ViewerActive(session);
+    }
+
+    public async Task<DesktopFrameSnapshot?> WaitForFrameAsync(
+        string deviceId,
+        long after,
+        TimeSpan timeout,
+        CancellationToken cancellationToken)
+    {
+        var session = _sessions.GetOrAdd(deviceId, static id => new DesktopSession(id));
+        TouchHttpViewer(session);
+        var current = Volatile.Read(ref session.LatestFrame);
+        if (current is not null && current.Sequence > after) return current;
+        Drain(session.FrameSignal);
+        current = Volatile.Read(ref session.LatestFrame);
+        if (current is not null && current.Sequence > after) return current;
+        try
+        {
+            await session.FrameSignal.WaitAsync(timeout, cancellationToken);
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+        }
+        current = Volatile.Read(ref session.LatestFrame);
+        return current is not null && current.Sequence > after ? current : null;
+    }
+
+    public async Task SendInputAsync(
+        string deviceId,
+        string message,
+        CancellationToken cancellationToken)
+    {
+        var session = _sessions.GetOrAdd(deviceId, static id => new DesktopSession(id));
+        TouchHttpViewer(session);
+        var agent = session.Agent;
+        if (agent?.State != WebSocketState.Open)
+            throw new InvalidOperationException("Agent desktop stream is offline.");
+        var payload = Encoding.UTF8.GetBytes(message);
+        if (payload.Length > MaximumInputBytes)
+            throw new InvalidDataException("Desktop input is too large.");
+        await session.AgentSendLock.WaitAsync(cancellationToken);
+        try
+        {
+            await agent.SendAsync(payload, WebSocketMessageType.Text, true, cancellationToken);
+        }
+        finally
+        {
+            session.AgentSendLock.Release();
         }
     }
 
     public object Status(string deviceId)
     {
         if (!_sessions.TryGetValue(deviceId, out var session))
-            return new { deviceId, agentConnected = false, viewerCount = 0 };
+            return new { deviceId, agentConnected = false, viewerCount = 0, httpViewerActive = false };
         return new
         {
             deviceId,
             agentConnected = session.Agent?.State == WebSocketState.Open,
-            viewerCount = session.Viewers.Values.Count(value => value.State == WebSocketState.Open)
+            viewerCount = session.Viewers.Values.Count(value => value.State == WebSocketState.Open),
+            httpViewerActive = HttpViewerActive(session)
         };
     }
 
@@ -78,22 +161,30 @@ internal sealed class DesktopRelayHub
             if (result.MessageType == WebSocketMessageType.Close) break;
             if (result.MessageType != WebSocketMessageType.Binary)
             {
-                await SafeCloseAsync(agent, WebSocketCloseStatus.InvalidMessageType, "Binary desktop frame required.", cancellationToken);
+                await SafeCloseAsync(agent, WebSocketCloseStatus.InvalidMessageType,
+                    "Binary desktop frame required.", cancellationToken);
                 break;
             }
 
             message.Write(buffer, 0, result.Count);
             if (message.Length > MaximumFrameBytes)
             {
-                await SafeCloseAsync(agent, WebSocketCloseStatus.MessageTooBig, "Desktop frame is too large.", cancellationToken);
+                await SafeCloseAsync(agent, WebSocketCloseStatus.MessageTooBig,
+                    "Desktop frame is too large.", cancellationToken);
                 break;
             }
             if (!result.EndOfMessage) continue;
 
             var frame = message.ToArray();
             message.SetLength(0);
-            var viewers = session.Viewers.ToArray();
-            foreach (var viewer in viewers)
+            if (!TryStoreFrame(session, frame))
+            {
+                await SafeCloseAsync(agent, WebSocketCloseStatus.InvalidPayloadData,
+                    "Desktop frame packet is invalid.", cancellationToken);
+                break;
+            }
+
+            foreach (var viewer in session.Viewers.ToArray())
             {
                 if (viewer.Value.State != WebSocketState.Open)
                 {
@@ -102,10 +193,7 @@ internal sealed class DesktopRelayHub
                 }
                 try
                 {
-                    await viewer.Value.SendAsync(
-                        frame,
-                        WebSocketMessageType.Binary,
-                        endOfMessage: true,
+                    await viewer.Value.SendAsync(frame, WebSocketMessageType.Binary, true,
                         cancellationToken);
                 }
                 catch (Exception exception) when (
@@ -117,7 +205,38 @@ internal sealed class DesktopRelayHub
         }
     }
 
-    private static async Task ReceiveViewerInputAsync(
+    private static bool TryStoreFrame(DesktopSession session, byte[] packet)
+    {
+        if (packet.Length < 6) return false;
+        var metadataLength = BinaryPrimitives.ReadInt32BigEndian(packet.AsSpan(0, 4));
+        if (metadataLength < 2 || metadataLength > packet.Length - 4) return false;
+        var metadata = packet.AsSpan(4, metadataLength).ToArray();
+        string contentType;
+        try
+        {
+            using var document = JsonDocument.Parse(metadata);
+            contentType = document.RootElement.TryGetProperty("contentType", out var value) &&
+                          value.ValueKind == JsonValueKind.String
+                ? value.GetString() ?? "image/jpeg"
+                : "image/jpeg";
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+        if (contentType.Length > 100 || contentType.Any(char.IsControl)) return false;
+        var payload = packet.AsSpan(4 + metadataLength).ToArray();
+        var sequence = Interlocked.Increment(ref session.Sequence);
+        Volatile.Write(ref session.LatestFrame, new DesktopFrameSnapshot(
+            sequence,
+            payload,
+            contentType,
+            Convert.ToBase64String(metadata)));
+        Signal(session.FrameSignal);
+        return true;
+    }
+
+    private async Task ReceiveViewerInputAsync(
         DesktopSession session,
         WebSocket viewer,
         CancellationToken cancellationToken)
@@ -130,38 +249,28 @@ internal sealed class DesktopRelayHub
             if (result.MessageType == WebSocketMessageType.Close) break;
             if (result.MessageType != WebSocketMessageType.Text)
             {
-                await SafeCloseAsync(viewer, WebSocketCloseStatus.InvalidMessageType, "Text input message required.", cancellationToken);
+                await SafeCloseAsync(viewer, WebSocketCloseStatus.InvalidMessageType,
+                    "Text input message required.", cancellationToken);
                 break;
             }
-
             message.Write(buffer, 0, result.Count);
             if (message.Length > MaximumInputBytes)
             {
-                await SafeCloseAsync(viewer, WebSocketCloseStatus.MessageTooBig, "Desktop input is too large.", cancellationToken);
+                await SafeCloseAsync(viewer, WebSocketCloseStatus.MessageTooBig,
+                    "Desktop input is too large.", cancellationToken);
                 break;
             }
             if (!result.EndOfMessage) continue;
-
-            var input = message.ToArray();
+            var input = Encoding.UTF8.GetString(message.ToArray());
             message.SetLength(0);
-            var agent = session.Agent;
-            if (agent?.State != WebSocketState.Open)
-            {
-                await SafeCloseAsync(viewer, WebSocketCloseStatus.EndpointUnavailable, "Agent desktop stream is offline.", cancellationToken);
-                break;
-            }
-
             try
             {
-                await agent.SendAsync(
-                    input,
-                    WebSocketMessageType.Text,
-                    endOfMessage: true,
-                    cancellationToken);
+                await SendInputAsync(session.DeviceId, input, cancellationToken);
             }
-            catch (WebSocketException)
+            catch (InvalidOperationException)
             {
-                await SafeCloseAsync(viewer, WebSocketCloseStatus.EndpointUnavailable, "Agent desktop stream failed.", cancellationToken);
+                await SafeCloseAsync(viewer, WebSocketCloseStatus.EndpointUnavailable,
+                    "Agent desktop stream is offline.", cancellationToken);
                 break;
             }
         }
@@ -175,18 +284,41 @@ internal sealed class DesktopRelayHub
         foreach (var viewer in session.Viewers.ToArray())
         {
             session.Viewers.TryRemove(viewer.Key, out _);
-            await SafeCloseAsync(
-                viewer.Value,
-                WebSocketCloseStatus.EndpointUnavailable,
-                reason,
-                cancellationToken);
+            await SafeCloseAsync(viewer.Value, WebSocketCloseStatus.EndpointUnavailable,
+                reason, cancellationToken);
         }
     }
 
     private void RemoveIfEmpty(DesktopSession session)
     {
-        if (session.Agent is null && session.Viewers.IsEmpty)
+        if (session.Agent is null && session.Viewers.IsEmpty && !HttpViewerActive(session))
             _sessions.TryRemove(new KeyValuePair<string, DesktopSession>(session.DeviceId, session));
+    }
+
+    private static void TouchHttpViewer(DesktopSession session)
+    {
+        Interlocked.Exchange(ref session.HttpViewerUntilUnixMilliseconds,
+            DateTimeOffset.UtcNow.Add(HttpViewerLease).ToUnixTimeMilliseconds());
+        Signal(session.ViewerSignal);
+    }
+
+    private static bool HttpViewerActive(DesktopSession session) =>
+        Interlocked.Read(ref session.HttpViewerUntilUnixMilliseconds) >
+        DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+
+    private static bool ViewerActive(DesktopSession session) =>
+        HttpViewerActive(session) ||
+        session.Viewers.Values.Any(value => value.State == WebSocketState.Open);
+
+    private static void Signal(SemaphoreSlim signal)
+    {
+        try { signal.Release(); }
+        catch (SemaphoreFullException) { }
+    }
+
+    private static void Drain(SemaphoreSlim signal)
+    {
+        while (signal.Wait(0)) { }
     }
 
     private static async Task SafeCloseAsync(
@@ -196,20 +328,21 @@ internal sealed class DesktopRelayHub
         CancellationToken cancellationToken)
     {
         if (socket.State is not (WebSocketState.Open or WebSocketState.CloseReceived)) return;
-        try
-        {
-            await socket.CloseAsync(status, reason, cancellationToken);
-        }
+        try { await socket.CloseAsync(status, reason, cancellationToken); }
         catch (Exception exception) when (
-            exception is WebSocketException or OperationCanceledException)
-        {
-        }
+            exception is WebSocketException or OperationCanceledException) { }
     }
 
     private sealed class DesktopSession(string deviceId)
     {
         public string DeviceId { get; } = deviceId;
         public WebSocket? Agent;
+        public long Sequence;
+        public DesktopFrameSnapshot? LatestFrame;
+        public long HttpViewerUntilUnixMilliseconds;
+        public SemaphoreSlim AgentSendLock { get; } = new(1, 1);
+        public SemaphoreSlim FrameSignal { get; } = new(0, 1);
+        public SemaphoreSlim ViewerSignal { get; } = new(0, 1);
         public ConcurrentDictionary<Guid, WebSocket> Viewers { get; } = new();
     }
 }

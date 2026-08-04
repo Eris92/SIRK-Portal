@@ -46,6 +46,11 @@ internal sealed record LegacyAgentCommandResult(
     string? Output,
     JsonElement? Data);
 
+internal sealed record LegacyDesktopControlRequest(
+    string TenantId,
+    string DeviceId,
+    int? WaitMilliseconds);
+
 internal static class LegacyAgentCompatibilityEndpoints
 {
     private const int MaximumBodyBytes = 4 * 1024 * 1024;
@@ -61,6 +66,12 @@ internal static class LegacyAgentCompatibilityEndpoints
             .AllowAnonymous()
             .DisableAntiforgery();
         endpoints.MapPost("/api/agent/v1/checkin", CheckInAsync)
+            .AllowAnonymous()
+            .DisableAntiforgery();
+        endpoints.MapGet("/api/agent/v1/desktop/stream", LegacyDesktopStreamAsync)
+            .AllowAnonymous()
+            .DisableAntiforgery();
+        endpoints.MapPost("/api/agent/v1/desktop/control", LegacyDesktopControlAsync)
             .AllowAnonymous()
             .DisableAntiforgery();
         return endpoints;
@@ -211,12 +222,19 @@ internal static class LegacyAgentCompatibilityEndpoints
             {
                 try
                 {
+                    var legacyResult = JsonSerializer.SerializeToElement(new
+                    {
+                        ok = result.Ok,
+                        code = result.Code ?? string.Empty,
+                        output = result.Output ?? string.Empty,
+                        data = result.Data
+                    }, JsonOptions);
                     commands.Complete(
                         device.Id,
                         new AgentCommandResultRequest(
                             result.CommandId,
                             result.Ok,
-                            result.Data,
+                            legacyResult,
                             result.Ok
                                 ? null
                                 : NormalizeError(result.Code, result.Output)));
@@ -265,6 +283,60 @@ internal static class LegacyAgentCompatibilityEndpoints
         {
             return PortalAuthenticationEndpoints.Error(400, "AGENT_CHECKIN_FAILED", exception.Message);
         }
+    }
+
+
+    private static async Task LegacyDesktopStreamAsync(
+        HttpContext context,
+        AgentStore agents,
+        DesktopRelayHub desktop)
+    {
+        if (!context.WebSockets.IsWebSocketRequest)
+        {
+            context.Response.StatusCode = StatusCodes.Status400BadRequest;
+            return;
+        }
+        var deviceId = context.Request.Headers["X-SIRK-Device"].ToString()
+            .Trim().ToLowerInvariant();
+        var tenantId = context.Request.Headers["X-SIRK-Tenant"].ToString().Trim();
+        var device = agents.GetDevice(deviceId);
+        if (device is not { Enabled: true } ||
+            !string.Equals(device.TenantId, tenantId, StringComparison.Ordinal) ||
+            !Authenticate(context.Request, [], device, agents))
+        {
+            context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+            return;
+        }
+        using var socket = await context.WebSockets.AcceptWebSocketAsync();
+        await desktop.AttachAgentAsync(device.Id, socket, context.RequestAborted);
+    }
+
+    private static async Task<IResult> LegacyDesktopControlAsync(
+        HttpContext context,
+        AgentStore agents,
+        DesktopRelayHub desktop)
+    {
+        var body = await ReadBodyAsync(context.Request, 64 * 1024, context.RequestAborted);
+        LegacyDesktopControlRequest request;
+        try { request = Deserialize<LegacyDesktopControlRequest>(body); }
+        catch (Exception exception) when (exception is InvalidDataException or JsonException)
+        {
+            return PortalAuthenticationEndpoints.Error(400, "DESKTOP_CONTROL_INVALID", exception.Message);
+        }
+        var device = agents.GetDevice(request.DeviceId);
+        if (device is not { Enabled: true } ||
+            !string.Equals(device.TenantId, request.TenantId, StringComparison.Ordinal) ||
+            !Authenticate(context.Request, body, device, agents))
+        {
+            return Unauthorized("AGENT_AUTHENTICATION_FAILED", "Agent authentication failed.");
+        }
+        var wait = TimeSpan.FromMilliseconds(Math.Clamp(request.WaitMilliseconds ?? 0, 0, 25_000));
+        var viewerActive = await desktop.WaitForViewerAsync(device.Id, wait, context.RequestAborted);
+        return Results.Ok(new
+        {
+            viewerActive,
+            inputs = Array.Empty<object>()
+        });
     }
 
     private static bool Authenticate(
@@ -367,10 +439,17 @@ internal static class LegacyAgentCompatibilityEndpoints
     private static string? LegacyCommandType(string type) => type switch
     {
         "script.run" => "terminal.execute",
+        "terminal.execute" => "terminal.execute",
         "files.list" => "files.list",
         "files.download" => "files.read",
+        "files.read" => "files.read",
         "files.upload" => "files.write",
+        "files.write" => "files.write",
         "desktop.start" => "desktop.admin.start",
+        "desktop.admin.start" => "desktop.admin.start",
+        "desktop.sessions" => "desktop.sessions",
+        "desktop.monitors" => "desktop.monitors",
+        "desktop.snapshot" => "desktop.snapshot",
         "desktop.input" => "desktop.input",
         _ => null
     };

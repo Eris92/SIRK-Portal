@@ -8,6 +8,15 @@ using Sirk.Portal.Workflows;
 namespace Sirk.Portal.Ui;
 
 internal sealed record LegacyAgentGroupMutation(string? Id, string? Name, string? Description);
+internal sealed record LegacyAgentOperationRequest(
+    string? TenantId,
+    string DeviceId,
+    string Type,
+    JsonElement Parameters);
+internal sealed record LegacyDesktopInputRequest(
+    string? TenantId,
+    string DeviceId,
+    JsonElement Input);
 internal sealed record LegacyIdentityMutation(
     string? Action,
     string? Id,
@@ -41,6 +50,14 @@ internal static class PortalUiCompatibilityEndpoints
             .RequireAuthorization(PortalPolicies.DeviceRead);
         endpoints.MapGet("/api/bootstrap", LegacyBootstrap)
             .RequireAuthorization();
+        endpoints.MapPost("/api/agent-operations", LegacyAgentOperationCreateAsync)
+            .RequireAuthorization(PortalPolicies.DeviceOperate);
+        endpoints.MapGet("/api/agent-operations", LegacyAgentOperationStatusAsync)
+            .RequireAuthorization(PortalPolicies.DeviceOperate);
+        endpoints.MapGet("/api/agent-desktop/frame", LegacyDesktopFrameAsync)
+            .RequireAuthorization(PortalPolicies.DeviceOperate);
+        endpoints.MapPost("/api/agent-desktop/input", LegacyDesktopInputAsync)
+            .RequireAuthorization(PortalPolicies.DeviceOperate);
 
         endpoints.MapGet("/api/admin/agent-groups", LegacyAgentGroups)
             .RequireAuthorization(PortalPolicies.PortalAdministration);
@@ -70,6 +87,192 @@ internal static class PortalUiCompatibilityEndpoints
         return endpoints;
     }
 
+
+    private static async Task<IResult> LegacyAgentOperationCreateAsync(
+        HttpContext context,
+        IAntiforgery antiforgery,
+        AgentStore agents,
+        AgentCommandStore commands)
+    {
+        if (context.Items["Sirk.InternalTunnel"] is not true)
+        {
+            var csrf = await PortalAuthenticationEndpoints.ValidateCsrfAsync(context, antiforgery);
+            if (csrf is not null) return csrf;
+        }
+        try
+        {
+            var form = await context.Request.ReadFormAsync(context.RequestAborted);
+            var raw = form["payload"].ToString();
+            var request = JsonSerializer.Deserialize<LegacyAgentOperationRequest>(
+                              raw,
+                              new JsonSerializerOptions(JsonSerializerDefaults.Web))
+                          ?? throw new InvalidDataException("Agent operation payload is required.");
+            var device = agents.GetDevice(request.DeviceId)
+                         ?? throw new KeyNotFoundException("Device was not found.");
+            if (!string.IsNullOrWhiteSpace(request.TenantId) &&
+                !string.Equals(device.TenantId, request.TenantId, StringComparison.Ordinal))
+                throw new InvalidDataException("Agent tenant does not match the device.");
+            var type = CanonicalOperationType(request.Type);
+            var value = commands.Queue(
+                new AgentCommandQueueRequest(
+                    device.Id,
+                    type,
+                    request.Parameters.ValueKind == JsonValueKind.Undefined
+                        ? JsonSerializer.SerializeToElement(new { })
+                        : request.Parameters,
+                    type.StartsWith("desktop.", StringComparison.Ordinal) ? 180 : 120),
+                PortalAuthenticationEndpoints.ActorId(context),
+                PortalAuthenticationEndpoints.ActorName(context));
+            return Results.Json(new { ok = true, value = LegacyCommandValue(value) },
+                statusCode: StatusCodes.Status202Accepted);
+        }
+        catch (KeyNotFoundException exception)
+        {
+            return PortalAuthenticationEndpoints.Error(404, "AGENT_NOT_FOUND", exception.Message);
+        }
+        catch (Exception exception) when (
+            exception is InvalidDataException or InvalidOperationException or JsonException)
+        {
+            return PortalAuthenticationEndpoints.Error(400, "AGENT_OPERATION_INVALID", exception.Message);
+        }
+    }
+
+    private static async Task<IResult> LegacyAgentOperationStatusAsync(
+        HttpContext context,
+        AgentCommandStore commands)
+    {
+        var commandId = context.Request.Query["commandId"].ToString();
+        if (string.IsNullOrWhiteSpace(commandId))
+            return PortalAuthenticationEndpoints.Error(400, "COMMAND_ID_REQUIRED", "Command ID is required.");
+        var wait = int.TryParse(context.Request.Query["waitMilliseconds"], out var parsed)
+            ? Math.Clamp(parsed, 0, 25_000)
+            : 0;
+        var value = wait > 0
+            ? await commands.WaitAsync(commandId, TimeSpan.FromMilliseconds(wait), context.RequestAborted)
+            : commands.Get(commandId);
+        return value is null
+            ? PortalAuthenticationEndpoints.Error(404, "AGENT_OPERATION_NOT_FOUND", "Operation was not found.")
+            : Results.Ok(new { ok = true, value = LegacyCommandValue(value) });
+    }
+
+    private static async Task<IResult> LegacyDesktopFrameAsync(
+        HttpContext context,
+        AgentStore agents,
+        DesktopRelayHub desktop)
+    {
+        var deviceId = context.Request.Query["deviceId"].ToString().Trim().ToLowerInvariant();
+        var device = agents.GetDevice(deviceId);
+        if (device is not { Enabled: true })
+            return PortalAuthenticationEndpoints.Error(404, "AGENT_NOT_FOUND", "Device was not found.");
+        var after = long.TryParse(context.Request.Query["after"], out var parsedAfter)
+            ? Math.Max(0, parsedAfter)
+            : 0;
+        var wait = int.TryParse(context.Request.Query["waitMilliseconds"], out var parsedWait)
+            ? Math.Clamp(parsedWait, 0, 25_000)
+            : 0;
+        var frame = await desktop.WaitForFrameAsync(
+            device.Id,
+            after,
+            TimeSpan.FromMilliseconds(wait),
+            context.RequestAborted);
+        if (frame is null) return Results.NoContent();
+        context.Response.Headers["X-SIRK-Sequence"] = frame.Sequence.ToString(
+            System.Globalization.CultureInfo.InvariantCulture);
+        context.Response.Headers["X-SIRK-Metadata"] = frame.MetadataBase64;
+        context.Response.Headers.CacheControl = "no-store";
+        return Results.Bytes(frame.Payload, frame.ContentType);
+    }
+
+    private static async Task<IResult> LegacyDesktopInputAsync(
+        HttpContext context,
+        IAntiforgery antiforgery,
+        AgentStore agents,
+        DesktopRelayHub desktop)
+    {
+        if (context.Items["Sirk.InternalTunnel"] is not true)
+        {
+            var csrf = await PortalAuthenticationEndpoints.ValidateCsrfAsync(context, antiforgery);
+            if (csrf is not null) return csrf;
+        }
+        try
+        {
+            var request = await context.Request.ReadFromJsonAsync<LegacyDesktopInputRequest>(
+                              cancellationToken: context.RequestAborted)
+                          ?? throw new InvalidDataException("Desktop input is required.");
+            var device = agents.GetDevice(request.DeviceId)
+                         ?? throw new KeyNotFoundException("Device was not found.");
+            if (!string.IsNullOrWhiteSpace(request.TenantId) &&
+                !string.Equals(device.TenantId, request.TenantId, StringComparison.Ordinal))
+                throw new InvalidDataException("Agent tenant does not match the device.");
+            var message = JsonSerializer.Serialize(new
+            {
+                type = "input",
+                id = 0,
+                input = request.Input
+            }, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+            await desktop.SendInputAsync(device.Id, message, context.RequestAborted);
+            return Results.Ok(new { ok = true });
+        }
+        catch (KeyNotFoundException exception)
+        {
+            return PortalAuthenticationEndpoints.Error(404, "AGENT_NOT_FOUND", exception.Message);
+        }
+        catch (InvalidOperationException exception)
+        {
+            return PortalAuthenticationEndpoints.Error(409, "DESKTOP_STREAM_OFFLINE", exception.Message);
+        }
+        catch (Exception exception) when (exception is InvalidDataException or JsonException)
+        {
+            return PortalAuthenticationEndpoints.Error(400, "DESKTOP_INPUT_INVALID", exception.Message);
+        }
+    }
+
+    private static string CanonicalOperationType(string? value) =>
+        (value ?? string.Empty).Trim().ToLowerInvariant() switch
+        {
+            "terminal.execute" => "terminal.execute",
+            "files.list" => "files.list",
+            "files.read" => "files.read",
+            "files.write" => "files.write",
+            "desktop.sessions" => "desktop.sessions",
+            "desktop.monitors" => "desktop.monitors",
+            "desktop.admin.start" => "desktop.admin.start",
+            "desktop.snapshot" => "desktop.snapshot",
+            "desktop.input" => "desktop.input",
+            _ => throw new InvalidDataException("Unsupported Agent operation.")
+        };
+
+    private static object LegacyCommandValue(AgentCommandRecord command)
+    {
+        object? result = null;
+        if (command.Status is "completed" or "failed" or "expired")
+        {
+            if (command.Result is { ValueKind: JsonValueKind.Object } value &&
+                value.TryGetProperty("ok", out _))
+            {
+                result = value;
+            }
+            else
+            {
+                result = new
+                {
+                    ok = command.Status == "completed",
+                    code = command.Status == "completed" ? "OK" : "OPERATION_FAILED",
+                    output = command.Error ?? string.Empty,
+                    data = command.Result
+                };
+            }
+        }
+        return new
+        {
+            commandId = command.Id,
+            status = command.Status,
+            result,
+            command.CreatedAtUtc,
+            command.ExpiresAtUtc
+        };
+    }
+
     private static IResult DeviceInventory(AgentStore agents) =>
         Results.Ok(DeviceInventoryValue(agents));
 
@@ -92,6 +295,8 @@ internal static class PortalUiCompatibilityEndpoints
             {
                 id = device.GetProperty("id").GetString() ?? string.Empty,
                 nodeId = device.GetProperty("id").GetString() ?? string.Empty,
+                deviceId = device.GetProperty("id").GetString() ?? string.Empty,
+                tenantId = device.GetProperty("tenantId").GetString() ?? string.Empty,
                 name = device.GetProperty("name").GetString() ?? string.Empty,
                 hostname = device.GetProperty("hostName").GetString() ?? string.Empty,
                 groupId = device.GetProperty("groupId").GetString() ?? string.Empty,
@@ -99,6 +304,7 @@ internal static class PortalUiCompatibilityEndpoints
                 online = device.GetProperty("online").GetBoolean(),
                 status = device.GetProperty("status").GetString() ?? string.Empty,
                 osdesc = device.GetProperty("platform").GetString() ?? string.Empty,
+                os = device.GetProperty("platform").GetString() ?? string.Empty,
                 platform = device.GetProperty("platform").GetString() ?? string.Empty,
                 ip = device.GetProperty("remoteAddress").GetString() ?? string.Empty,
                 remoteAddress = device.GetProperty("remoteAddress").GetString() ?? string.Empty,

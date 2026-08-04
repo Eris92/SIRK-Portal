@@ -158,6 +158,15 @@
         return endpoint.href;
     }
 
+    function usesHttpTunnel() {
+        try {
+            var rewritten = core && typeof core.portalUrl === "function"
+                ? core.portalUrl("/api/v1/desktop/stream")
+                : "/api/v1/desktop/stream";
+            return /^\/connect\//.test(new URL(rewritten, window.location.href).pathname);
+        } catch (error) { return false; }
+    }
+
     function waitForAgentOperation(node, commandId, status) {
         var deadline = Date.now() + 150000;
         return new Promise(function (resolve, reject) {
@@ -405,19 +414,10 @@
                 ? desktopInputSocket : desktopSocket;
             if (inputChannel && inputChannel.readyState === WebSocket.OPEN &&
                 socketActions.indexOf(parameters.action) >= 0) {
-                if (parameters.action === "move") {
-                    inputChannel.send(JSON.stringify({ type: "input", id: 0, input: parameters }));
-                    return Promise.resolve({ ok: true });
-                }
-                var id = ++inputSequence;
-                return new Promise(function (resolve, reject) {
-                    var timer = setTimeout(function () {
-                        pendingInput.delete(id);
-                        reject(new Error("Input dispatch timeout."));
-                    }, 2000);
-                    pendingInput.set(id, { resolve: resolve, reject: reject, timer: timer, started: started });
-                    inputChannel.send(JSON.stringify({ type: "input", id: id, input: parameters }));
-                });
+                inputChannel.send(JSON.stringify({ type: "input", id: ++inputSequence, input: parameters }));
+                inputTimes.push(performance.now() - started);
+                if (inputTimes.length > 60) inputTimes.shift();
+                return Promise.resolve({ ok: true });
             }
             var runtime = window.SirkPlatformRuntime && window.SirkPlatformRuntime.state;
             var csrfToken = runtime && runtime.bootstrap && runtime.bootstrap.csrfToken || "";
@@ -485,11 +485,19 @@
             hasCompleteFrame = false;
             snapshot.sequence = 0;
             var settings = effectiveProfile();
-            input({ action: "streamProfile", maxWidth: settings.maxWidth, quality: settings.quality,
-                targetKbps: settings.targetKbps, targetFps: settings.targetFps,
-                frameMode: settings.frameMode, deltaScalePercent: settings.deltaScalePercent })
-                .catch(function () {});
-            startDesktopSocket(streamGeneration);
+            var streamProfile = { action: "streamProfile", maxWidth: settings.maxWidth,
+                quality: settings.quality, targetKbps: settings.targetKbps,
+                targetFps: settings.targetFps, frameMode: settings.frameMode,
+                deltaScalePercent: settings.deltaScalePercent };
+            if (usesHttpTunnel()) {
+                input(streamProfile).then(function () { snapshot(streamGeneration); })
+                    .catch(function (error) {
+                        status.textContent = error.message || String(error);
+                        status.classList.add("is-error");
+                    });
+                return;
+            }
+            startDesktopSocket(streamGeneration, streamProfile);
         }
         var desktopSocket = null;
         var desktopInputSocket = null;
@@ -558,26 +566,22 @@
                     " · atlas " + Number(data.width || 0) + " × " + Number(data.height || 0));
             });
         }
-        function startDesktopSocket(generation) {
+        function startDesktopSocket(generation, streamProfile) {
             if (desktopSocket) { try { desktopSocket.close(); } catch (error) {} }
-            if (desktopInputSocket) { try { desktopInputSocket.close(); } catch (error) {} }
-            var identityQuery = "tenantId=" + encodeURIComponent(node.tenantId) +
-                "&deviceId=" + encodeURIComponent(node.deviceId);
-            var url = portalWebSocketUrl("/api/agent-desktop/stream?" + identityQuery +
-                "&after=" + encodeURIComponent(snapshot.sequence || 0));
+            desktopInputSocket = null;
+            var url = portalWebSocketUrl("/api/v1/desktop/stream?deviceId=" +
+                encodeURIComponent(node.deviceId));
             var socket = new WebSocket(url);
             desktopSocket = socket;
-            var inputSocket = new WebSocket(portalWebSocketUrl(
-                "/api/agent-desktop/input-stream?" + identityQuery));
-            desktopInputSocket = inputSocket;
-            inputSocket.onmessage = handleInputSocketMessage;
-            inputSocket.onclose = function () {
-                if (generation !== streamGeneration || inputSocket !== desktopInputSocket) return;
-                desktopInputSocket = null;
-                rejectPendingInputs("Desktop input socket closed.");
-            };
-            inputSocket.onerror = function () { try { inputSocket.close(); } catch (error) {} };
+            desktopInputSocket = socket;
             socket.binaryType = "arraybuffer";
+            socket.onopen = function () {
+                if (generation !== streamGeneration || socket !== desktopSocket) return;
+                input(streamProfile).catch(function (error) {
+                    status.textContent = error.message || String(error);
+                    status.classList.add("is-error");
+                });
+            };
             socket.onmessage = function (event) {
                 if (generation !== streamGeneration || socket !== desktopSocket) return;
                 if (typeof event.data === "string") {
@@ -624,7 +628,10 @@
                 if (!desktopInputSocket || desktopInputSocket.readyState !== WebSocket.OPEN)
                     rejectPendingInputs("Desktop socket closed.");
                 desktopSocket = null;
-                setTimeout(function () { snapshot(generation); }, 250);
+                desktopInputSocket = null;
+                if (connected) setTimeout(function () {
+                    if (generation === streamGeneration) startDesktopSocket(generation, streamProfile);
+                }, 1000);
             };
             socket.onerror = function () { try { socket.close(); } catch (error) {} };
         }
