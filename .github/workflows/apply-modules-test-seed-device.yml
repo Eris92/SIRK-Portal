@@ -1,0 +1,48 @@
+name: Apply modules test device seed
+
+on:
+  push:
+    branches:
+      - feat/canonical-agent-management-v1
+
+permissions:
+  contents: write
+
+jobs:
+  apply-and-validate:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/canonical-agent-management-v1
+          fetch-depth: 0
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Apply modules test seed
+        run: python3 .github/scripts/apply_modules_test_seed_device.py
+      - name: Run modules and canonical Agent tests
+        shell: bash
+        run: |
+          dotnet publish src/Sirk.Portal/Sirk.Portal.csproj -c Release -r linux-x64 --self-contained false -o artifacts/linux-x64
+          python3 .github/scripts/test-dotnet10-modules-v2.py artifacts/linux-x64/Sirk.Portal.dll
+          python3 .github/scripts/test-dotnet10-agent-v1.py artifacts/linux-x64/Sirk.Portal.dll
+      - name: Validate scope separation
+        shell: bash
+        run: |
+          if grep -F '/api/v1/agent/enroll' .github/scripts/test-dotnet10-modules.py; then
+            echo 'Modules test still performs Agent enrollment.' >&2
+            exit 1
+          fi
+          grep -F 'module-test-device' .github/scripts/test-dotnet10-modules.py
+      - name: Commit test correction
+        shell: bash
+        run: |
+          rm -f .github/scripts/apply_modules_test_seed_device.py
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add .github/scripts
+          git commit -m 'test: isolate modules smoke from Agent enrollment'
+          git push origin HEAD:feat/canonical-agent-management-v1
