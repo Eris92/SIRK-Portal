@@ -31,11 +31,11 @@
         var style = document.createElement("style");
         style.id = "sirkDeviceViewModeStyle";
         style.textContent = [
-            ".sirk-device-view-mode{display:none;flex:0 0 auto;margin-left:8px;z-index:2147483000}",
-            ".sirk-standalone-header.is-devices-view .sirk-device-view-mode{display:block}",
-            ".sirk-device-view-mode-toggle{display:inline-flex!important;align-items:center!important;justify-content:center!important;width:32px;height:32px;padding:0!important;line-height:0!important;border:1px solid var(--sirk-border,#dce3ec);border-radius:9px;background:var(--sirk-panel,#fff);color:var(--sirk-muted,#657187);cursor:pointer;box-shadow:0 3px 10px rgba(15,23,42,.08)}",
+            ".sirk-device-view-mode{display:none;place-items:center;flex:0 0 44px;width:44px;height:44px;margin-left:0;z-index:2147483000}",
+            ".sirk-standalone-header.is-devices-view .sirk-device-view-mode{display:grid}",
+            ".sirk-device-view-mode-toggle{display:inline-flex!important;align-items:center!important;justify-content:center!important;width:44px;height:44px;padding:0!important;line-height:0!important;border:1px solid var(--sirk-border,#dce3ec);border-radius:12px;background:var(--sirk-panel,#fff);color:var(--sirk-muted,#657187);cursor:pointer;box-shadow:0 3px 10px rgba(15,23,42,.08)}",
             ".sirk-device-view-mode-toggle:hover,.sirk-device-view-mode-toggle:focus-visible,.sirk-device-view-mode-toggle.is-active{border-color:#60a5fa;color:#2563eb;outline:none}",
-            ".sirk-device-view-mode-toggle svg{display:block!important;flex:0 0 auto;width:17px;height:17px;margin:0!important;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}",
+            ".sirk-device-view-mode-toggle svg{display:block!important;flex:0 0 auto;width:20px;height:20px;margin:0!important;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}",
             ".sirk-device-view-mode-menu{position:fixed!important;z-index:2147483647!important;display:grid;min-width:285px;padding:6px;border:1px solid var(--sirk-border,#dce3ec);border-radius:10px;background:var(--sirk-panel,#fff);color:var(--sirk-text,#172033);box-shadow:0 14px 35px rgba(15,23,42,.28)}",
             ".sirk-device-view-mode-menu[hidden]{display:none!important}",
             ".sirk-device-view-mode-menu button{display:flex;align-items:center;gap:9px;min-height:36px;padding:8px 10px;border:0;border-radius:7px;background:transparent;color:inherit;text-align:left;font:600 13px Segoe UI,Arial,sans-serif;cursor:pointer}",
@@ -45,7 +45,13 @@
             "html.sirk-device-focus-mode .sirk-standalone-root{grid-template-columns:minmax(0,1fr)!important}",
             "html.sirk-device-focus-mode .sirk-standalone-topbar{display:none!important}",
             "html.sirk-device-focus-mode #sirkPortalRoot,html.sirk-device-focus-mode #sirkStandaloneRoot,html.sirk-device-focus-mode .sirk-standalone-main{width:100%!important;height:100%!important;min-height:100%!important}",
-            "html.sirk-device-focus-mode #sirkStandaloneContent{min-height:0!important}",
+            "html.sirk-device-focus-mode #sirkStandaloneContent{min-height:0!important;padding:0!important;margin:0!important;overflow:hidden!important}",
+            "html.sirk-device-focus-mode .sirk-device-workspace{grid-template-rows:minmax(0,1fr)!important;width:100%!important;height:100%!important;min-height:0!important}",
+            "html.sirk-device-focus-mode .sirk-device-workspace>.sirk-device-compact-header,html.sirk-device-focus-mode .sirk-device-workspace>.sirk-device-tabs{display:none!important}",
+            "html.sirk-device-focus-mode .sirk-device-tab-body{width:100%!important;height:100%!important;min-height:0!important;border:0!important;border-radius:0!important}",
+            "html.sirk-device-focus-mode .sirk-agent-operation.sirk-agent-desktop{width:100%!important;height:100%!important;min-height:0!important;margin:0!important;box-sizing:border-box!important;overflow:hidden!important}",
+            "html.sirk-device-focus-mode .sirk-agent-desktop-stage{display:flex!important;flex:1 1 auto!important;width:100%!important;min-height:0!important;overflow:hidden!important}",
+            "html.sirk-device-focus-mode .sirk-agent-desktop-stage canvas{max-width:100%!important;max-height:100%!important;width:auto!important;height:auto!important;margin:auto!important}",
             "html.sirk-device-connection-mode .sirk-standalone-sidebar,html.sirk-device-connection-mode .sirk-standalone-topbar{display:none!important}",
             "html.sirk-device-connection-mode .sirk-standalone-root{grid-template-columns:minmax(0,1fr)!important}",
             "html.sirk-device-connection-mode #sirkPortalRoot,html.sirk-device-connection-mode #sirkStandaloneRoot,html.sirk-device-connection-mode .sirk-standalone-main{width:100%!important;height:100%!important;min-height:100%!important}",
@@ -70,12 +76,14 @@
         try { localStorage.setItem("sirkPortal.focusMode", enabled ? "1" : "0"); }
         catch (error) {}
         window.dispatchEvent(new Event("resize"));
+        window.dispatchEvent(new CustomEvent("sirkportal:deviceviewmodechange", { detail: { focus: enabled, connection: false } }));
     }
 
     function setConnectionMode(enabled) {
         document.documentElement.classList.toggle("sirk-device-connection-mode", enabled);
         if (enabled) document.documentElement.classList.remove("sirk-device-focus-mode");
         window.dispatchEvent(new Event("resize"));
+        window.dispatchEvent(new CustomEvent("sirkportal:deviceviewmodechange", { detail: { focus: false, connection: enabled } }));
     }
 
     function requestPortalFullscreen() {

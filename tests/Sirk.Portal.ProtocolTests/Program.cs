@@ -20,6 +20,7 @@ DesktopImageCodecUiContract.Run();
 CommandWorkspaceStyleContract.Run();
 DeviceHeaderLayoutContract.Run();
 DeviceConnectionWorkspaceContract.Run();
+DeviceHostTabSplitContract.Run();
 
 const string portalId = "portal-test";
 const string portalToken = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
