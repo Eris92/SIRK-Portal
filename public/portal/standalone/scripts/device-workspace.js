@@ -12,7 +12,7 @@
     var inventory = null;
     var activeTab = "general";
     var transformScheduled = false;
-    var quickCommands = { data: null, category: "", selected: null, search: "" };
+    var quickCommands = { data: null, category: "", selected: null, search: "", favoritesOnly: false, collapsed: quickReadBoolean("sirkPortal.quickCommands.categoriesCollapsed", false), detailsCollapsed: quickReadBoolean("sirkPortal.quickCommands.detailsCollapsed", false), outputAttention: false, output: "", outputError: false, pollToken: 0 };
     var DEVICE_ICON = '<svg class="sirk-device-computer-svg" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4"/><path d="M6.5 7.5h11v6h-11z" class="sirk-device-computer-screen"/></svg>';
 
     var REMOTE_TABS = ["desktop", "terminal", "files"];
@@ -26,7 +26,8 @@
             ip: "Adres IP", lastSeen: "Ostatnio widziany", agent: "Wersja agenta", nodeId: "Node ID",
             quickCommands: "Szybkie polecenia", close: "Zamknij", loadingCommands: "Ładowanie poleceń…", noCommands: "Brak poleceń.",
             searchCommands: "Szukaj poleceń…", variables: "Parametry", runCommand: "Uruchom", requestCommand: "Wyślij wniosek",
-            commandSent: "Polecenie zostało wysłane.", commandPending: "Polecenie oczekuje na akceptację.", commandFailed: "Nie udało się wysłać polecenia.", confirmCommand: "Uruchomić polecenie"
+            commandSent: "Polecenie zostało wysłane.", commandPending: "Polecenie oczekuje na akceptację.", commandFailed: "Nie udało się wysłać polecenia.", confirmCommand: "Uruchomić polecenie",
+            collapseCategories: "Zwiń kategorie", expandCategories: "Rozwiń kategorie", favorites: "Pokaż ulubione", hideOutput: "Ukryj wyniki", showOutput: "Pokaż wyniki", refresh: "Odśwież", noFavoriteCommands: "Brak ulubionych poleceń.", selectCommand: "Wybierz polecenie, aby zobaczyć parametry i wynik.", submittingCommand: "Wysyłanie polecenia…", waitingOutput: "Oczekiwanie na wynik agenta…", commandCompleted: "Polecenie zakończone.", commandTimeout: "Przekroczono czas oczekiwania na wynik."
         },
         en: {
             general: "Overview", desktop: "Desktop", terminal: "Terminal", commands: "Commands", files: "Files",
@@ -36,7 +37,8 @@
             ip: "IP address", lastSeen: "Last seen", agent: "Agent version", nodeId: "Node ID",
             quickCommands: "Quick commands", close: "Close", loadingCommands: "Loading commands…", noCommands: "No commands.",
             searchCommands: "Search commands…", variables: "Variables", runCommand: "Run", requestCommand: "Request",
-            commandSent: "Command submitted.", commandPending: "Command is waiting for approval.", commandFailed: "Command could not be submitted.", confirmCommand: "Run command"
+            commandSent: "Command submitted.", commandPending: "Command is waiting for approval.", commandFailed: "Command could not be submitted.", confirmCommand: "Run command",
+            collapseCategories: "Collapse categories", expandCategories: "Expand categories", favorites: "Show favorites", hideOutput: "Hide output", showOutput: "Show output", refresh: "Refresh", noFavoriteCommands: "No favorite commands.", selectCommand: "Select a command to view parameters and output.", submittingCommand: "Submitting command…", waitingOutput: "Waiting for agent output…", commandCompleted: "Command completed.", commandTimeout: "Command output timeout reached."
         }
     };
 
@@ -310,6 +312,7 @@
     function renderAgentDesktop(host, node) {
         var stopped = false;
         host.innerHTML = '<div class="sirk-agent-operation sirk-agent-desktop"><header><strong>Pulpit SIRK Agent Live</strong><small>Natychmiastowa pomoc zdalna w wybranej sesji użytkownika</small></header><div class="sirk-agent-desktop-controls"><label>Sesja<select data-agent-desktop-session disabled></select></label><label>Monitor<select data-agent-desktop-monitor disabled><option value="-1">Wszystkie monitory</option></select></label><label>Profil<select data-agent-desktop-profile><option value="auto">Auto</option><option value="smooth">Płynny GUI 120 Hz</option><option value="text">Ostry tekst</option><option value="video">Wideo H.264</option><option value="weak">Słabe łącze</option><option value="minimum">Minimalny transfer</option></select></label><label>Kodek<select data-agent-desktop-codec><option value="auto">Auto (profil)</option><option value="webp">WebP</option><option value="png">PNG</option><option value="jpeg">JPEG</option><option value="h264">H.264</option></select></label><label>Jakość<select data-agent-desktop-quality><option value="auto">Auto (profil)</option><option value="40">40%</option><option value="50">50%</option><option value="60">60%</option><option value="70">70%</option><option value="80">80%</option><option value="85">85%</option><option value="90">90%</option><option value="100">100%</option></select></label><button type="button" data-agent-desktop-connect>Połącz</button><button type="button" data-agent-desktop-disconnect disabled>Rozłącz</button></div><div class="sirk-agent-desktop-stats" data-agent-desktop-stats><span>FPS <b data-stat-fps>0</b></span><span>latencja p50/p95 <b data-stat-latency>—</b></span><span>input dispatch <b data-stat-input>—</b></span><span>capture/encode/session/decode/render <b data-stat-pipeline>—</b></span><span>bitrate <b data-stat-bitrate>0</b></span><span>delta <b data-stat-delta>—</b></span><span>łącze <b data-stat-link>pomiar…</b></span><span>backend <b data-stat-backend>—</b></span></div><div class="sirk-agent-desktop-admin"><strong>Pulpit administracyjny</strong><select data-agent-admin-tool><option value="powershell">PowerShell SYSTEM</option><option value="computer-management">Zarządzanie komputerem</option><option value="services">Usługi</option><option value="registry">Edytor rejestru</option><option value="task-manager">Menedżer zadań</option><option value="event-viewer">Podgląd zdarzeń</option><option value="device-manager">Menedżer urządzeń</option></select><button type="button" data-agent-admin-start disabled>Uruchom w sesji użytkownika</button></div><div class="sirk-agent-desktop-stage" style="position:relative;display:flex;justify-content:center;align-items:center;overflow:hidden;min-height:240px"><canvas data-agent-desktop-image aria-label="Zdalny pulpit" tabindex="0" style="display:block;max-width:100%;max-height:calc(100vh - 360px);width:auto;height:auto;margin:0 auto;touch-action:none"></canvas><span data-agent-desktop-cursor style="position:absolute;width:12px;height:12px;border:2px solid #fff;border-radius:50%;background:#111;box-shadow:0 0 0 1px #111;pointer-events:none;transform:translate(-2px,-2px)"></span></div><div class="sirk-agent-desktop-input"><input data-agent-desktop-text placeholder="Tekst do aktywnego okna"><button type="button" data-agent-desktop-send>Wyślij tekst</button><select data-agent-desktop-key><option>Enter</option><option>Tab</option><option>Escape</option><option>Backspace</option><option>Delete</option><option>Up</option><option>Down</option><option>Left</option><option>Right</option><option>Home</option><option>End</option><option>PageUp</option><option>PageDown</option><option>F5</option></select><button type="button" data-agent-desktop-key-send>Klawisz</button></div><div class="sirk-agent-desktop-clipboard"><textarea data-agent-desktop-clipboard placeholder="Schowek wybranej sesji"></textarea><button type="button" data-agent-desktop-clipboard-get>Pobierz schowek</button><button type="button" data-agent-desktop-clipboard-set>Ustaw schowek</button></div><div class="sirk-agent-policy-action" data-agent-policy-action hidden><button type="button" data-agent-policy-enable>Włącz zdalny pulpit dla urządzenia</button></div><pre data-agent-operation-status>Gotowy do natychmiastowego połączenia.</pre></div>';
+        ensureCompactCommands(host);
         var image = host.querySelector("[data-agent-desktop-image]");
         var imageContext = image.getContext("2d", { alpha: false, desynchronized: true });
         var moveCanvas = document.createElement("canvas");
@@ -1188,6 +1191,99 @@
         }
     }
 
+    function quickReadBoolean(key, fallback) {
+        try {
+            var value = localStorage.getItem(key);
+            return value == null ? fallback : value === "1";
+        } catch (error) { return fallback; }
+    }
+
+    function quickWriteBoolean(key, value) {
+        try { localStorage.setItem(key, value ? "1" : "0"); } catch (error) {}
+    }
+
+    function quickItemKey(item) {
+        if (!item) return "";
+        return String(item.path || (item.kind === "command" ? "@command/" + item.commandId : ""));
+    }
+
+    function quickFavoritePaths() {
+        try {
+            var value = JSON.parse(localStorage.getItem("sirkPlatform.commands.preferences") || "{}");
+            return Array.isArray(value.favorites) ? value.favorites.map(String) : [];
+        } catch (error) { return []; }
+    }
+
+    function quickIsFavorite(item) {
+        return quickFavoritePaths().indexOf(quickItemKey(item)) >= 0;
+    }
+
+    function quickIcon(name) {
+        var icons = {
+            bolt: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m13 2-8 12h7l-1 8 8-12h-7l1-8Z"/></svg>',
+            collapse: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6-6 6 6 6M21 6l-6 6 6 6"/></svg>',
+            expand: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 6 6 6-6 6M15 6l6 6-6 6"/></svg>',
+            star: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-3-5.6 3 1.1-6.2L3 9.6l6.2-.9L12 3Z"/></svg>',
+            details: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M14 4v16M17 8h2M17 12h2M17 16h2"/></svg>',
+            search: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m16 16 5 5"/></svg>',
+            refresh: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6v6h-6M4 18v-6h6"/><path d="M18.5 9A7 7 0 0 0 6 6.5L4 9M5.5 15A7 7 0 0 0 18 17.5l2-2.5"/></svg>',
+            close: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>'
+        };
+        return icons[name] || "";
+    }
+
+    function quickSetOutput(value, error, completed) {
+        quickCommands.output = String(value == null ? "" : value);
+        quickCommands.outputError = error === true;
+        if (completed && quickCommands.detailsCollapsed) quickCommands.outputAttention = true;
+        var status = document.querySelector("#sirkQuickCommandsPanel .sirk-quick-command-status");
+        if (status) {
+            status.textContent = quickCommands.output;
+            status.classList.toggle("is-error", quickCommands.outputError);
+        }
+        var details = document.querySelector("#sirkQuickCommandsPanel [data-quick-command-details]");
+        if (details) details.classList.toggle("has-attention", quickCommands.outputAttention);
+    }
+
+    function loadCompactCommands(force) {
+        if (quickCommands.data && !force) return Promise.resolve(quickCommands.data);
+        var panel = document.getElementById("sirkQuickCommandsPanel");
+        if (panel) panel.innerHTML = '<div class="sirk-command-loading">' + esc(t("loadingCommands")) + '</div>';
+        return core.api("commands", "scripts").then(function (response) {
+            quickCommands.data = { tree: response.tree || { children: [] }, catalog: response.catalog || [] };
+            return quickCommands.data;
+        });
+    }
+
+    function ensureCompactCommands(host) {
+        var operation = host.querySelector(".sirk-agent-desktop") || host;
+        if (operation.querySelector("#sirkQuickCommandsPanel")) return;
+        var toggle = document.createElement("button");
+        toggle.type = "button";
+        toggle.id = "sirkQuickCommandsToggle";
+        toggle.className = "sirk-quick-commands-toggle sirk-command-icon-button";
+        toggle.setAttribute("aria-expanded", "false");
+        toggle.title = t("quickCommands");
+        toggle.innerHTML = quickIcon("bolt") + '<span>' + esc(t("quickCommands")) + '</span>';
+        var panel = document.createElement("aside");
+        panel.id = "sirkQuickCommandsPanel";
+        panel.className = "sirk-quick-commands-panel";
+        panel.hidden = true;
+        operation.appendChild(toggle);
+        operation.appendChild(panel);
+        toggle.addEventListener("click", function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+            var opening = panel.hidden;
+            panel.hidden = !opening;
+            toggle.setAttribute("aria-expanded", opening ? "true" : "false");
+            if (!opening) return;
+            loadCompactCommands(false).then(renderCompactCommands).catch(function (error) {
+                panel.innerHTML = '<div class="sirk-command-error">' + esc(error.message || String(error)) + '</div>';
+            });
+        });
+    }
+
     function flattenCommandScripts(node, prefix, output) {
         (node && node.children || []).forEach(function (child) {
             if (child.type === "script") {
@@ -1209,7 +1305,7 @@
                 key: "catalog:" + category.key,
                 label: category.title || category.key,
                 items: (category.commands || []).map(function (command) {
-                    return { kind: "command", commandId: command.id, label: command.label || command.id, description: command.description || "", requiresApproval: command.requiresApproval === true, confirmExecution: command.confirmExecution === true, variables: command.variables || [] };
+                    return { kind: "command", commandId: command.id, path: "@command/" + category.key + "/" + command.id, label: command.label || command.id, description: command.description || "", requiresApproval: command.requiresApproval === true, confirmExecution: command.confirmExecution === true, variables: command.variables || [] };
                 })
             });
         });
@@ -1235,7 +1331,6 @@
                     option.value = String(choice.value == null ? choice : choice.value);
                     option.textContent = choice.labels && choice.labels[language()] || choice.label || option.value;
                     input.appendChild(option);
-
                 });
             } else {
                 input = document.createElement("input");
@@ -1254,19 +1349,46 @@
         };
     }
 
-    function submitCompactCommand(item, values, button, status) {
+    function pollCompactOutput(item, id, token, attempt) {
+        if (token !== quickCommands.pollToken || quickItemKey(item) !== quickItemKey(quickCommands.selected)) return;
+        core.api("commands", "output", null, { id: id }).then(function (response) {
+            if (token !== quickCommands.pollToken || quickItemKey(item) !== quickItemKey(quickCommands.selected)) return;
+            if (response.ready) {
+                quickSetOutput(response.output || (response.status ? t("commandCompleted") + " " + response.status : t("commandCompleted")), false, true);
+                return;
+            }
+            if (attempt >= 300) {
+                quickSetOutput(t("commandTimeout"), true, true);
+                return;
+            }
+            quickSetOutput(t("waitingOutput"), false, false);
+            window.setTimeout(function () { pollCompactOutput(item, id, token, attempt + 1); }, 1000);
+        }).catch(function (error) { if (token === quickCommands.pollToken) quickSetOutput(error.message || String(error), true, true); });
+    }
+
+    function submitCompactCommand(item, values, button) {
         if (item.confirmExecution === true && !window.confirm(t("confirmCommand") + ' "' + item.label + '"?')) return;
         button.disabled = true;
-        status.textContent = t("loadingCommands");
+        quickCommands.pollToken += 1;
+        var token = quickCommands.pollToken;
+        quickSetOutput(t("submittingCommand"), false, false);
         var payload = { nodeId: String(selectedNode && (selectedNode.id || selectedNode._id) || ""), nodeName: selectedNode && selectedNode.name || "", variableValues: values || {}, confirmedExecution: item.confirmExecution === true, note: "" };
         if (item.kind === "command") payload.commandId = item.commandId;
         else payload.scriptPath = item.path;
         core.post("commands", "execute", payload).then(function (response) {
-            status.textContent = response.request && response.request.status === "pending" ? t("commandPending") : t("commandSent");
-            status.classList.remove("is-error");
+            var request = response.request || {}, result = request.result || {};
+            if (request.status === "pending") {
+                quickSetOutput(t("commandPending"), false, true);
+                return;
+            }
+            if (result.id) {
+                quickSetOutput(result.output || result.message || t("waitingOutput"), false, false);
+                pollCompactOutput(item, result.id, token, 0);
+                return;
+            }
+            quickSetOutput(result.output || result.message || request.status || t("commandSent"), false, true);
         }).catch(function (error) {
-            status.textContent = t("commandFailed") + " " + (error.message || String(error));
-            status.classList.add("is-error");
+            quickSetOutput(t("commandFailed") + " " + (error.message || String(error)), true, true);
         }).then(function () { button.disabled = false; });
     }
 
@@ -1277,29 +1399,62 @@
         if (!categories.some(function (category) { return category.key === quickCommands.category; })) quickCommands.category = categories[0] && categories[0].key || "";
         var selectedCategory = categories.find(function (category) { return category.key === quickCommands.category; });
         var query = String(quickCommands.search || "").toLowerCase();
-        var items = (selectedCategory && selectedCategory.items || []).filter(function (item) { return !query || (item.label + " " + item.description).toLowerCase().indexOf(query) >= 0; });
-        panel.innerHTML = '<header><strong>' + esc(t("quickCommands")) + '</strong><button type="button" data-quick-command-close="1" title="' + esc(t("close")) + '">×</button></header><input class="sirk-quick-command-search" type="search" placeholder="' + esc(t("searchCommands")) + '" value="' + esc(quickCommands.search) + '"><div class="sirk-quick-command-browser"><nav>' + categories.map(function (category) { return '<button type="button" data-quick-command-category="' + esc(category.key) + '" class="' + (category.key === quickCommands.category ?"is-active" : "") + '">' + esc(category.label) + '</button>'; }).join("") + '</nav><section>' + (items.length ? items.map(function (item, index) { return '<button type="button" data-quick-command-item="' + index + '"><strong>' + esc(item.label) + '</strong>' + (item.description ? '<small>' + esc(item.description) + '</small>' : '') + '</button>'; }).join("") : '<p>' + esc(t("noCommands")) + '</p>') + '</section></div><div class="sirk-quick-command-run"></div><div class="sirk-quick-command-status" aria-live="polite"></div>';
+        var items = (selectedCategory && selectedCategory.items || []).filter(function (item) {
+            if (quickCommands.favoritesOnly && !quickIsFavorite(item)) return false;
+            return !query || (item.label + " " + item.description).toLowerCase().indexOf(query) >= 0;
+        });
+        var selectedKey = quickItemKey(quickCommands.selected);
+        if (selectedKey && !items.some(function (item) { return quickItemKey(item) === selectedKey; })) quickCommands.selected = null;
+        var browserClass = "sirk-quick-command-browser sirk-command-layout" + (quickCommands.collapsed ? " is-collapsed" : "") + (quickCommands.detailsCollapsed ? " is-details-collapsed" : "");
+        panel.innerHTML = '<header class="sirk-command-toolbar"><div class="sirk-command-toolbar-left">' +
+            '<button type="button" class="sirk-command-icon-button" data-quick-command-collapse title="' + esc(quickCommands.collapsed ? t("expandCategories") : t("collapseCategories")) + '">' + quickIcon(quickCommands.collapsed ? "expand" : "collapse") + '</button>' +
+            '<button type="button" class="sirk-command-icon-button' + (quickCommands.favoritesOnly ? " is-active" : "") + '" data-quick-command-favorites title="' + esc(t("favorites")) + '">' + quickIcon("star") + '</button>' +
+            '<button type="button" class="sirk-command-icon-button' + (quickCommands.detailsCollapsed ? "" : " is-active") + (quickCommands.outputAttention ? " has-attention" : "") + '" data-quick-command-details title="' + esc(quickCommands.detailsCollapsed ? t("showOutput") : t("hideOutput")) + '">' + quickIcon("details") + '</button>' +
+            '<label class="sirk-command-search">' + quickIcon("search") + '<input class="sirk-quick-command-search" type="search" placeholder="' + esc(t("searchCommands")) + '" value="' + esc(quickCommands.search) + '"></label></div>' +
+            '<div class="sirk-command-toolbar-right"><button type="button" class="sirk-command-icon-button" data-quick-command-refresh title="' + esc(t("refresh")) + '">' + quickIcon("refresh") + '</button>' +
+            '<button type="button" class="sirk-command-icon-button" data-quick-command-close title="' + esc(t("close")) + '">' + quickIcon("close") + '</button></div></header>' +
+            '<div class="' + browserClass + '"><nav class="sirk-command-primary">' + categories.map(function (category) {
+                return '<button type="button" data-quick-command-category="' + esc(category.key) + '" class="' + (category.key === quickCommands.category ? "is-active" : "") + '"><strong>' + esc(category.label) + '</strong></button>';
+            }).join("") + '</nav><section class="sirk-command-secondary">' + (items.length ? items.map(function (item, index) {
+                return '<button type="button" data-quick-command-item="' + index + '" class="' + (quickItemKey(item) === selectedKey ? "is-active" : "") + '">' + (quickIsFavorite(item) ? '<i class="sirk-command-favorite-mark">★</i>' : '') + '<span><strong>' + esc(item.label) + '</strong>' + (item.description ? '<small>' + esc(item.description) + '</small>' : '') + '</span></button>';
+            }).join("") : '<p class="sirk-command-details-empty">' + esc(quickCommands.favoritesOnly ? t("noFavoriteCommands") : t("noCommands")) + '</p>') + '</section>' +
+            '<section class="sirk-quick-command-details sirk-command-details"><div class="sirk-quick-command-run"><p class="sirk-command-details-empty">' + esc(t("selectCommand")) + '</p></div><pre class="sirk-quick-command-status" aria-live="polite"></pre></section></div>';
         panel.__items = items;
+        if (quickCommands.selected) selectCompactCommand(quickCommands.selected, true);
+        else quickSetOutput(quickCommands.output, quickCommands.outputError, false);
     }
 
-    function selectCompactCommand(item) {
-        var runHost = document.querySelector("#sirkQuickCommandsPanel .sirk-quick-command-run");
-        var status = document.querySelector("#sirkQuickCommandsPanel .sirk-quick-command-status");
-        if (!runHost || !status) return;
+    function selectCompactCommand(item, preserveOutput) {
+        var panel = document.getElementById("sirkQuickCommandsPanel");
+        var runHost = panel && panel.querySelector(".sirk-quick-command-run");
+        if (!runHost) return;
+        quickCommands.selected = item;
+        if (!preserveOutput) {
+            quickCommands.output = "";
+            quickCommands.outputError = false;
+            quickCommands.outputAttention = false;
+        }
+        Array.prototype.forEach.call(panel.querySelectorAll("[data-quick-command-item]"), function (button) {
+            var index = Number(button.getAttribute("data-quick-command-item"));
+            button.classList.toggle("is-active", panel.__items && quickItemKey(panel.__items[index]) === quickItemKey(item));
+        });
         function show(value) {
+            if (quickItemKey(value) !== quickItemKey(quickCommands.selected)) return;
+            quickCommands.selected = value;
             runHost.innerHTML = "";
             var heading = document.createElement("h3"); heading.textContent = value.label; runHost.appendChild(heading);
             if (value.description) { var description = document.createElement("p"); description.textContent = value.description; runHost.appendChild(description); }
             var collect = compactVariableForm(runHost, value);
             var run = document.createElement("button"); run.type = "button"; run.className = "sirk-quick-command-submit"; run.textContent = value.requiresApproval ? t("requestCommand") : t("runCommand");
-            run.addEventListener("click", function () { submitCompactCommand(value, collect(), run, status); });
+            run.addEventListener("click", function () { submitCompactCommand(value, collect(), run); });
             runHost.appendChild(run);
+            quickSetOutput(quickCommands.output, quickCommands.outputError, false);
         }
         if (item.kind !== "script") { show(item); return; }
         core.api("commands", "script", null, { path: item.path }).then(function (response) {
             var script = response.script || item;
             show({ kind: "script", path: script.path, label: localized(script, "label") || script.label || script.name, description: localized(script, "description") || script.description || "", variables: script.variables || [], requiresApproval: script.requiresApproval === true, confirmExecution: script.confirmExecution === true });
-        }).catch(function (error) { status.textContent = error.message || String(error); status.classList.add("is-error"); });
+        }).catch(function (error) { quickSetOutput(error.message || String(error), true, true); });
     }
 
     function renderTab(node, type) {
@@ -1389,9 +1544,42 @@
             if (quickToggle) quickToggle.setAttribute("aria-expanded", "false");
             return;
         }
+        var quickCollapse = event.target && event.target.closest && event.target.closest("[data-quick-command-collapse]");
+        if (quickCollapse) {
+            quickCommands.collapsed = !quickCommands.collapsed;
+            quickWriteBoolean("sirkPortal.quickCommands.categoriesCollapsed", quickCommands.collapsed);
+            renderCompactCommands();
+            return;
+        }
+        var quickFavorites = event.target && event.target.closest && event.target.closest("[data-quick-command-favorites]");
+        if (quickFavorites) {
+            quickCommands.favoritesOnly = !quickCommands.favoritesOnly;
+            quickCommands.selected = null;
+            renderCompactCommands();
+            return;
+        }
+        var quickDetails = event.target && event.target.closest && event.target.closest("[data-quick-command-details]");
+        if (quickDetails) {
+            quickCommands.detailsCollapsed = !quickCommands.detailsCollapsed;
+            if (!quickCommands.detailsCollapsed) quickCommands.outputAttention = false;
+            quickWriteBoolean("sirkPortal.quickCommands.detailsCollapsed", quickCommands.detailsCollapsed);
+            renderCompactCommands();
+            return;
+        }
+        var quickRefresh = event.target && event.target.closest && event.target.closest("[data-quick-command-refresh]");
+        if (quickRefresh) {
+            quickRefresh.disabled = true;
+            loadCompactCommands(true).then(renderCompactCommands).catch(function (error) {
+                quickSetOutput(error.message || String(error), true, true);
+            }).then(function () { quickRefresh.disabled = false; });
+            return;
+        }
         var quickCategory = event.target && event.target.closest && event.target.closest("[data-quick-command-category]");
         if (quickCategory) {
             quickCommands.category = quickCategory.getAttribute("data-quick-command-category") || "";
+            quickCommands.selected = null;
+            quickCommands.output = "";
+            quickCommands.outputAttention = false;
             renderCompactCommands();
             return;
         }
@@ -1399,7 +1587,7 @@
         if (quickItem) {
             var panel = document.getElementById("sirkQuickCommandsPanel");
             var index = Number(quickItem.getAttribute("data-quick-command-item"));
-            if (panel && panel.__items && panel.__items[index]) selectCompactCommand(panel.__items[index]);
+            if (panel && panel.__items && panel.__items[index]) selectCompactCommand(panel.__items[index], false);
         }
     }, true);
 

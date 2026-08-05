@@ -1,0 +1,365 @@
+/* Canonical Commands and Quick Commands workspace.
+   Both command surfaces intentionally share this single stylesheet. */
+
+#sirkPortalRoot .sirk-device-commands-host,
+#sirkPortalRoot .sirk-quick-commands-panel{
+    --sirk-command-primary:205px;
+    --sirk-command-secondary:340px;
+    --sirk-command-details:300px;
+    --sirk-command-collapsed:64px;
+    --sirk-command-border:var(--sirk-border,#dce3ec);
+    --sirk-command-panel:var(--sirk-panel,#fff);
+    --sirk-command-text:var(--sirk-text,#172033);
+    --sirk-command-muted:var(--sirk-muted,#64748b);
+    --sirk-command-hover:var(--sirk-hover,#eef3f9);
+    --sirk-command-accent:#3867d6;
+    color:var(--sirk-command-text);
+}
+
+#sirkPortalRoot .sirk-device-commands-host{
+    min-width:0;
+    height:100%;
+}
+
+#sirkPortalRoot .sirk-device-commands-host .sirk-view-shell{
+    display:grid;
+    grid-template-rows:auto minmax(0,1fr);
+    min-height:520px;
+    height:calc(100vh - 235px);
+    overflow:hidden;
+    border:1px solid var(--sirk-command-border);
+    border-radius:9px;
+    background:var(--sirk-command-panel);
+}
+
+#sirkPortalRoot .sirk-device-commands-host .sirk-tabs-host:empty{display:none}
+
+#sirkPortalRoot .sirk-device-commands-host .sirk-layout-host,
+#sirkPortalRoot .sirk-quick-command-browser{
+    display:grid;
+    grid-template-columns:minmax(165px,var(--sirk-command-primary)) minmax(285px,var(--sirk-command-secondary)) minmax(240px,1fr);
+    min-width:0;
+    min-height:0;
+    height:100%;
+    overflow:hidden;
+    background:var(--sirk-command-panel);
+}
+
+#sirkPortalRoot .sirk-device-commands-host .sirk-layout-host.is-collapsed,
+#sirkPortalRoot .sirk-quick-command-browser.is-collapsed{
+    grid-template-columns:var(--sirk-command-collapsed) minmax(285px,var(--sirk-command-secondary)) minmax(240px,1fr);
+}
+
+#sirkPortalRoot .sirk-quick-command-browser.is-details-collapsed{
+    grid-template-columns:minmax(165px,var(--sirk-command-primary)) minmax(285px,var(--sirk-command-secondary)) 0;
+}
+
+#sirkPortalRoot .sirk-quick-command-browser.is-collapsed.is-details-collapsed{
+    grid-template-columns:var(--sirk-command-collapsed) minmax(285px,var(--sirk-command-secondary)) 0;
+}
+
+#sirkPortalRoot .sirk-device-commands-host :is(.sirk-column-primary,.sirk-column-secondary,.sirk-column-details),
+#sirkPortalRoot .sirk-quick-command-browser :is(.sirk-command-primary,.sirk-command-secondary,.sirk-command-details){
+    min-width:0;
+    min-height:0;
+    overflow:auto;
+    padding:10px 8px;
+    box-sizing:border-box;
+    background:var(--sirk-command-panel);
+}
+
+#sirkPortalRoot .sirk-device-commands-host :is(.sirk-column-primary,.sirk-column-secondary),
+#sirkPortalRoot .sirk-quick-command-browser :is(.sirk-command-primary,.sirk-command-secondary){
+    border-right:1px solid var(--sirk-command-border);
+}
+
+#sirkPortalRoot .sirk-device-commands-host .sirk-layout-host.is-collapsed .sirk-column-primary,
+#sirkPortalRoot .sirk-quick-command-browser.is-collapsed .sirk-command-primary{
+    padding:8px 5px;
+}
+
+#sirkPortalRoot .sirk-quick-command-browser.is-details-collapsed .sirk-command-details{
+    display:none;
+}
+
+#sirkPortalRoot .sirk-device-commands-host :is(.sirk-nav-item,.sirk-tree-folder-header,.sirk-tree-script),
+#sirkPortalRoot .sirk-quick-command-browser :is([data-quick-command-category],[data-quick-command-item]){
+    display:flex;
+    align-items:center;
+    gap:8px;
+    width:100%;
+    min-width:0;
+    min-height:38px;
+    margin:0 0 3px;
+    padding:8px 9px;
+    border:1px solid transparent;
+    border-radius:7px;
+    background:transparent;
+    color:inherit;
+    text-align:left;
+    cursor:pointer;
+    box-sizing:border-box;
+}
+
+#sirkPortalRoot .sirk-device-commands-host :is(.sirk-nav-item,.sirk-tree-folder-header,.sirk-tree-script):hover,
+#sirkPortalRoot .sirk-quick-command-browser :is([data-quick-command-category],[data-quick-command-item]):hover{
+    background:var(--sirk-command-hover);
+}
+
+#sirkPortalRoot .sirk-device-commands-host :is(.sirk-nav-item,.sirk-tree-script).active,
+#sirkPortalRoot .sirk-quick-command-browser :is([data-quick-command-category],[data-quick-command-item]).is-active{
+    border-color:#9bbcff;
+    background:#edf3ff;
+    color:#214fbd;
+    box-shadow:inset 3px 0 0 var(--sirk-command-accent);
+}
+
+#sirkPortalRoot .sirk-device-commands-host :is(.sirk-tree-label,.sirk-nav-item span),
+#sirkPortalRoot .sirk-quick-command-browser :is([data-quick-command-category],[data-quick-command-item]) strong{
+    min-width:0;
+    overflow-wrap:anywhere;
+    white-space:normal;
+    line-height:1.25;
+}
+
+#sirkPortalRoot .sirk-quick-command-browser [data-quick-command-item]{align-items:flex-start}
+#sirkPortalRoot .sirk-quick-command-browser [data-quick-command-item] > span{display:grid;gap:3px;min-width:0;flex:1 1 auto}
+#sirkPortalRoot .sirk-quick-command-browser [data-quick-command-item] small{
+    display:block;
+    color:var(--sirk-command-muted);
+    font-size:12px;
+    line-height:1.3;
+    overflow-wrap:anywhere;
+}
+#sirkPortalRoot .sirk-command-favorite-mark{flex:0 0 auto;color:#d69e00;font-size:15px;line-height:1}
+
+#sirkPortalRoot .sirk-command-toolbar,
+#sirkPortalRoot .sirk-device-commands-host .sirk-toolbar-host{
+    display:flex;
+    align-items:center;
+    gap:7px;
+    min-height:50px;
+    padding:7px 10px;
+    border-bottom:1px solid var(--sirk-command-border);
+    background:var(--sirk-command-panel);
+    box-sizing:border-box;
+}
+
+#sirkPortalRoot .sirk-command-toolbar-left,
+#sirkPortalRoot .sirk-command-toolbar-right{
+    display:flex;
+    align-items:center;
+    gap:6px;
+    min-width:0;
+    flex-wrap:nowrap;
+}
+#sirkPortalRoot .sirk-command-toolbar-left{flex:1 1 auto}
+#sirkPortalRoot .sirk-command-toolbar-right{flex:0 0 auto;margin-left:auto}
+
+#sirkPortalRoot .sirk-command-icon-button,
+#sirkPortalRoot .sirk-device-commands-host .sirk-toolbar-button{
+    appearance:none;
+    display:inline-grid;
+    place-items:center;
+    width:36px;
+    min-width:36px;
+    height:36px;
+    min-height:36px;
+    padding:0;
+    border:1px solid var(--sirk-command-border);
+    border-radius:8px;
+    background:var(--sirk-command-panel);
+    color:var(--sirk-command-text);
+    box-shadow:none;
+    cursor:pointer;
+    line-height:1;
+}
+
+#sirkPortalRoot .sirk-command-icon-button:hover,
+#sirkPortalRoot .sirk-command-icon-button.is-active,
+#sirkPortalRoot .sirk-device-commands-host .sirk-toolbar-button:hover,
+#sirkPortalRoot .sirk-device-commands-host .sirk-toolbar-button.is-active{
+    border-color:#75a7ff;
+    background:#edf3ff;
+    color:#214fbd;
+}
+
+#sirkPortalRoot .sirk-command-icon-button.has-attention{
+    border-color:#e8a3a3;
+    background:#fff0f0;
+    color:#b42318;
+}
+
+#sirkPortalRoot .sirk-command-icon-button svg,
+#sirkPortalRoot .sirk-device-commands-host .sirk-toolbar-button svg{
+    display:block;
+    width:20px;
+    height:20px;
+    fill:none;
+    stroke:currentColor;
+    stroke-width:1.8;
+    stroke-linecap:round;
+    stroke-linejoin:round;
+    overflow:visible;
+}
+
+#sirkPortalRoot .sirk-command-search{
+    display:flex;
+    align-items:center;
+    gap:7px;
+    flex:1 1 150px;
+    min-width:80px;
+    max-width:320px;
+    height:36px;
+    padding:0 9px;
+    border:1px solid var(--sirk-command-border);
+    border-radius:8px;
+    background:var(--sirk-command-panel);
+    box-sizing:border-box;
+}
+#sirkPortalRoot .sirk-command-search:focus-within{border-color:#75a7ff;box-shadow:0 0 0 2px rgba(56,103,214,.12)}
+#sirkPortalRoot .sirk-command-search svg{width:17px;height:17px;flex:0 0 17px;fill:none;stroke:currentColor;stroke-width:1.8}
+#sirkPortalRoot .sirk-command-search input{
+    width:100%;
+    min-width:0;
+    height:32px;
+    padding:0;
+    border:0;
+    outline:0;
+    background:transparent;
+    color:inherit;
+    font:inherit;
+}
+
+#sirkPortalRoot .sirk-quick-commands-toggle{
+    position:absolute;
+    z-index:24;
+    top:8px;
+    right:8px;
+    display:inline-flex;
+    align-items:center;
+    gap:7px;
+    width:auto;
+    min-width:0;
+    padding:0 11px;
+    font-size:13px;
+    font-weight:700;
+}
+#sirkPortalRoot .sirk-quick-commands-toggle svg{width:18px;height:18px}
+
+#sirkPortalRoot .sirk-agent-desktop{position:relative}
+#sirkPortalRoot .sirk-quick-commands-panel{
+    position:absolute;
+    z-index:23;
+    top:52px;
+    right:8px;
+    bottom:8px;
+    display:grid;
+    grid-template-rows:auto minmax(0,1fr);
+    width:min(845px,calc(100% - 16px));
+    min-width:0;
+    min-height:320px;
+    overflow:hidden;
+    border:1px solid var(--sirk-command-border);
+    border-radius:10px;
+    background:var(--sirk-command-panel);
+    box-shadow:0 18px 44px rgba(15,23,42,.24);
+}
+#sirkPortalRoot .sirk-quick-commands-panel[hidden]{display:none}
+#sirkPortalRoot .sirk-quick-commands-panel:has(.sirk-quick-command-browser.is-collapsed){width:min(704px,calc(100% - 16px))}
+#sirkPortalRoot .sirk-quick-commands-panel:has(.sirk-quick-command-browser.is-details-collapsed){width:min(545px,calc(100% - 16px))}
+#sirkPortalRoot .sirk-quick-commands-panel:has(.sirk-quick-command-browser.is-collapsed.is-details-collapsed){width:min(404px,calc(100% - 16px))}
+
+#sirkPortalRoot .sirk-command-details,
+#sirkPortalRoot .sirk-device-commands-host .sirk-column-details{
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+}
+#sirkPortalRoot .sirk-command-details-empty{margin:auto;color:var(--sirk-command-muted);text-align:center;line-height:1.45}
+#sirkPortalRoot .sirk-quick-command-run{display:flex;flex-direction:column;gap:9px;flex:0 0 auto}
+#sirkPortalRoot .sirk-quick-command-run h3{margin:0;font-size:17px;line-height:1.3;overflow-wrap:anywhere}
+#sirkPortalRoot .sirk-quick-command-run p{margin:0;color:var(--sirk-command-muted);line-height:1.4;overflow-wrap:anywhere}
+#sirkPortalRoot .sirk-quick-command-field{display:grid;gap:5px;margin:0}
+#sirkPortalRoot .sirk-quick-command-field > span{font-size:12px;font-weight:700;color:var(--sirk-command-muted)}
+#sirkPortalRoot .sirk-quick-command-field :is(input,select),
+#sirkPortalRoot .sirk-device-commands-host :is(input,select,textarea){
+    width:100%;
+    min-width:0;
+    min-height:36px;
+    padding:7px 9px;
+    border:1px solid var(--sirk-command-border);
+    border-radius:7px;
+    background:var(--sirk-command-panel);
+    color:inherit;
+    box-sizing:border-box;
+}
+#sirkPortalRoot .sirk-quick-command-submit{
+    min-height:38px;
+    padding:8px 13px;
+    border:1px solid #2d5fc8;
+    border-radius:7px;
+    background:#3867d6;
+    color:#fff;
+    font-weight:700;
+    cursor:pointer;
+}
+#sirkPortalRoot .sirk-quick-command-submit:disabled{opacity:.55;cursor:wait}
+#sirkPortalRoot .sirk-quick-command-status{
+    display:block;
+    flex:1 1 auto;
+    min-height:72px;
+    max-width:none;
+    margin:0;
+    padding:10px;
+    overflow:auto;
+    border:1px solid var(--sirk-command-border);
+    border-radius:7px;
+    background:rgba(100,116,139,.07);
+    color:inherit;
+    white-space:pre-wrap;
+    overflow-wrap:anywhere;
+    font:12px/1.45 Consolas,"Cascadia Mono",monospace;
+}
+#sirkPortalRoot .sirk-quick-command-status:empty{display:none}
+#sirkPortalRoot .sirk-quick-command-status.is-error{color:#b42318;border-color:#efb4b4;background:#fff4f4}
+#sirkPortalRoot .sirk-command-loading,
+#sirkPortalRoot .sirk-command-error{padding:20px;text-align:center;color:var(--sirk-command-muted)}
+#sirkPortalRoot .sirk-command-error{color:#b42318}
+
+@media(max-width:1100px){
+    #sirkPortalRoot .sirk-device-commands-host .sirk-layout-host,
+    #sirkPortalRoot .sirk-quick-command-browser{
+        grid-template-columns:minmax(145px,185px) minmax(250px,320px) minmax(220px,1fr);
+    }
+    #sirkPortalRoot .sirk-quick-commands-panel{width:min(765px,calc(100% - 16px))}
+    #sirkPortalRoot .sirk-quick-commands-panel:has(.sirk-quick-command-browser.is-collapsed){width:min(644px,calc(100% - 16px))}
+    #sirkPortalRoot .sirk-quick-commands-panel:has(.sirk-quick-command-browser.is-details-collapsed){width:min(485px,calc(100% - 16px))}
+    #sirkPortalRoot .sirk-quick-commands-panel:has(.sirk-quick-command-browser.is-collapsed.is-details-collapsed){width:min(364px,calc(100% - 16px))}
+}
+
+@media(max-width:760px){
+    #sirkPortalRoot .sirk-quick-commands-panel{top:48px;left:6px;right:6px;bottom:6px;width:auto!important}
+    #sirkPortalRoot .sirk-quick-command-browser,
+    #sirkPortalRoot .sirk-quick-command-browser.is-collapsed,
+    #sirkPortalRoot .sirk-quick-command-browser.is-details-collapsed,
+    #sirkPortalRoot .sirk-quick-command-browser.is-collapsed.is-details-collapsed{
+        grid-template-columns:110px minmax(0,1fr);
+        grid-template-rows:minmax(180px,1fr) minmax(160px,.8fr);
+    }
+    #sirkPortalRoot .sirk-quick-command-browser .sirk-command-details{grid-column:1 / -1;display:flex}
+    #sirkPortalRoot .sirk-quick-command-browser.is-details-collapsed .sirk-command-details{display:none}
+    #sirkPortalRoot .sirk-command-toolbar{padding:6px;gap:4px}
+    #sirkPortalRoot .sirk-command-toolbar-left,#sirkPortalRoot .sirk-command-toolbar-right{gap:3px}
+    #sirkPortalRoot .sirk-command-icon-button{width:34px;min-width:34px;height:34px;min-height:34px}
+    #sirkPortalRoot .sirk-command-search{max-width:none}
+    #sirkPortalRoot .sirk-quick-commands-toggle span{display:none}
+    #sirkPortalRoot .sirk-quick-commands-toggle{width:36px;padding:0;justify-content:center}
+    #sirkPortalRoot .sirk-device-commands-host .sirk-view-shell{height:auto;min-height:560px}
+    #sirkPortalRoot .sirk-device-commands-host .sirk-layout-host,
+    #sirkPortalRoot .sirk-device-commands-host .sirk-layout-host.is-collapsed{
+        grid-template-columns:110px minmax(0,1fr);
+        grid-template-rows:minmax(220px,1fr) minmax(220px,1fr);
+    }
+    #sirkPortalRoot .sirk-device-commands-host .sirk-column-details{grid-column:1 / -1}
+}
