@@ -250,7 +250,13 @@ else {
     $trustCertificateValue = $trustAnswer -notin @('n','nie','no')
 }
 
-$workRoot = Join-Path $env:TEMP ('SIRK-Portal-DotNet10-' + [guid]::NewGuid().ToString('N'))
+$commonDataRoot = [Environment]::GetFolderPath([Environment+SpecialFolder]::CommonApplicationData)
+if ([string]::IsNullOrWhiteSpace($commonDataRoot)) {
+    throw 'Nie można ustalić systemowego katalogu ProgramData.'
+}
+$installerWorkBase = Join-Path $commonDataRoot 'SIRK\Temp'
+New-Item -ItemType Directory -Path $installerWorkBase -Force | Out-Null
+$workRoot = Join-Path $installerWorkBase ('Portal-' + [guid]::NewGuid().ToString('N'))
 $sourceZip = Join-Path $workRoot 'source.zip'
 $sourceExtract = Join-Path $workRoot 'source'
 $publishRoot = Join-Path $workRoot 'publish'

@@ -16,6 +16,14 @@ $env:SIRK_INSTALL_FQDN = $Fqdn
 $env:SIRK_INSTALL_BREAKGLASS_PASSWORD = $Password
 $env:SIRK_INSTALL_TRUST_CERTIFICATE = 'true'
 
+$originalTemp = $env:TEMP
+$originalTmp = $env:TMP
+$longTempName = 'SIRK-CI-' + ('LongTempSegment0123456789-' * 5)
+$longTemp = Join-Path $env:SystemDrive $longTempName
+New-Item -ItemType Directory -Path $longTemp -Force | Out-Null
+$env:TEMP = $longTemp
+$env:TMP = $longTemp
+
 function Remove-TestService([string]$Name) {
     $service = Get-Service $Name -ErrorAction SilentlyContinue
     if (-not $service) { return }
@@ -208,6 +216,9 @@ catch {
     throw
 }
 finally {
+    $env:TEMP = $originalTemp
+    $env:TMP = $originalTmp
+    Remove-Item -LiteralPath $longTemp -Recurse -Force -ErrorAction SilentlyContinue
     Remove-TestService SirkPortal
     Remove-TestService SirkUpdater
     Remove-NetFirewallRule -DisplayName 'SIRK Portal HTTPS' -ErrorAction SilentlyContinue

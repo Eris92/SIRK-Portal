@@ -21,7 +21,13 @@ Set-StrictMode -Version Latest
 $env:DOTNET_CLI_TELEMETRY_OPTOUT = '1'
 $env:DOTNET_NOLOGO = '1'
 
-$workRoot = Join-Path $env:TEMP ('SIRK-Portal-Bootstrap-' + [guid]::NewGuid().ToString('N'))
+$commonDataRoot = [Environment]::GetFolderPath([Environment+SpecialFolder]::CommonApplicationData)
+if ([string]::IsNullOrWhiteSpace($commonDataRoot)) {
+    throw 'Nie można ustalić systemowego katalogu ProgramData.'
+}
+$installerWorkBase = Join-Path $commonDataRoot 'SIRK\Temp'
+New-Item -ItemType Directory -Path $installerWorkBase -Force | Out-Null
+$workRoot = Join-Path $installerWorkBase ('Bootstrap-' + [guid]::NewGuid().ToString('N'))
 $sourceZip = Join-Path $workRoot 'source.zip'
 $extractRoot = Join-Path $workRoot 'source'
 
