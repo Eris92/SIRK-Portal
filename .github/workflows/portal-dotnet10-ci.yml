@@ -82,4 +82,6 @@ jobs:
         run: dotnet run --project tests/Sirk.Portal.ProtocolTests/Sirk.Portal.ProtocolTests.csproj --configuration Release
       - name: Install and verify from zero
         shell: powershell
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: .\.github\scripts\Test-NodeFreeWindowsInstall.ps1 -Branch '${{ github.head_ref || github.ref_name }}'
