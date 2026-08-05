@@ -35,6 +35,9 @@ internal static class CanonicalAgentManagementV1Contract
                 signer.Contains("IDataProtector", StringComparison.Ordinal) &&
                 signer.Contains("IeeeP1363FixedFieldConcatenation", StringComparison.Ordinal),
             "Protected ES256 policy signer is incomplete.");
+        Require(endpoints.Contains("policySigner.Sign(", StringComparison.Ordinal) &&
+                endpoints.Contains("trustedPolicyKeys = new[] { policySigner.TrustedKey() }", StringComparison.Ordinal),
+            "Authenticated Agent check-in does not deliver the signed policy and trust anchor.");
         Require(workspace.Contains("OPERATION_NOT_ALLOWED", StringComparison.Ordinal) &&
                 workspace.Contains("/api/v1/admin/agent-policies", StringComparison.Ordinal),
             "Desktop workspace does not surface or remediate policy rejection.");
