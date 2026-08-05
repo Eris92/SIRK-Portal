@@ -103,7 +103,7 @@ if text.count(old_enrollment) != 1:
     raise RuntimeError(f'legacy module enrollment block: expected one occurrence, found {text.count(old_enrollment)}')
 text = text.replace(old_enrollment, '', 1)
 
-if '/api/v1/agent/enroll' in text or 'enrollmentToken' in text:
+if '/api/v1/agent/enroll' in text or 'credentials["source"]' in text:
     raise RuntimeError('modules smoke still performs Agent enrollment')
 
 path.write_text(text, encoding='utf-8', newline='\n')
