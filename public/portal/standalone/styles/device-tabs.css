@@ -31,7 +31,7 @@ html.sirk-device-connection-mode #sirkPortalRoot .sirk-device-tab-menu-toggle{di
 .sirk-device-tab-menu button:hover,.sirk-device-tab-menu button:focus-visible{background:var(--sirk-hover,#eef3f9);outline:none}
 .sirk-device-tab-menu button.is-active{background:rgba(59,130,246,.13);color:#2563eb}
 html.sirk-device-focus-mode #sirkPortalRoot .sirk-standalone-header,
-html.sirk-device-connection-mode #sirkPortalRoot .sirk-standalone-header{flex:0 0 48px!important;min-height:48px!important;height:48px!important;padding:2px 22px!important;box-sizing:border-box!important}
+html.sirk-device-connection-mode #sirkPortalRoot .sirk-standalone-header{flex:0 0 50px!important;min-height:50px!important;height:50px!important;padding:2px 22px!important;box-sizing:border-box!important}
 html.sirk-device-focus-mode #sirkPortalRoot .sirk-standalone-content,
 html.sirk-device-connection-mode #sirkPortalRoot .sirk-standalone-content{padding:0!important;margin:0!important}
 #sirkPortalRoot .sirk-standalone-header.is-devices-view #sirkStandaloneTitle{display:none!important}
