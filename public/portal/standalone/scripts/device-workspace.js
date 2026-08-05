@@ -309,7 +309,7 @@
 
     function renderAgentDesktop(host, node) {
         var stopped = false;
-        host.innerHTML = '<div class="sirk-agent-operation sirk-agent-desktop"><header><strong>Pulpit SIRK Agent Live</strong><small>Natychmiastowa pomoc zdalna w wybranej sesji użytkownika</small></header><div class="sirk-agent-desktop-controls"><label>Sesja<select data-agent-desktop-session disabled></select></label><label>Monitor<select data-agent-desktop-monitor disabled><option value="-1">Wszystkie monitory</option></select></label><label>Profil<select data-agent-desktop-profile><option value="auto">Auto</option><option value="smooth">Płynny GUI 120 Hz</option><option value="text">Ostry tekst</option><option value="video">Wideo H.264</option><option value="weak">Słabe łącze</option><option value="minimum">Minimalny transfer</option></select></label><button type="button" data-agent-desktop-connect>Połącz</button><button type="button" data-agent-desktop-disconnect disabled>Rozłącz</button></div><div class="sirk-agent-desktop-stats" data-agent-desktop-stats><span>FPS <b data-stat-fps>0</b></span><span>latencja p50/p95 <b data-stat-latency>—</b></span><span>input dispatch <b data-stat-input>—</b></span><span>capture/encode/session/decode/render <b data-stat-pipeline>—</b></span><span>bitrate <b data-stat-bitrate>0</b></span><span>delta <b data-stat-delta>—</b></span><span>łącze <b data-stat-link>pomiar…</b></span><span>backend <b data-stat-backend>—</b></span></div><div class="sirk-agent-desktop-admin"><strong>Pulpit administracyjny</strong><select data-agent-admin-tool><option value="powershell">PowerShell SYSTEM</option><option value="computer-management">Zarządzanie komputerem</option><option value="services">Usługi</option><option value="registry">Edytor rejestru</option><option value="task-manager">Menedżer zadań</option><option value="event-viewer">Podgląd zdarzeń</option><option value="device-manager">Menedżer urządzeń</option></select><button type="button" data-agent-admin-start disabled>Uruchom w sesji użytkownika</button></div><div class="sirk-agent-desktop-stage" style="position:relative"><canvas data-agent-desktop-image aria-label="Zdalny pulpit" tabindex="0"></canvas><span data-agent-desktop-cursor style="position:absolute;width:12px;height:12px;border:2px solid #fff;border-radius:50%;background:#111;box-shadow:0 0 0 1px #111;pointer-events:none;transform:translate(-2px,-2px)"></span></div><div class="sirk-agent-desktop-input"><input data-agent-desktop-text placeholder="Tekst do aktywnego okna"><button type="button" data-agent-desktop-send>Wyślij tekst</button><select data-agent-desktop-key><option>Enter</option><option>Tab</option><option>Escape</option><option>Backspace</option><option>Delete</option><option>Up</option><option>Down</option><option>Left</option><option>Right</option><option>Home</option><option>End</option><option>PageUp</option><option>PageDown</option><option>F5</option></select><button type="button" data-agent-desktop-key-send>Klawisz</button></div><div class="sirk-agent-desktop-clipboard"><textarea data-agent-desktop-clipboard placeholder="Schowek wybranej sesji"></textarea><button type="button" data-agent-desktop-clipboard-get>Pobierz schowek</button><button type="button" data-agent-desktop-clipboard-set>Ustaw schowek</button></div><div class="sirk-agent-policy-action" data-agent-policy-action hidden><button type="button" data-agent-policy-enable>Włącz zdalny pulpit dla urządzenia</button></div><pre data-agent-operation-status>Gotowy do natychmiastowego połączenia.</pre></div>';
+        host.innerHTML = '<div class="sirk-agent-operation sirk-agent-desktop"><header><strong>Pulpit SIRK Agent Live</strong><small>Natychmiastowa pomoc zdalna w wybranej sesji użytkownika</small></header><div class="sirk-agent-desktop-controls"><label>Sesja<select data-agent-desktop-session disabled></select></label><label>Monitor<select data-agent-desktop-monitor disabled><option value="-1">Wszystkie monitory</option></select></label><label>Profil<select data-agent-desktop-profile><option value="auto">Auto</option><option value="smooth">Płynny GUI 120 Hz</option><option value="text">Ostry tekst</option><option value="video">Wideo H.264</option><option value="weak">Słabe łącze</option><option value="minimum">Minimalny transfer</option></select></label><button type="button" data-agent-desktop-connect>Połącz</button><button type="button" data-agent-desktop-disconnect disabled>Rozłącz</button></div><div class="sirk-agent-desktop-stats" data-agent-desktop-stats><span>FPS <b data-stat-fps>0</b></span><span>latencja p50/p95 <b data-stat-latency>—</b></span><span>input dispatch <b data-stat-input>—</b></span><span>capture/encode/session/decode/render <b data-stat-pipeline>—</b></span><span>bitrate <b data-stat-bitrate>0</b></span><span>delta <b data-stat-delta>—</b></span><span>łącze <b data-stat-link>pomiar…</b></span><span>backend <b data-stat-backend>—</b></span></div><div class="sirk-agent-desktop-admin"><strong>Pulpit administracyjny</strong><select data-agent-admin-tool><option value="powershell">PowerShell SYSTEM</option><option value="computer-management">Zarządzanie komputerem</option><option value="services">Usługi</option><option value="registry">Edytor rejestru</option><option value="task-manager">Menedżer zadań</option><option value="event-viewer">Podgląd zdarzeń</option><option value="device-manager">Menedżer urządzeń</option></select><button type="button" data-agent-admin-start disabled>Uruchom w sesji użytkownika</button></div><div class="sirk-agent-desktop-stage" style="position:relative;display:flex;justify-content:center;align-items:center;overflow:hidden;min-height:240px"><canvas data-agent-desktop-image aria-label="Zdalny pulpit" tabindex="0" style="display:block;max-width:100%;max-height:calc(100vh - 360px);width:auto;height:auto;margin:0 auto;touch-action:none"></canvas><span data-agent-desktop-cursor style="position:absolute;width:12px;height:12px;border:2px solid #fff;border-radius:50%;background:#111;box-shadow:0 0 0 1px #111;pointer-events:none;transform:translate(-2px,-2px)"></span></div><div class="sirk-agent-desktop-input"><input data-agent-desktop-text placeholder="Tekst do aktywnego okna"><button type="button" data-agent-desktop-send>Wyślij tekst</button><select data-agent-desktop-key><option>Enter</option><option>Tab</option><option>Escape</option><option>Backspace</option><option>Delete</option><option>Up</option><option>Down</option><option>Left</option><option>Right</option><option>Home</option><option>End</option><option>PageUp</option><option>PageDown</option><option>F5</option></select><button type="button" data-agent-desktop-key-send>Klawisz</button></div><div class="sirk-agent-desktop-clipboard"><textarea data-agent-desktop-clipboard placeholder="Schowek wybranej sesji"></textarea><button type="button" data-agent-desktop-clipboard-get>Pobierz schowek</button><button type="button" data-agent-desktop-clipboard-set>Ustaw schowek</button></div><div class="sirk-agent-policy-action" data-agent-policy-action hidden><button type="button" data-agent-policy-enable>Włącz zdalny pulpit dla urządzenia</button></div><pre data-agent-operation-status>Gotowy do natychmiastowego połączenia.</pre></div>';
         var image = host.querySelector("[data-agent-desktop-image]");
         var imageContext = image.getContext("2d", { alpha: false, desynchronized: true });
         var moveCanvas = document.createElement("canvas");
@@ -354,6 +354,16 @@
         function setStreamStatus(message) {
             if (status.textContent !== message) status.textContent = message;
             if (status.classList.contains("is-error")) status.classList.remove("is-error");
+        }
+        function positionLocalCursor(x, y, desktopWidth, desktopHeight) {
+            if (!desktopWidth || !desktopHeight || !image.parentElement) return;
+            var stageBounds = image.parentElement.getBoundingClientRect();
+            var imageBounds = image.getBoundingClientRect();
+            localCursor.style.display = "";
+            localCursor.style.left = (imageBounds.left - stageBounds.left +
+                Number(x || 0) / desktopWidth * imageBounds.width) + "px";
+            localCursor.style.top = (imageBounds.top - stageBounds.top +
+                Number(y || 0) / desktopHeight * imageBounds.height) + "px";
         }
         function updateStats(data, frameMs, decodeMs, renderMs) {
             frameTimes.push(frameMs); if (frameTimes.length > 120) frameTimes.shift();
@@ -635,9 +645,7 @@
                         Number(patch.width || desktopWidth), Number(patch.height || desktopHeight));
                 });
                 if (data.fullFrame === true) hasCompleteFrame = true;
-                localCursor.style.display = "";
-                localCursor.style.left = (Number(data.cursorX || 0) / desktopWidth * 100) + "%";
-                localCursor.style.top = (Number(data.cursorY || 0) / desktopHeight * 100) + "%";
+                positionLocalCursor(data.cursorX, data.cursorY, desktopWidth, desktopHeight);
                 decoded.close();
                 var capturedAt = Number(data.capturedAtUnixMilliseconds || 0);
                 updateStats(data, capturedAt > 0 ? Math.max(0, Date.now() - capturedAt) :
@@ -681,9 +689,7 @@
                 if (data.cursorOnly === true) {
                     sourceWidth = Number(data.sourceWidth || sourceWidth || data.width || 1);
                     sourceHeight = Number(data.sourceHeight || sourceHeight || data.height || 1);
-                    localCursor.style.display = "";
-                    localCursor.style.left = (Number(data.cursorX || 0) / sourceWidth * 100) + "%";
-                    localCursor.style.top = (Number(data.cursorY || 0) / sourceHeight * 100) + "%";
+                    positionLocalCursor(data.cursorX, data.cursorY, sourceWidth, sourceHeight);
                     return;
                 }
                 if (data.contentType === "image/jpeg") {
@@ -751,10 +757,11 @@
                     snapshot(generation);
                     return;
                 }
-                nativeWidth = Number(data.width || 0);
-                nativeHeight = Number(data.height || 0);
-                sourceWidth = Number(data.sourceWidth || nativeWidth);
-                sourceHeight = Number(data.sourceHeight || nativeHeight);
+                var jpegFrame = value.contentType.indexOf("image/jpeg") === 0;
+                sourceWidth = Number(data.sourceWidth || data.width || 0);
+                sourceHeight = Number(data.sourceHeight || data.height || 0);
+                nativeWidth = jpegFrame ? sourceWidth : Number(data.width || sourceWidth);
+                nativeHeight = jpegFrame ? sourceHeight : Number(data.height || sourceHeight);
                 var decodeStarted = performance.now();
                 if (value.contentType.indexOf("video/h264") === 0 && "VideoDecoder" in window)
                     return decodeH264Frame(value, generation, requestStarted, true);
@@ -786,16 +793,20 @@
                             Number(patch.width || nativeWidth), Number(patch.height || nativeHeight));
                     });
                     if (data.fullFrame === true) hasCompleteFrame = true;
-                    localCursor.style.display = "";
-                    localCursor.style.left = (Number(data.cursorX || 0) / nativeWidth * 100) + "%";
-                    localCursor.style.top = (Number(data.cursorY || 0) / nativeHeight * 100) + "%";
+                    positionLocalCursor(data.cursorX, data.cursorY, sourceWidth, sourceHeight);
                     decoded.close();
                     var capturedAt = Number(data.capturedAtUnixMilliseconds || 0);
                     var frameMs = capturedAt > 0 ? Math.max(0, Date.now() - capturedAt) :
                         performance.now() - requestStarted;
                     updateStats(data, frameMs, renderStarted - decodeStarted,
                         performance.now() - renderStarted);
-                    setStreamStatus("Połączono · tunel Central HTTP · " + nativeWidth + " × " + nativeHeight + " · profil " + profile.options[profile.selectedIndex].text);
+                    var frameDescription = jpegFrame
+                        ? sourceWidth + " × " + sourceHeight + " · atlas " +
+                            Number(data.width || 0) + " × " + Number(data.height || 0)
+                        : sourceWidth + " × " + sourceHeight + " → " +
+                            nativeWidth + " × " + nativeHeight;
+                    setStreamStatus("Połączono · tunel Central HTTP · " + frameDescription +
+                        " · profil " + profile.options[profile.selectedIndex].text);
                     setTimeout(function () { snapshot(generation); }, 0);
                 });
             }).catch(function (error) {
@@ -832,9 +843,8 @@
                                 imageContext.drawImage(decoded, 0, 0, nativeWidth, nativeHeight);
                                 var renderMilliseconds = performance.now() - renderStarted;
                                 hasCompleteFrame = true;
-                                localCursor.style.display = "";
-                                localCursor.style.left = (Number(frameData.cursorX || 0) / sourceWidth * 100) + "%";
-                                localCursor.style.top = (Number(frameData.cursorY || 0) / sourceHeight * 100) + "%";
+                                positionLocalCursor(frameData.cursorX, frameData.cursorY,
+                                    sourceWidth, sourceHeight);
                                 var capturedAt = Number(frameData.capturedAtUnixMilliseconds || 0);
                                 var inputAt = Number(metadata.requestStarted || requestStarted);
                                 updateStats(frameData, capturedAt ? Math.max(0, Date.now() - capturedAt) :
@@ -888,9 +898,7 @@
         image.addEventListener("pointermove", function (event) {
             var now = Date.now(); if (now - lastMouseMoveAt < 8) return;
             var point = coordinates(event); if (!point) return; lastMouseMoveAt = now;
-            localCursor.style.display = "";
-            localCursor.style.left = (point.x / sourceWidth * 100) + "%";
-            localCursor.style.top = (point.y / sourceHeight * 100) + "%";
+            positionLocalCursor(point.x, point.y, sourceWidth, sourceHeight);
             input({ action: "move", x: point.x, y: point.y }).catch(function () {});
         });
         image.addEventListener("wheel", function (event) {
