@@ -309,7 +309,7 @@
 
     function renderAgentDesktop(host, node) {
         var stopped = false;
-        host.innerHTML = '<div class="sirk-agent-operation sirk-agent-desktop"><header><strong>Pulpit SIRK Agent Live</strong><small>Natychmiastowa pomoc zdalna w wybranej sesji użytkownika</small></header><div class="sirk-agent-desktop-controls"><label>Sesja<select data-agent-desktop-session disabled></select></label><label>Monitor<select data-agent-desktop-monitor disabled><option value="-1">Wszystkie monitory</option></select></label><label>Profil<select data-agent-desktop-profile><option value="auto">Auto</option><option value="smooth">Płynny GUI 120 Hz</option><option value="text">Ostry tekst</option><option value="video">Wideo H.264</option><option value="weak">Słabe łącze</option><option value="minimum">Minimalny transfer</option></select></label><button type="button" data-agent-desktop-connect>Połącz</button><button type="button" data-agent-desktop-disconnect disabled>Rozłącz</button></div><div class="sirk-agent-desktop-stats" data-agent-desktop-stats><span>FPS <b data-stat-fps>0</b></span><span>latencja p50/p95 <b data-stat-latency>—</b></span><span>input dispatch <b data-stat-input>—</b></span><span>capture/encode/session/decode/render <b data-stat-pipeline>—</b></span><span>bitrate <b data-stat-bitrate>0</b></span><span>delta <b data-stat-delta>—</b></span><span>łącze <b data-stat-link>pomiar…</b></span><span>backend <b data-stat-backend>—</b></span></div><div class="sirk-agent-desktop-admin"><strong>Pulpit administracyjny</strong><select data-agent-admin-tool><option value="powershell">PowerShell SYSTEM</option><option value="computer-management">Zarządzanie komputerem</option><option value="services">Usługi</option><option value="registry">Edytor rejestru</option><option value="task-manager">Menedżer zadań</option><option value="event-viewer">Podgląd zdarzeń</option><option value="device-manager">Menedżer urządzeń</option></select><button type="button" data-agent-admin-start disabled>Uruchom w sesji użytkownika</button></div><div class="sirk-agent-desktop-stage" style="position:relative"><canvas data-agent-desktop-image aria-label="Zdalny pulpit" tabindex="0"></canvas><span data-agent-desktop-cursor style="position:absolute;width:12px;height:12px;border:2px solid #fff;border-radius:50%;background:#111;box-shadow:0 0 0 1px #111;pointer-events:none;transform:translate(-2px,-2px)"></span></div><div class="sirk-agent-desktop-input"><input data-agent-desktop-text placeholder="Tekst do aktywnego okna"><button type="button" data-agent-desktop-send>Wyślij tekst</button><select data-agent-desktop-key><option>Enter</option><option>Tab</option><option>Escape</option><option>Backspace</option><option>Delete</option><option>Up</option><option>Down</option><option>Left</option><option>Right</option><option>Home</option><option>End</option><option>PageUp</option><option>PageDown</option><option>F5</option></select><button type="button" data-agent-desktop-key-send>Klawisz</button></div><div class="sirk-agent-desktop-clipboard"><textarea data-agent-desktop-clipboard placeholder="Schowek wybranej sesji"></textarea><button type="button" data-agent-desktop-clipboard-get>Pobierz schowek</button><button type="button" data-agent-desktop-clipboard-set>Ustaw schowek</button></div><pre data-agent-operation-status>Gotowy do natychmiastowego połączenia.</pre></div>';
+        host.innerHTML = '<div class="sirk-agent-operation sirk-agent-desktop"><header><strong>Pulpit SIRK Agent Live</strong><small>Natychmiastowa pomoc zdalna w wybranej sesji użytkownika</small></header><div class="sirk-agent-desktop-controls"><label>Sesja<select data-agent-desktop-session disabled></select></label><label>Monitor<select data-agent-desktop-monitor disabled><option value="-1">Wszystkie monitory</option></select></label><label>Profil<select data-agent-desktop-profile><option value="auto">Auto</option><option value="smooth">Płynny GUI 120 Hz</option><option value="text">Ostry tekst</option><option value="video">Wideo H.264</option><option value="weak">Słabe łącze</option><option value="minimum">Minimalny transfer</option></select></label><button type="button" data-agent-desktop-connect>Połącz</button><button type="button" data-agent-desktop-disconnect disabled>Rozłącz</button></div><div class="sirk-agent-desktop-stats" data-agent-desktop-stats><span>FPS <b data-stat-fps>0</b></span><span>latencja p50/p95 <b data-stat-latency>—</b></span><span>input dispatch <b data-stat-input>—</b></span><span>capture/encode/session/decode/render <b data-stat-pipeline>—</b></span><span>bitrate <b data-stat-bitrate>0</b></span><span>delta <b data-stat-delta>—</b></span><span>łącze <b data-stat-link>pomiar…</b></span><span>backend <b data-stat-backend>—</b></span></div><div class="sirk-agent-desktop-admin"><strong>Pulpit administracyjny</strong><select data-agent-admin-tool><option value="powershell">PowerShell SYSTEM</option><option value="computer-management">Zarządzanie komputerem</option><option value="services">Usługi</option><option value="registry">Edytor rejestru</option><option value="task-manager">Menedżer zadań</option><option value="event-viewer">Podgląd zdarzeń</option><option value="device-manager">Menedżer urządzeń</option></select><button type="button" data-agent-admin-start disabled>Uruchom w sesji użytkownika</button></div><div class="sirk-agent-desktop-stage" style="position:relative"><canvas data-agent-desktop-image aria-label="Zdalny pulpit" tabindex="0"></canvas><span data-agent-desktop-cursor style="position:absolute;width:12px;height:12px;border:2px solid #fff;border-radius:50%;background:#111;box-shadow:0 0 0 1px #111;pointer-events:none;transform:translate(-2px,-2px)"></span></div><div class="sirk-agent-desktop-input"><input data-agent-desktop-text placeholder="Tekst do aktywnego okna"><button type="button" data-agent-desktop-send>Wyślij tekst</button><select data-agent-desktop-key><option>Enter</option><option>Tab</option><option>Escape</option><option>Backspace</option><option>Delete</option><option>Up</option><option>Down</option><option>Left</option><option>Right</option><option>Home</option><option>End</option><option>PageUp</option><option>PageDown</option><option>F5</option></select><button type="button" data-agent-desktop-key-send>Klawisz</button></div><div class="sirk-agent-desktop-clipboard"><textarea data-agent-desktop-clipboard placeholder="Schowek wybranej sesji"></textarea><button type="button" data-agent-desktop-clipboard-get>Pobierz schowek</button><button type="button" data-agent-desktop-clipboard-set>Ustaw schowek</button></div><div class="sirk-agent-policy-action" data-agent-policy-action hidden><button type="button" data-agent-policy-enable>Włącz zdalny pulpit dla urządzenia</button></div><pre data-agent-operation-status>Gotowy do natychmiastowego połączenia.</pre></div>';
         var image = host.querySelector("[data-agent-desktop-image]");
         var imageContext = image.getContext("2d", { alpha: false, desynchronized: true });
         var moveCanvas = document.createElement("canvas");
@@ -326,6 +326,8 @@
         var disconnectButton = host.querySelector("[data-agent-desktop-disconnect]");
         var adminTool = host.querySelector("[data-agent-admin-tool]");
         var adminStart = host.querySelector("[data-agent-admin-start]");
+        var policyAction = host.querySelector("[data-agent-policy-action]");
+        var policyEnable = host.querySelector("[data-agent-policy-enable]");
         var nativeWidth = 0, nativeHeight = 0, sourceWidth = 0, sourceHeight = 0;
         var streamGeneration = 0, connected = false;
         var inputSequence = 0, pendingInput = new Map();
@@ -477,7 +479,15 @@
         }
         function loadSessions() {
             return runAgentOperation(node, "desktop.sessions", {}, status).then(function (value) {
-                var sessions = value.result && value.result.data || [];
+                var result = value.result || {};
+                if (value.status === "failed") {
+                    var code = String(result.code || "");
+                    var message = String(result.output || code || "Agent odrzucił pobranie sesji.");
+                    policyAction.hidden = code !== "OPERATION_NOT_ALLOWED";
+                    throw new Error(message);
+                }
+                policyAction.hidden = true;
+                var sessions = result.data || [];
                 session.innerHTML = "";
                 sessions.forEach(function (item) {
                     var option = document.createElement("option");
@@ -485,10 +495,45 @@
                     option.textContent = "Sesja " + item.sessionId + (item.active ? " · aktywna" : "");
                     session.appendChild(option);
                 });
-                if (!sessions.length) throw new Error("Brak aktywnego brokera sesji użytkownika.");
+                if (!sessions.length) throw new Error("Agent nie zgłosił aktywnej sesji użytkownika.");
                 return loadMonitors();
             });
         }
+        policyEnable.addEventListener("click", function () {
+            var runtime = window.SirkPlatformRuntime && window.SirkPlatformRuntime.state;
+            var csrfToken = runtime && runtime.bootstrap && runtime.bootstrap.csrfToken || "";
+            policyEnable.disabled = true;
+            status.textContent = "Zapisywanie podpisanej polityki zdalnego pulpitu…";
+            status.classList.remove("is-error");
+            fetch(portalHttpUrl("/api/v1/admin/agent-policies"), {
+                method: "PUT",
+                credentials: "same-origin",
+                headers: { "Content-Type": "application/json", "X-SIRK-CSRF": csrfToken },
+                body: JSON.stringify({
+                    scopeType: "device",
+                    scopeId: node.deviceId,
+                    policy: { remoteDesktopEnabled: true }
+                })
+            }).then(function (response) {
+                return response.json().then(function (value) {
+                    if (!response.ok || value.ok === false)
+                        throw new Error(value.error || value.title || "Nie udało się zapisać polityki.");
+                    return value;
+                });
+            }).then(function () {
+                status.textContent = "Polityka zapisana. Oczekiwanie na podpisany check-in Agenta…";
+                policyAction.hidden = true;
+                setTimeout(function retryPolicy() {
+                    loadSessions().catch(function (error) {
+                        status.textContent = error.message || String(error);
+                        status.classList.add("is-error");
+                    });
+                }, 3000);
+            }).catch(function (error) {
+                status.textContent = error.message || String(error);
+                status.classList.add("is-error");
+            }).then(function () { policyEnable.disabled = false; });
+        });
         function restartStream() {
             if (!connected) return;
             streamGeneration += 1;

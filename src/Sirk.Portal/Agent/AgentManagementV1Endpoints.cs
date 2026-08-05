@@ -7,14 +7,14 @@ using Sirk.Portal.Security;
 
 namespace Sirk.Portal.Agent;
 
-internal sealed record LegacyAgentEnrollmentRequest(
+internal sealed record AgentV1EnrollmentRequest(
     int ProtocolVersion,
     string TenantId,
     string DeviceId,
     string MachineName,
     string PublicKeySpki);
 
-internal sealed record LegacyAgentCheckInRequest(
+internal sealed record AgentV1CheckInRequest(
     int ProtocolVersion,
     string TenantId,
     string DeviceId,
@@ -35,23 +35,23 @@ internal sealed record LegacyAgentCheckInRequest(
     JsonElement? PortalStatus,
     JsonElement? TelemetryQueue,
     IReadOnlyList<string>? AcknowledgedPolicyIds,
-    IReadOnlyList<LegacyAgentCommandResult>? CommandResults,
+    IReadOnlyList<AgentV1CommandResult>? CommandResults,
     int? WaitMilliseconds,
     IReadOnlyList<JsonElement>? Events);
 
-internal sealed record LegacyAgentCommandResult(
+internal sealed record AgentV1CommandResult(
     string CommandId,
     bool Ok,
     string? Code,
     string? Output,
     JsonElement? Data);
 
-internal sealed record LegacyDesktopControlRequest(
+internal sealed record AgentV1DesktopControlRequest(
     string TenantId,
     string DeviceId,
     int? WaitMilliseconds);
 
-internal static class LegacyAgentCompatibilityEndpoints
+internal static class AgentManagementV1Endpoints
 {
     private const int MaximumBodyBytes = 4 * 1024 * 1024;
     private static readonly TimeSpan MaximumClockSkew = TimeSpan.FromMinutes(2);
@@ -59,19 +59,19 @@ internal static class LegacyAgentCompatibilityEndpoints
     private static long _lastNonceCleanup;
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
-    public static IEndpointRouteBuilder MapLegacyAgentCompatibility(
+    public static IEndpointRouteBuilder MapAgentManagementV1(
         this IEndpointRouteBuilder endpoints)
     {
-        endpoints.MapPost("/api/agent/v1/enroll", EnrollAsync)
+        endpoints.MapPost("/api/v1/agent/enroll", EnrollAsync)
             .AllowAnonymous()
             .DisableAntiforgery();
-        endpoints.MapPost("/api/agent/v1/checkin", CheckInAsync)
+        endpoints.MapPost("/api/v1/agent/checkin", CheckInAsync)
             .AllowAnonymous()
             .DisableAntiforgery();
-        endpoints.MapGet("/api/agent/v1/desktop/stream", LegacyDesktopStreamAsync)
+        endpoints.MapGet("/api/v1/agent/desktop/stream", AgentDesktopStreamAsync)
             .AllowAnonymous()
             .DisableAntiforgery();
-        endpoints.MapPost("/api/agent/v1/desktop/control", LegacyDesktopControlAsync)
+        endpoints.MapPost("/api/v1/agent/desktop/control", AgentDesktopControlAsync)
             .AllowAnonymous()
             .DisableAntiforgery();
         return endpoints;
@@ -80,7 +80,8 @@ internal static class LegacyAgentCompatibilityEndpoints
     private static async Task<IResult> EnrollAsync(
         HttpContext context,
         AgentStore agents,
-        PortalAuditLog audit)
+        PortalAuditLog audit,
+        AgentPolicySigner policySigner)
     {
         try
         {
@@ -100,7 +101,7 @@ internal static class LegacyAgentCompatibilityEndpoints
             var groupId = compoundToken[..separator].Trim().ToLowerInvariant();
             var enrollmentToken = compoundToken[(separator + 1)..].Trim();
             var body = await ReadBodyAsync(context.Request, MaximumBodyBytes, context.RequestAborted);
-            var request = Deserialize<LegacyAgentEnrollmentRequest>(body);
+            var request = Deserialize<AgentV1EnrollmentRequest>(body);
             if (request.ProtocolVersion != 1)
                 throw new InvalidDataException("Unsupported Agent enrollment protocol version.");
 
@@ -145,9 +146,9 @@ internal static class LegacyAgentCompatibilityEndpoints
                     tenantId = issued.Device.TenantId,
                     deviceId = issued.Device.Id,
                     deviceToken = issued.DeviceToken,
-                    checkInEndpoint = "/api/agent/v1/checkin",
+                    checkInEndpoint = "/api/v1/agent/checkin",
                     enrolledAtUtc = issued.Device.EnrolledAtUtc,
-                    trustedPolicyKeys = Array.Empty<object>()
+                    trustedPolicyKeys = new[] { policySigner.TrustedKey() }
                 },
                 statusCode: StatusCodes.Status201Created);
         }
@@ -169,13 +170,15 @@ internal static class LegacyAgentCompatibilityEndpoints
     private static async Task<IResult> CheckInAsync(
         HttpContext context,
         AgentStore agents,
-        AgentCommandStore commands)
+        AgentCommandStore commands,
+        AgentPolicyStore policies,
+        AgentPolicySigner policySigner)
     {
         var body = await ReadBodyAsync(context.Request, MaximumBodyBytes, context.RequestAborted);
-        LegacyAgentCheckInRequest request;
+        AgentV1CheckInRequest request;
         try
         {
-            request = Deserialize<LegacyAgentCheckInRequest>(body);
+            request = Deserialize<AgentV1CheckInRequest>(body);
         }
         catch (Exception exception) when (exception is InvalidDataException or JsonException)
         {
@@ -222,7 +225,7 @@ internal static class LegacyAgentCompatibilityEndpoints
             {
                 try
                 {
-                    var legacyResult = JsonSerializer.SerializeToElement(new
+                    var canonicalResult = JsonSerializer.SerializeToElement(new
                     {
                         ok = result.Ok,
                         code = result.Code ?? string.Empty,
@@ -234,7 +237,7 @@ internal static class LegacyAgentCompatibilityEndpoints
                         new AgentCommandResultRequest(
                             result.CommandId,
                             result.Ok,
-                            legacyResult,
+                            canonicalResult,
                             result.Ok
                                 ? null
                                 : NormalizeError(result.Code, result.Output)));
@@ -248,8 +251,8 @@ internal static class LegacyAgentCompatibilityEndpoints
             var delivered = new List<object>();
             foreach (var command in commands.Poll(device.Id, 8))
             {
-                var legacyType = LegacyCommandType(command.Type);
-                if (legacyType is null)
+                var canonicalType = AgentCommandType(command.Type);
+                if (canonicalType is null)
                 {
                     commands.Complete(
                         device.Id,
@@ -264,17 +267,30 @@ internal static class LegacyAgentCompatibilityEndpoints
                 delivered.Add(new
                 {
                     commandId = command.Id,
-                    type = legacyType,
+                    type = canonicalType,
                     parameters = command.Parameters,
                     command.CreatedAtUtc,
                     command.ExpiresAtUtc
                 });
             }
 
+            var effective = policies.EffectiveForDelivery(device);
+            var deliveredPolicies = Array.Empty<JsonElement>();
+            if (effective is not null)
+            {
+                var signed = policySigner.Sign(
+                    device.TenantId, device.Id, effective.Revision, effective.Policy);
+                if (!(request.AcknowledgedPolicyIds ?? []).Contains(
+                        signed.PolicyId, StringComparer.Ordinal))
+                    deliveredPolicies = [signed.Envelope];
+            }
+
             return Results.Ok(new
             {
                 ok = true,
-                policies = Array.Empty<object>(),
+                protocolVersion = 1,
+                trustedPolicyKeys = new[] { policySigner.TrustedKey() },
+                policies = deliveredPolicies,
                 commands = delivered
             });
         }
@@ -286,7 +302,7 @@ internal static class LegacyAgentCompatibilityEndpoints
     }
 
 
-    private static async Task LegacyDesktopStreamAsync(
+    private static async Task AgentDesktopStreamAsync(
         HttpContext context,
         AgentStore agents,
         DesktopRelayHub desktop)
@@ -311,14 +327,14 @@ internal static class LegacyAgentCompatibilityEndpoints
         await desktop.AttachAgentAsync(device.Id, socket, context.RequestAborted);
     }
 
-    private static async Task<IResult> LegacyDesktopControlAsync(
+    private static async Task<IResult> AgentDesktopControlAsync(
         HttpContext context,
         AgentStore agents,
         DesktopRelayHub desktop)
     {
         var body = await ReadBodyAsync(context.Request, 64 * 1024, context.RequestAborted);
-        LegacyDesktopControlRequest request;
-        try { request = Deserialize<LegacyDesktopControlRequest>(body); }
+        AgentV1DesktopControlRequest request;
+        try { request = Deserialize<AgentV1DesktopControlRequest>(body); }
         catch (Exception exception) when (exception is InvalidDataException or JsonException)
         {
             return PortalAuthenticationEndpoints.Error(400, "DESKTOP_CONTROL_INVALID", exception.Message);
@@ -437,7 +453,7 @@ internal static class LegacyAgentCompatibilityEndpoints
             throw new InvalidDataException("Agent public key must use ECDSA P-256.");
     }
 
-    private static string? LegacyCommandType(string type) => type switch
+    private static string? AgentCommandType(string type) => type switch
     {
         "script.run" => "terminal.execute",
         "terminal.execute" => "terminal.execute",

@@ -68,49 +68,10 @@ internal sealed class AgentInstallerTicketMiddleware(
 
         if (context.Request.Path.Equals("/api/v1/agent/enroll"))
         {
-            await InvokeCanonicalAsync(context);
-            return;
-        }
-
-        if (context.Request.Path.Equals("/api/agent/v1/enroll"))
-        {
             await InvokeSignedAgentV1Async(context);
             return;
         }
 
-        await next(context);
-    }
-
-    private async Task InvokeCanonicalAsync(HttpContext context)
-    {
-        context.Request.EnableBuffering(64 * 1024, 256 * 1024);
-        AgentEnrollmentRequest? request = null;
-        try
-        {
-            request = await JsonSerializer.DeserializeAsync<AgentEnrollmentRequest>(
-                context.Request.Body,
-                JsonOptions,
-                context.RequestAborted);
-        }
-        catch (JsonException)
-        {
-            // The canonical enrollment endpoint returns the final structured error.
-        }
-        finally
-        {
-            context.Request.Body.Position = 0;
-        }
-
-        if (request is null ||
-            !tickets.TryConsume(request.GroupId, request.EnrollmentToken))
-        {
-            await next(context);
-            return;
-        }
-
-        using var validation = AgentInstallerTicketValidationScope.Enter(
-            request.GroupId,
-            request.EnrollmentToken);
         await next(context);
     }
 

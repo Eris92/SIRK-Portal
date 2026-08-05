@@ -14,6 +14,7 @@ internal sealed class PortalPaths
         AgentInstallerTicketsFile = Path.Combine(DataRoot, "agent-installer-tickets.json");
         AgentCommandsFile = Path.Combine(DataRoot, "agent-commands.json");
         PoliciesFile = Path.Combine(DataRoot, "agent-policies.json");
+        AgentPolicySigningKeyFile = Path.Combine(DataRoot, "agent-policy-signing-key.json");
         AuditFile = Path.Combine(DataRoot, "audit.jsonl");
 
         FilesDirectory = Path.Combine(DataRoot, "Files");
@@ -37,6 +38,7 @@ internal sealed class PortalPaths
     public string AgentInstallerTicketsFile { get; }
     public string AgentCommandsFile { get; }
     public string PoliciesFile { get; }
+    public string AgentPolicySigningKeyFile { get; }
     public string AuditFile { get; }
     public string FilesDirectory { get; }
     public string CommandsDirectory { get; }
