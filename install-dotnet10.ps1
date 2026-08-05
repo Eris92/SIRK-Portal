@@ -146,6 +146,30 @@ function Install-DotNet10Component {
     }
 }
 
+function Ensure-PortalEventLogSource {
+    param([string]$SourceName = 'Sirk.Portal')
+
+    try {
+        if ([System.Diagnostics.EventLog]::SourceExists($SourceName)) {
+            $registeredLog = [System.Diagnostics.EventLog]::LogNameFromSourceName($SourceName, '.')
+            if (-not [string]::Equals($registeredLog, 'Application', [StringComparison]::OrdinalIgnoreCase)) {
+                throw "Źródło zdarzeń $SourceName jest przypisane do dziennika $registeredLog zamiast Application."
+            }
+            Write-Host "Źródło Windows Event Log $SourceName jest już zarejestrowane." -ForegroundColor DarkGreen
+            return
+        }
+
+        [System.Diagnostics.EventLog]::CreateEventSource($SourceName, 'Application')
+        if (-not [System.Diagnostics.EventLog]::SourceExists($SourceName)) {
+            throw "Źródło zdarzeń $SourceName nie zostało utworzone."
+        }
+        Write-Host "Zarejestrowano źródło Windows Event Log: $SourceName" -ForegroundColor DarkGreen
+    }
+    catch {
+        throw "Nie można przygotować źródła Windows Event Log $SourceName. $($_.Exception.Message)"
+    }
+}
+
 function Test-IsolatedDotNetSdk {
     param(
         [Parameter(Mandatory)][string]$DotNetRoot,
@@ -477,6 +501,7 @@ try {
     & icacls.exe $productionSettings /inheritance:r /grant:r 'SYSTEM:F' 'Administrators:F' | Out-Null
 
     Write-Step 'Rejestracja usługi Windows'
+    Ensure-PortalEventLogSource -SourceName 'Sirk.Portal'
     $installedExe = Join-Path $InstallRoot 'Sirk.Portal.exe'
     $binaryPath = '"' + $installedExe + '"'
     New-Service -Name $serviceName -BinaryPathName $binaryPath -DisplayName 'SIRK Portal' -StartupType Automatic | Out-Null
