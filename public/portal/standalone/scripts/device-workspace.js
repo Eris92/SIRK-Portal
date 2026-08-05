@@ -97,8 +97,11 @@
     }
 
     function getInventory() {
-        if (inventory) return Promise.resolve(inventory);
-        return fetch("/api/devices", { credentials: "same-origin", cache: "no-store" }).then(function (response) { return response.json().then(function (value) { if (!response.ok || value.ok === false) throw new Error(value.error || "Device inventory unavailable."); return value.value || value; }); }).then(function (value) {
+        var apiBase = new URL(String(window.__SIRK_PLATFORM_API_BASE__ || ""), window.location.href);
+        var request = apiBase.pathname.replace(/\/+$/, "") === "/api"
+            ? fetch("/api/devices", { credentials: "same-origin", cache: "no-store" }).then(function (response) { return response.json().then(function (value) { if (!response.ok || value.ok === false) throw new Error(value.error || "Device inventory unavailable."); return value.value || value; }); })
+            : core.api("portal", "devices");
+        return Promise.resolve(request).then(function (value) {
             inventory = {
                 nodes: Array.isArray(value && value.nodes) ? value.nodes : [],
                 groups: Array.isArray(value && value.groups) ? value.groups : []
