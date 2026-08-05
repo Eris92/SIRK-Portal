@@ -153,6 +153,24 @@ def signed_headers(key_path: Path, body: bytes, root: Path, token: str):
     }
 
 
+def system_text_json_canonical(value: object) -> bytes:
+    # Portal and Agent both use Utf8JsonWriter with the default encoder.
+    # The default .NET encoder escapes HTML-sensitive Basic Latin characters,
+    # including '+' in DateTimeOffset strings, unlike Python's json module.
+    encoded = json.dumps(
+        value, sort_keys=True, separators=(",", ":"), ensure_ascii=True
+    )
+    for character, escape in (
+        ("+", "\\u002B"),
+        ("&", "\\u0026"),
+        ("'", "\\u0027"),
+        ("<", "\\u003C"),
+        (">", "\\u003E"),
+    ):
+        encoded = encoded.replace(character, escape)
+    return encoded.encode("utf-8")
+
+
 def verify_signed_policy(envelope: dict, trusted_key: dict, root: Path) -> None:
     signature = envelope.get("signature") or {}
     if signature.get("algorithm") != "ES256":
@@ -161,9 +179,7 @@ def verify_signed_policy(envelope: dict, trusted_key: dict, root: Path) -> None:
         raise RuntimeError("Signed policy key ID does not match the delivered trust anchor.")
 
     payload = {key: value for key, value in envelope.items() if key != "signature"}
-    canonical = json.dumps(
-        payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False
-    ).encode("utf-8")
+    canonical = system_text_json_canonical(payload)
     canonical_path = root / "policy-canonical.json"
     signature_path = root / "policy-signature.der"
     public_key_path = root / "policy-public.pem"
