@@ -16,6 +16,7 @@ internal static class CanonicalAgentManagementV1Contract
         Require(!program.Contains("MapLegacyAgentCompatibility", StringComparison.Ordinal),
             "Legacy Agent compatibility endpoint is still mapped.");
         Require(endpoints.Contains("/api/v1/agent/checkin", StringComparison.Ordinal) &&
+                endpoints.Contains("/api/v1/agent/rotate-key", StringComparison.Ordinal) &&
                 endpoints.Contains("/api/v1/agent/desktop/stream", StringComparison.Ordinal) &&
                 endpoints.Contains("/api/v1/agent/desktop/control", StringComparison.Ordinal),
             "Canonical Agent v1 routes are incomplete.");

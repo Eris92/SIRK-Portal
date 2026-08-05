@@ -51,6 +51,11 @@ internal sealed record AgentV1DesktopControlRequest(
     string DeviceId,
     int? WaitMilliseconds);
 
+internal sealed record AgentV1RotateKeyRequest(
+    string TenantId,
+    string DeviceId,
+    string PublicKeySpki);
+
 internal static class AgentManagementV1Endpoints
 {
     private const int MaximumBodyBytes = 4 * 1024 * 1024;
@@ -66,6 +71,9 @@ internal static class AgentManagementV1Endpoints
             .AllowAnonymous()
             .DisableAntiforgery();
         endpoints.MapPost("/api/v1/agent/checkin", CheckInAsync)
+            .AllowAnonymous()
+            .DisableAntiforgery();
+        endpoints.MapPost("/api/v1/agent/rotate-key", RotateKeyAsync)
             .AllowAnonymous()
             .DisableAntiforgery();
         endpoints.MapGet("/api/v1/agent/desktop/stream", AgentDesktopStreamAsync)
@@ -301,6 +309,64 @@ internal static class AgentManagementV1Endpoints
         }
     }
 
+
+    private static async Task<IResult> RotateKeyAsync(
+        HttpContext context,
+        AgentStore agents,
+        PortalAuditLog audit)
+    {
+        var body = await ReadBodyAsync(context.Request, 64 * 1024, context.RequestAborted);
+        AgentV1RotateKeyRequest request;
+        try
+        {
+            request = Deserialize<AgentV1RotateKeyRequest>(body);
+            ValidatePublicKey(request.PublicKeySpki);
+        }
+        catch (Exception exception) when (
+            exception is InvalidDataException or JsonException or CryptographicException)
+        {
+            return PortalAuthenticationEndpoints.Error(400, "AGENT_ROTATE_KEY_INVALID", exception.Message);
+        }
+
+        var device = agents.GetDevice(request.DeviceId);
+        if (device is not { Enabled: true } ||
+            !string.Equals(device.TenantId, request.TenantId, StringComparison.Ordinal) ||
+            !Authenticate(context.Request, body, device, agents))
+        {
+            return Unauthorized("AGENT_AUTHENTICATION_FAILED", "Agent authentication failed.");
+        }
+
+        try
+        {
+            var updated = agents.RotateDevicePublicKey(device.Id, request.PublicKeySpki);
+            audit.Write(new PortalAuditEvent(
+                updated.Id,
+                updated.Name,
+                "agent.rotate-key.v1",
+                "device",
+                updated.Id,
+                true,
+                PortalAuthenticationEndpoints.RemoteAddress(context),
+                context.TraceIdentifier,
+                new Dictionary<string, string>
+                {
+                    ["tenantId"] = updated.TenantId,
+                    ["protocol"] = "agent-v1-ecdsa"
+                }));
+            return Results.Ok(new
+            {
+                ok = true,
+                tenantId = updated.TenantId,
+                deviceId = updated.Id,
+                rotatedAtUtc = updated.UpdatedAtUtc
+            });
+        }
+        catch (Exception exception) when (
+            exception is KeyNotFoundException or UnauthorizedAccessException or InvalidDataException)
+        {
+            return PortalAuthenticationEndpoints.Error(400, "AGENT_ROTATE_KEY_FAILED", exception.Message);
+        }
+    }
 
     private static async Task AgentDesktopStreamAsync(
         HttpContext context,
