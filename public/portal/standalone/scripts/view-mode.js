@@ -31,8 +31,8 @@
         var style = document.createElement("style");
         style.id = "sirkDeviceViewModeStyle";
         style.textContent = [
-            ".sirk-device-tabs-standalone{position:relative!important;padding-right:54px!important;overflow:visible!important}",
-            ".sirk-device-view-mode{position:absolute;right:12px;top:50%;transform:translateY(-50%);z-index:2147483000}",
+            ".sirk-device-view-mode{display:none;flex:0 0 auto;margin-left:8px;z-index:2147483000}",
+            ".sirk-standalone-header.is-devices-view .sirk-device-view-mode{display:block}",
             ".sirk-device-view-mode-toggle{display:inline-flex!important;align-items:center!important;justify-content:center!important;width:32px;height:32px;padding:0!important;line-height:0!important;border:1px solid var(--sirk-border,#dce3ec);border-radius:9px;background:var(--sirk-panel,#fff);color:var(--sirk-muted,#657187);cursor:pointer;box-shadow:0 3px 10px rgba(15,23,42,.08)}",
             ".sirk-device-view-mode-toggle:hover,.sirk-device-view-mode-toggle:focus-visible,.sirk-device-view-mode-toggle.is-active{border-color:#60a5fa;color:#2563eb;outline:none}",
             ".sirk-device-view-mode-toggle svg{display:block!important;flex:0 0 auto;width:17px;height:17px;margin:0!important;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}",
@@ -86,8 +86,9 @@
     }
 
     function mountViewModeButton() {
-        var bar = document.querySelector(".sirk-device-tabs-standalone");
-        if (!bar || bar.querySelector(".sirk-device-view-mode")) return false;
+        var header = document.querySelector(".sirk-standalone-header");
+        var userMenu = header && header.querySelector("#sirkUserMenu");
+        if (!header || header.querySelector(".sirk-device-view-mode")) return false;
 
         var host = document.createElement("div");
         host.className = "sirk-device-view-mode";
@@ -223,7 +224,7 @@
         menu.appendChild(connection);
         menu.appendChild(connectionFullscreen);
         host.appendChild(toggle);
-        bar.appendChild(host);
+        header.insertBefore(host, userMenu || null);
         document.body.appendChild(menu);
         refresh();
         return true;
