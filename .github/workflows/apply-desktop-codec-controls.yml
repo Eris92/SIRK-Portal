@@ -22,7 +22,9 @@ jobs:
         with:
           dotnet-version: 10.0.x
       - name: Apply codec and quality controls
-        run: python3 .github/scripts/apply_desktop_codec_controls.py
+        run: |
+          python3 .github/scripts/apply_desktop_codec_controls.py
+          python3 .github/scripts/fix_desktop_canvas_contract_for_codecs.py
       - name: Validate JavaScript syntax
         run: node --check public/portal/standalone/scripts/device-workspace.js
       - name: Build Portal
@@ -35,6 +37,7 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add public/portal/standalone/scripts/device-workspace.js \
+                  tests/Sirk.Portal.ProtocolTests/DesktopCanvasContract.cs \
                   tests/Sirk.Portal.ProtocolTests/DesktopImageCodecUiContract.cs \
                   tests/Sirk.Portal.ProtocolTests/Program.cs
           git commit -m 'feat: add desktop codec and quality controls'
