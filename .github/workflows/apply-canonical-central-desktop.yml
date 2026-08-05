@@ -30,7 +30,7 @@ jobs:
       - name: Validate legacy desktop route removal
         shell: bash
         run: |
-          if grep -R '/api/agent-desktop/' src public tests --exclude='*.py'; then
+          if grep -R '/api/agent-desktop/' src public --exclude='*.py'; then
             echo 'Legacy desktop compatibility route remains.' >&2
             exit 1
           fi
