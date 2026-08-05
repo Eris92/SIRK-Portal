@@ -515,7 +515,14 @@
                 showMenu(state.menuKey, toggle);
             }
         });
-        window.addEventListener("sirkportal:deviceviewmodechange", scheduleSync);
+        window.addEventListener("sirkportal:deviceviewmodechange", function (event) {
+            var detail = event && event.detail || {};
+            if ((detail.focus === true || detail.connection === true) && state.active !== "all" && state.panes[state.active]) {
+                state.pendingSection[state.active] = "desktop";
+                applyPendingSection(state.active, 0);
+            }
+            scheduleSync();
+        });
         window.addEventListener("hashchange", scheduleSync);
         document.addEventListener("pointerdown", function (event) {
             if (!state.menu || state.menu.hidden) return;
