@@ -1,13 +1,25 @@
 (function () {
     "use strict";
 
-    if (window.__sirkPlatformDeviceTabsV11Loaded) return;
-    window.__sirkPlatformDeviceTabsV11Loaded = true;
+    if (window.__sirkPlatformDeviceTabsV12Loaded) return;
+    window.__sirkPlatformDeviceTabsV12Loaded = true;
 
     var STORAGE_KEY = "sirkPortal.deviceTabs";
-    var CHILD_PARAM = "sirkWorkspaceChild";
-    var NODE_PARAM = "sirkWorkspaceNode";
-    var NAME_PARAM = "sirkWorkspaceName";
+    var state = {
+        main: null,
+        content: null,
+        bar: null,
+        panes: Object.create(null),
+        active: "all",
+        restoreActive: "all",
+        restored: false,
+        restoreAttempted: false,
+        bound: false,
+        observer: null,
+        resizeObserver: null,
+        syncScheduled: false,
+        switching: false
+    };
 
     function clean(value) { return String(value || "").replace(/\s+/g, " ").trim(); }
     function safeKey(value) { return clean(value).replace(/[^a-z0-9._:-]/gi, "_").slice(0, 180); }
@@ -16,68 +28,18 @@
         catch (error) { return document.documentElement.lang === "en" ? "en" : "pl"; }
     }
     function allLabel() { return language() === "en" ? "All" : "Wszystkie"; }
-    function isChildWorkspace() {
-        try { return new URL(window.location.href).searchParams.get(CHILD_PARAM) === "1"; }
-        catch (error) { return false; }
-    }
-
-    function startChildWorkspace() {
-        var url = new URL(window.location.href);
-        var nodeId = clean(url.searchParams.get(NODE_PARAM));
-        document.documentElement.classList.add("sirk-device-workspace-child");
-        if (!nodeId) return;
-
-        var opened = false;
-        var attempts = 0;
-        function openNode() {
-            if (opened) return;
-            attempts += 1;
-            var devices = document.querySelector('.sirk-standalone-nav [data-view="devices"]');
-            if (devices && !devices.classList.contains("is-active")) {
-                try { devices.click(); } catch (error) {}
-            }
-            var rows = document.querySelectorAll("#sirkStandaloneContent [data-device-id]");
-            for (var i = 0; i < rows.length; i += 1) {
-                if (String(rows[i].getAttribute("data-device-id") || "") === nodeId) {
-                    opened = true;
-                    try { rows[i].click(); } catch (error) { opened = false; }
-                    break;
-                }
-            }
-            if (!opened && attempts < 300) window.setTimeout(openNode, 100);
-        }
-        if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", openNode, { once: true });
-        else openNode();
-    }
-
-    if (isChildWorkspace()) {
-        startChildWorkspace();
-        return;
-    }
-
-    var state = {
-        shell: null,
-        main: null,
-        content: null,
-        bar: null,
-        layer: null,
-        panes: Object.create(null),
-        active: "all",
-        restored: false,
-        restoreActive: "all",
-        bound: false,
-        observer: null,
-        resizeObserver: null,
-        viewObserver: null,
-        syncScheduled: false,
-        started: false
-    };
 
     function currentView() {
-        var active = document.querySelector('.sirk-standalone-nav button.is-active[data-view]');
+        var active = document.querySelector('.sirk-standalone-nav [data-view].is-active');
         return active ? String(active.getAttribute("data-view") || "") : "";
     }
     function devicesActive() { return currentView() === "devices"; }
+    function contentIsWorkspace() {
+        return !!(state.content && state.content.querySelector(".sirk-device-workspace"));
+    }
+    function contentIsDeviceList() {
+        return !!(state.content && state.content.querySelector("[data-device-id],#sirkDevicesHost,.sirk-device-groups"));
+    }
 
     function readPersisted() {
         try {
@@ -96,43 +58,14 @@
         } catch (error) {}
     }
 
-    function workspaceUrl(pane) {
-        var url = new URL(window.location.href);
-        url.searchParams.set(CHILD_PARAM, "1");
-        url.searchParams.set(NODE_PARAM, pane.nodeId);
-        url.searchParams.set(NAME_PARAM, pane.name);
-        url.searchParams.delete("sirkNative");
-        url.hash = "devices";
-        return url.href;
-    }
-
-    function createHostFrame(pane) {
-        var wrapper = document.createElement("div");
-        wrapper.className = "sirk-device-session-pane";
-        wrapper.setAttribute("data-device-isolated-key", pane.key);
-        wrapper.setAttribute("aria-hidden", "true");
-
-        var frame = document.createElement("iframe");
-        frame.className = "sirk-device-isolated-frame";
-        frame.title = pane.name;
-        frame.allow = "clipboard-read; clipboard-write; fullscreen";
-        frame.src = workspaceUrl(pane);
-        wrapper.appendChild(frame);
-        return wrapper;
-    }
-
-    function ensurePane(key, nodeId, name, createFrame) {
+    function ensurePane(key, nodeId, name) {
         var pane = state.panes[key];
         if (!pane) {
-            pane = { key: key, nodeId: nodeId || "", name: name || nodeId || key, element: null };
+            pane = { key: key, nodeId: nodeId || "", name: name || nodeId || key };
             state.panes[key] = pane;
         }
         if (nodeId) pane.nodeId = nodeId;
         if (name) pane.name = name;
-        if (createFrame && !pane.element && state.layer) {
-            pane.element = createHostFrame(pane);
-            state.layer.appendChild(pane.element);
-        }
         return pane;
     }
 
@@ -145,111 +78,10 @@
             var name = clean(item && item.name);
             var key = clean(item && item.key) || (nodeId ? "node:" + safeKey(nodeId) : "");
             if (!key || !nodeId) return;
-            ensurePane(key, nodeId, name || nodeId, false);
+            ensurePane(key, nodeId, name || nodeId);
         });
         state.restoreActive = state.panes[saved.active] ? saved.active : "all";
-        state.active = state.restoreActive;
-    }
-
-    function updateLayerBounds() {
-        if (!state.main || !state.content || !state.layer) return;
-        state.main.style.position = "relative";
-        state.layer.style.left = state.content.offsetLeft + "px";
-        state.layer.style.top = state.content.offsetTop + "px";
-        state.layer.style.width = state.content.offsetWidth + "px";
-        state.layer.style.height = state.content.offsetHeight + "px";
-    }
-
-    function ensureInfrastructure() {
-        var shell = document.getElementById("sirkStandaloneRoot");
-        var content = document.getElementById("sirkStandaloneContent");
-        var main = content && content.closest(".sirk-standalone-main");
-        if (!shell || !content || !main) return false;
-
-        state.shell = shell;
-        state.content = content;
-        state.main = main;
-
-        document.querySelectorAll(".sirk-standalone-sidebar .sirk-device-tabs,.sirk-standalone-nav .sirk-device-tabs").forEach(function (wrong) { wrong.remove(); });
-
-        if (!state.bar || !state.bar.isConnected) {
-            state.bar = document.createElement("div");
-            state.bar.className = "sirk-device-tabs sirk-device-tabs-standalone";
-            state.bar.setAttribute("role", "tablist");
-            main.insertBefore(state.bar, content);
-        }
-        if (!state.layer || !state.layer.isConnected) {
-            state.layer = document.createElement("div");
-            state.layer.className = "sirk-device-session-layer";
-            state.layer.setAttribute("aria-hidden", "true");
-            main.appendChild(state.layer);
-        }
-
-        restoreMetadata();
-        bind();
-        updateLayerBounds();
-        sync();
-        return true;
-    }
-
-    function contentIsDeviceList() {
-        return !!(state.content && state.content.querySelector("[data-device-id],#sirkDevicesHost,.sirk-device-groups"));
-    }
-
-    function showPane(key) {
-        if (!state.content || !state.layer) return false;
-        if (key !== "all" && !state.panes[key]) return false;
-
-        state.active = key;
-        var hostVisible = devicesActive() && key !== "all";
-
-        Object.keys(state.panes).forEach(function (paneKey) {
-            var pane = state.panes[paneKey];
-            if (!pane.element) return;
-            var active = hostVisible && paneKey === key;
-            pane.element.classList.toggle("is-active", active);
-            pane.element.setAttribute("aria-hidden", active ? "false" : "true");
-        });
-
-        state.layer.classList.toggle("is-active", hostVisible);
-        state.layer.setAttribute("aria-hidden", hostVisible ? "false" : "true");
-        state.content.style.visibility = hostVisible ? "hidden" : "";
-        state.content.style.pointerEvents = hostVisible ? "none" : "";
-
-        renderTabs();
-        persist();
-        updateLayerBounds();
-        window.dispatchEvent(new Event("resize"));
-        return true;
-    }
-
-    function activate(key) {
-        if (key === "all") {
-            showPane("all");
-            return;
-        }
-        var pane = state.panes[key];
-        if (!pane) return;
-        ensurePane(key, pane.nodeId, pane.name, true);
-        showPane(key);
-    }
-
-    function activateAll() { activate("all"); }
-
-    function closeTab(key) {
-        if (!state.panes[key]) return;
-        var pane = state.panes[key];
-        var wasActive = state.active === key;
-        if (pane.element) {
-            pane.element.querySelectorAll("iframe").forEach(function (frame) { frame.src = "about:blank"; });
-            pane.element.remove();
-        }
-        delete state.panes[key];
-        if (wasActive) showPane("all");
-        else {
-            renderTabs();
-            persist();
-        }
+        state.active = "all";
     }
 
     function renderTabs() {
@@ -290,10 +122,103 @@
         });
     }
 
+    function markActive(key) {
+        state.active = key && state.panes[key] ? key : "all";
+        renderTabs();
+        persist();
+    }
+
+    function findRow(nodeId) {
+        if (!state.content) return null;
+        var rows = state.content.querySelectorAll("[data-device-id]");
+        for (var index = 0; index < rows.length; index += 1) {
+            if (clean(rows[index].getAttribute("data-device-id")) === clean(nodeId)) return rows[index];
+        }
+        return null;
+    }
+
+    function activateAll() {
+        markActive("all");
+        if (state.content) state.content.removeAttribute("data-sirk-active-device-id");
+        var back = state.content && state.content.querySelector("[data-device-back]");
+        if (back) {
+            try { back.click(); } catch (error) {}
+            scheduleSync();
+            return;
+        }
+        var devices = document.querySelector('.sirk-standalone-nav [data-view="devices"]');
+        if (devices && !contentIsDeviceList()) {
+            try { devices.click(); } catch (error) {}
+        }
+        scheduleSync();
+    }
+
+    function activatePane(key) {
+        var pane = state.panes[key];
+        if (!pane || state.switching) return;
+        markActive(key);
+
+        var currentId = clean(state.content && state.content.getAttribute("data-sirk-active-device-id"));
+        if (contentIsWorkspace() && currentId === pane.nodeId) return;
+
+        state.switching = true;
+        var attempts = 0;
+        function open() {
+            attempts += 1;
+            if (!devicesActive()) {
+                var devices = document.querySelector('.sirk-standalone-nav [data-view="devices"]');
+                if (devices) {
+                    try { devices.click(); } catch (error) {}
+                }
+            }
+
+            if (contentIsWorkspace()) {
+                var back = state.content.querySelector("[data-device-back]");
+                if (back) {
+                    try { back.click(); } catch (error) {}
+                }
+                if (attempts < 160) window.setTimeout(open, 75);
+                else state.switching = false;
+                return;
+            }
+
+            var row = findRow(pane.nodeId);
+            if (row) {
+                state.content.setAttribute("data-sirk-active-device-id", pane.nodeId);
+                state.switching = false;
+                try { row.click(); } catch (error) { state.switching = false; }
+                scheduleSync();
+                return;
+            }
+
+            var nav = document.querySelector('.sirk-standalone-nav [data-view="devices"]');
+            if (nav && !contentIsDeviceList()) {
+                try { nav.click(); } catch (error) {}
+            }
+            if (attempts < 160) window.setTimeout(open, 75);
+            else {
+                state.switching = false;
+                markActive("all");
+            }
+        }
+        open();
+    }
+
+    function closeTab(key) {
+        if (!state.panes[key]) return;
+        var wasActive = state.active === key;
+        delete state.panes[key];
+        if (wasActive) activateAll();
+        else {
+            renderTabs();
+            persist();
+        }
+    }
+
     function hostInfo(target) {
-        if (!devicesActive() || state.active !== "all" || !target || !target.closest || !contentIsDeviceList()) return null;
+        if (!devicesActive() || !target || !target.closest || !contentIsDeviceList()) return null;
         var row = target.closest("[data-device-id],.sirk-device-row");
-        if (!row || !state.content.contains(row)) return null;
+        if (!row || !state.content || !state.content.contains(row)) return null;
         var nodeId = clean(row.getAttribute("data-device-id"));
         var nameNode = row.querySelector(".sirk-device-primary strong,[data-device-name],.sirk-device-name,strong");
         var name = clean(nameNode && nameNode.textContent || "");
@@ -318,85 +243,36 @@
             event.preventDefault();
             event.stopPropagation();
             if (typeof event.stopImmediatePropagation === "function") event.stopImmediatePropagation();
-            activate(tab.getAttribute("data-device-workspace-key"));
+            var key = tab.getAttribute("data-device-workspace-key");
+            if (key === "all") activateAll();
+            else activatePane(key);
+            return;
+        }
+
+        var back = event.target && event.target.closest && event.target.closest("[data-device-back]");
+        if (back && state.content && state.content.contains(back)) {
+            markActive("all");
+            state.content.removeAttribute("data-sirk-active-device-id");
+            scheduleSync();
+            return;
+        }
+
+        var navigation = event.target && event.target.closest && event.target.closest(".sirk-standalone-nav [data-view]");
+        if (navigation) {
+            if (navigation.getAttribute("data-view") !== "devices") {
+                state.switching = false;
+            }
+            scheduleSync();
             return;
         }
 
         var info = hostInfo(event.target);
         if (!info) return;
-        event.preventDefault();
-        event.stopPropagation();
-        if (typeof event.stopImmediatePropagation === "function") event.stopImmediatePropagation();
-        ensurePane(info.key, info.nodeId, info.name, true);
-        showPane(info.key);
-    }
-
-    function bind() {
-        if (state.bound) return;
-        state.bound = true;
-        window.addEventListener("click", intercept, true);
-        window.addEventListener("resize", updateLayerBounds);
-        window.addEventListener("sirkportal:languagechange", function () { renderTabs(); });
-        if (window.ResizeObserver) {
-            state.resizeObserver = new ResizeObserver(updateLayerBounds);
-            if (state.main) state.resizeObserver.observe(state.main);
-            if (state.content) state.resizeObserver.observe(state.content);
-        }
-    }
-
-    function sync() {
-        if (!state.bar || !state.layer || !state.content) return;
-        var visible = devicesActive();
-        state.bar.hidden = !visible;
-        state.bar.style.display = visible ? "flex" : "none";
-
-        if (!visible) {
-            state.layer.classList.remove("is-active");
-            state.layer.setAttribute("aria-hidden", "true");
-            state.content.style.visibility = "";
-            state.content.style.pointerEvents = "";
-            Object.keys(state.panes).forEach(function (key) {
-                if (state.panes[key].element) state.panes[key].element.classList.remove("is-active");
-            });
-            return;
-        }
-
-        if (state.active !== "all" && state.panes[state.active]) {
-            ensurePane(state.active, state.panes[state.active].nodeId, state.panes[state.active].name, true);
-            showPane(state.active);
-        } else if (contentIsDeviceList()) {
-            showPane("all");
-        }
-        updateLayerBounds();
-    }
-
-    function suspend() {
-        if (state.observer) {
-            state.observer.disconnect();
-            state.observer = null;
-        }
-        Object.keys(state.panes).forEach(function (key) {
-            var pane = state.panes[key];
-            if (!pane || !pane.element) return;
-            pane.element.querySelectorAll("iframe").forEach(function (frame) {
-                frame.src = "about:blank";
-            });
-            pane.element.remove();
-            pane.element = null;
-        });
-        if (state.layer) {
-            state.layer.remove();
-            state.layer = null;
-        }
-        if (state.bar) {
-            state.bar.remove();
-            state.bar = null;
-        }
-        if (state.content) {
-            state.content.style.visibility = "";
-            state.content.style.pointerEvents = "";
-        }
-        state.active = "all";
+        ensurePane(info.key, info.nodeId, info.name);
+        state.content.setAttribute("data-sirk-active-device-id", info.nodeId);
+        markActive(info.key);
+        scheduleSync();
+        // Deliberately do not stop propagation. The native device workspace opens in this document.
     }
 
     function scheduleSync() {
@@ -404,50 +280,75 @@
         state.syncScheduled = true;
         window.requestAnimationFrame(function () {
             state.syncScheduled = false;
-            if (devicesActive()) {
-                ensureInfrastructure();
-                sync();
-            } else {
-                suspend();
-            }
+            sync();
         });
     }
 
-    function start() {
-        if (state.started) {
-            scheduleSync();
-            return;
+    function sync() {
+        if (!state.bar || !state.content) return;
+        var visible = devicesActive();
+        state.bar.hidden = !visible;
+        state.bar.style.display = visible ? "flex" : "none";
+        if (!visible) return;
+
+        if (!contentIsWorkspace() && contentIsDeviceList()) {
+            state.content.removeAttribute("data-sirk-active-device-id");
+            if (!state.switching && state.active !== "all") markActive("all");
+            if (!state.restoreAttempted && state.restoreActive !== "all" && state.panes[state.restoreActive]) {
+                state.restoreAttempted = true;
+                window.setTimeout(function () { activatePane(state.restoreActive); }, 0);
+                return;
+            }
         }
-        state.started = true;
-        var content = document.getElementById("sirkStandaloneContent");
-        if (content) {
-            state.viewObserver = new MutationObserver(scheduleSync);
-            state.viewObserver.observe(content, {
-                attributes: true,
-                attributeFilter: ["data-active-view"]
-            });
-        }
-        window.addEventListener("hashchange", scheduleSync);
-        scheduleSync();
+        renderTabs();
     }
 
-    window.SirkPlatformDeviceTabs = {
-        mount: function () { start(); scheduleSync(); return true; },
-        unmount: suspend,
-        activateAll: activateAll,
-        activate: activate,
-        close: closeTab,
-        debug: function () {
-            var result = { active: state.active, mode: "persistent-session-layer", panes: {} };
-            Object.keys(state.panes).forEach(function (key) {
-                result.panes[key] = {
-                    mounted: !!(state.panes[key].element && state.panes[key].element.isConnected),
-                    active: !!(state.panes[key].element && state.panes[key].element.classList.contains("is-active"))
-                };
-            });
-            return result;
+    function bind() {
+        if (state.bound) return;
+        state.bound = true;
+        window.addEventListener("click", intercept, true);
+        window.addEventListener("resize", scheduleSync);
+        window.addEventListener("sirkportal:languagechange", renderTabs);
+        window.addEventListener("hashchange", scheduleSync);
+
+        state.observer = new MutationObserver(scheduleSync);
+        state.observer.observe(state.content, { childList: true });
+        if (window.ResizeObserver) {
+            state.resizeObserver = new ResizeObserver(scheduleSync);
+            state.resizeObserver.observe(state.content);
         }
-    };
+    }
+
+    function ensureInfrastructure() {
+        var content = document.getElementById("sirkStandaloneContent");
+        var main = content && content.closest(".sirk-standalone-main");
+        if (!content || !main) return false;
+        state.content = content;
+        state.main = main;
+
+        document.querySelectorAll(".sirk-standalone-sidebar .sirk-device-tabs,.sirk-standalone-nav .sirk-device-tabs,.sirk-device-session-layer").forEach(function (obsolete) {
+            obsolete.remove();
+        });
+
+        if (!state.bar || !state.bar.isConnected) {
+            state.bar = document.createElement("div");
+            state.bar.className = "sirk-device-tabs sirk-device-tabs-standalone";
+            state.bar.setAttribute("role", "tablist");
+            main.insertBefore(state.bar, content);
+        }
+        restoreMetadata();
+        bind();
+        renderTabs();
+        return true;
+    }
+
+    function start() {
+        if (!ensureInfrastructure()) {
+            window.setTimeout(start, 100);
+            return;
+        }
+        sync();
+    }
 
     if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start, { once: true });
     else start();
