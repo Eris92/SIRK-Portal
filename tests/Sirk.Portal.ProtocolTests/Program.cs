@@ -11,6 +11,9 @@ using Sirk.Portal.Automation;
 using Sirk.Portal.Central;
 using Sirk.Portal.Infrastructure;
 using Microsoft.Extensions.Configuration;
+using Sirk.Portal.ProtocolTests;
+
+CanonicalDesktopTransportContract.Run();
 
 const string portalId = "portal-test";
 const string portalToken = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";

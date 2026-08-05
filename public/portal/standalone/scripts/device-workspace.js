@@ -431,7 +431,7 @@
             }
             var runtime = window.SirkPlatformRuntime && window.SirkPlatformRuntime.state;
             var csrfToken = runtime && runtime.bootstrap && runtime.bootstrap.csrfToken || "";
-            return fetch(portalHttpUrl("/api/agent-desktop/input"), {
+            return fetch(portalHttpUrl("/api/v1/desktop/input"), {
                 method: "POST",
                 credentials: "same-origin",
                 headers: { "Content-Type": "application/json", "X-SIRK-CSRF": csrfToken },
@@ -674,7 +674,7 @@
         function snapshot(generation) {
             if (stopped || !connected || !host.isConnected || generation !== streamGeneration) return;
             var requestStarted = performance.now();
-            var url = portalHttpUrl("/api/agent-desktop/frame?tenantId=" + encodeURIComponent(node.tenantId) +
+            var url = portalHttpUrl("/api/v1/desktop/frame?tenantId=" + encodeURIComponent(node.tenantId) +
                 "&deviceId=" + encodeURIComponent(node.deviceId) +
                 "&after=" + encodeURIComponent(snapshot.sequence || 0) + "&waitMilliseconds=25000");
             fetch(url, { credentials: "same-origin", cache: "no-store" }).then(function (response) {
@@ -750,7 +750,7 @@
                         performance.now() - requestStarted;
                     updateStats(data, frameMs, renderStarted - decodeStarted,
                         performance.now() - renderStarted);
-                    setStreamStatus("Połączono · strumień bezpośredni · " + nativeWidth + " × " + nativeHeight + " · profil " + profile.options[profile.selectedIndex].text);
+                    setStreamStatus("Połączono · tunel Central HTTP · " + nativeWidth + " × " + nativeHeight + " · profil " + profile.options[profile.selectedIndex].text);
                     setTimeout(function () { snapshot(generation); }, 0);
                 });
             }).catch(function (error) {
