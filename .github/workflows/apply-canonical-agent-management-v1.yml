@@ -24,8 +24,8 @@ jobs:
       - name: Apply canonical management transport
         shell: pwsh
         run: |
-          python .github/scripts/apply_canonical_agent_management_v1.py
           python .github/scripts/patch_canonical_agent_enrollment_bridge.py
+          python .github/scripts/apply_canonical_agent_management_v1.py
       - name: Restore and build Portal
         shell: pwsh
         run: |
