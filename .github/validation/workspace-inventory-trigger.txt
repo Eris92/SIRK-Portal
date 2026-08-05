@@ -1,1 +1,1 @@
-trigger workspace inventory validation
+trigger workspace inventory validation 2026-08-05
