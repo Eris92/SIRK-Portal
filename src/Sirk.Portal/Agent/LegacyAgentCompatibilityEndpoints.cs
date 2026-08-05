@@ -332,10 +332,11 @@ internal static class LegacyAgentCompatibilityEndpoints
         }
         var wait = TimeSpan.FromMilliseconds(Math.Clamp(request.WaitMilliseconds ?? 0, 0, 25_000));
         var viewerActive = await desktop.WaitForViewerAsync(device.Id, wait, context.RequestAborted);
+        var inputs = desktop.DrainQueuedInputs(device.Id, 128);
         return Results.Ok(new
         {
             viewerActive,
-            inputs = Array.Empty<object>()
+            inputs
         });
     }
 

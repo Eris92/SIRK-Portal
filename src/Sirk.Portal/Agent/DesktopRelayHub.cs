@@ -16,7 +16,9 @@ internal sealed class DesktopRelayHub
 {
     private const int MaximumFrameBytes = 8 * 1024 * 1024;
     private const int MaximumInputBytes = 64 * 1024;
+    private const int MaximumQueuedInputs = 256;
     private static readonly TimeSpan HttpViewerLease = TimeSpan.FromSeconds(40);
+    private static readonly TimeSpan QueuedInputLifetime = TimeSpan.FromSeconds(10);
     private readonly ConcurrentDictionary<string, DesktopSession> _sessions =
         new(StringComparer.Ordinal);
 
@@ -111,6 +113,34 @@ internal sealed class DesktopRelayHub
         return current is not null && current.Sequence > after ? current : null;
     }
 
+    public async Task<string> SendOrQueueInputAsync(
+        string deviceId,
+        string message,
+        CancellationToken cancellationToken)
+    {
+        var session = _sessions.GetOrAdd(deviceId, static id => new DesktopSession(id));
+        TouchHttpViewer(session);
+        var payload = ValidateInputPayload(message);
+        var agent = session.Agent;
+        if (agent?.State == WebSocketState.Open)
+        {
+            try
+            {
+                await SendInputPayloadAsync(session, agent, payload, cancellationToken);
+                return "direct";
+            }
+            catch (Exception exception) when (
+                exception is WebSocketException or InvalidOperationException)
+            {
+                // The Agent reconnects independently. Preserve short-lived input
+                // for its authenticated HTTP control poll instead of returning 409.
+            }
+        }
+
+        QueueInput(session, message);
+        return "queued";
+    }
+
     public async Task SendInputAsync(
         string deviceId,
         string message,
@@ -118,15 +148,66 @@ internal sealed class DesktopRelayHub
     {
         var session = _sessions.GetOrAdd(deviceId, static id => new DesktopSession(id));
         TouchHttpViewer(session);
+        var payload = ValidateInputPayload(message);
         var agent = session.Agent;
         if (agent?.State != WebSocketState.Open)
             throw new InvalidOperationException("Agent desktop stream is offline.");
+        await SendInputPayloadAsync(session, agent, payload, cancellationToken);
+    }
+
+    public IReadOnlyList<JsonElement> DrainQueuedInputs(
+        string deviceId,
+        int limit)
+    {
+        if (!_sessions.TryGetValue(deviceId, out var session))
+            return Array.Empty<JsonElement>();
+
+        var result = new List<JsonElement>();
+        var maximum = Math.Clamp(limit, 1, MaximumQueuedInputs);
+        var now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        while (result.Count < maximum && session.PendingInputs.TryDequeue(out var queued))
+        {
+            Interlocked.Decrement(ref session.PendingInputCount);
+            if (queued.ExpiresAtUnixMilliseconds <= now) continue;
+            try
+            {
+                using var document = JsonDocument.Parse(queued.Message);
+                var root = document.RootElement;
+                if (root.TryGetProperty("type", out var type) &&
+                    string.Equals(type.GetString(), "input", StringComparison.Ordinal) &&
+                    root.TryGetProperty("input", out var input) &&
+                    input.ValueKind == JsonValueKind.Object)
+                {
+                    result.Add(input.Clone());
+                }
+            }
+            catch (JsonException)
+            {
+                // Invalid queued input is discarded and never reaches the Agent.
+            }
+        }
+        return result;
+    }
+
+    private static byte[] ValidateInputPayload(string message)
+    {
         var payload = Encoding.UTF8.GetBytes(message);
         if (payload.Length > MaximumInputBytes)
             throw new InvalidDataException("Desktop input is too large.");
+        return payload;
+    }
+
+    private static async Task SendInputPayloadAsync(
+        DesktopSession session,
+        WebSocket agent,
+        byte[] payload,
+        CancellationToken cancellationToken)
+    {
         await session.AgentSendLock.WaitAsync(cancellationToken);
         try
         {
+            if (!ReferenceEquals(session.Agent, agent) || agent.State != WebSocketState.Open)
+                throw new InvalidOperationException("Agent desktop stream is offline.");
             await agent.SendAsync(payload, WebSocketMessageType.Text, true, cancellationToken);
         }
         finally
@@ -135,16 +216,37 @@ internal sealed class DesktopRelayHub
         }
     }
 
+    private static void QueueInput(DesktopSession session, string message)
+    {
+        var expiresAt = DateTimeOffset.UtcNow.Add(QueuedInputLifetime)
+            .ToUnixTimeMilliseconds();
+        session.PendingInputs.Enqueue(new QueuedDesktopInput(message, expiresAt));
+        Interlocked.Increment(ref session.PendingInputCount);
+        while (Volatile.Read(ref session.PendingInputCount) > MaximumQueuedInputs &&
+               session.PendingInputs.TryDequeue(out _))
+        {
+            Interlocked.Decrement(ref session.PendingInputCount);
+        }
+    }
+
     public object Status(string deviceId)
     {
         if (!_sessions.TryGetValue(deviceId, out var session))
-            return new { deviceId, agentConnected = false, viewerCount = 0, httpViewerActive = false };
+            return new
+            {
+                deviceId,
+                agentConnected = false,
+                viewerCount = 0,
+                httpViewerActive = false,
+                queuedInputs = 0
+            };
         return new
         {
             deviceId,
             agentConnected = session.Agent?.State == WebSocketState.Open,
             viewerCount = session.Viewers.Values.Count(value => value.State == WebSocketState.Open),
-            httpViewerActive = HttpViewerActive(session)
+            httpViewerActive = HttpViewerActive(session),
+            queuedInputs = Math.Max(0, Volatile.Read(ref session.PendingInputCount))
         };
     }
 
@@ -333,6 +435,10 @@ internal sealed class DesktopRelayHub
             exception is WebSocketException or OperationCanceledException) { }
     }
 
+    private sealed record QueuedDesktopInput(
+        string Message,
+        long ExpiresAtUnixMilliseconds);
+
     private sealed class DesktopSession(string deviceId)
     {
         public string DeviceId { get; } = deviceId;
@@ -343,6 +449,8 @@ internal sealed class DesktopRelayHub
         public SemaphoreSlim AgentSendLock { get; } = new(1, 1);
         public SemaphoreSlim FrameSignal { get; } = new(0, 1);
         public SemaphoreSlim ViewerSignal { get; } = new(0, 1);
+        public ConcurrentQueue<QueuedDesktopInput> PendingInputs { get; } = new();
+        public int PendingInputCount;
         public ConcurrentDictionary<Guid, WebSocket> Viewers { get; } = new();
     }
 }
