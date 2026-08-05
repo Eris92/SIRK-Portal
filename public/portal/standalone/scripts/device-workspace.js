@@ -309,7 +309,7 @@
 
     function renderAgentDesktop(host, node) {
         var stopped = false;
-        host.innerHTML = '<div class="sirk-agent-operation sirk-agent-desktop"><header><strong>Pulpit SIRK Agent Live</strong><small>Natychmiastowa pomoc zdalna w wybranej sesji użytkownika</small></header><div class="sirk-agent-desktop-controls"><label>Sesja<select data-agent-desktop-session disabled></select></label><label>Monitor<select data-agent-desktop-monitor disabled><option value="-1">Wszystkie monitory</option></select></label><label>Profil<select data-agent-desktop-profile><option value="auto">Auto</option><option value="smooth">Płynny GUI 120 Hz</option><option value="text">Ostry tekst</option><option value="video">Wideo H.264</option><option value="weak">Słabe łącze</option><option value="minimum">Minimalny transfer</option></select></label><button type="button" data-agent-desktop-connect>Połącz</button><button type="button" data-agent-desktop-disconnect disabled>Rozłącz</button></div><div class="sirk-agent-desktop-stats" data-agent-desktop-stats><span>FPS <b data-stat-fps>0</b></span><span>latencja p50/p95 <b data-stat-latency>—</b></span><span>input dispatch <b data-stat-input>—</b></span><span>capture/encode/session/decode/render <b data-stat-pipeline>—</b></span><span>bitrate <b data-stat-bitrate>0</b></span><span>delta <b data-stat-delta>—</b></span><span>łącze <b data-stat-link>pomiar…</b></span><span>backend <b data-stat-backend>—</b></span></div><div class="sirk-agent-desktop-admin"><strong>Pulpit administracyjny</strong><select data-agent-admin-tool><option value="powershell">PowerShell SYSTEM</option><option value="computer-management">Zarządzanie komputerem</option><option value="services">Usługi</option><option value="registry">Edytor rejestru</option><option value="task-manager">Menedżer zadań</option><option value="event-viewer">Podgląd zdarzeń</option><option value="device-manager">Menedżer urządzeń</option></select><button type="button" data-agent-admin-start disabled>Uruchom w sesji użytkownika</button></div><div class="sirk-agent-desktop-stage" style="position:relative;display:flex;justify-content:center;align-items:center;overflow:hidden;min-height:240px"><canvas data-agent-desktop-image aria-label="Zdalny pulpit" tabindex="0" style="display:block;max-width:100%;max-height:calc(100vh - 360px);width:auto;height:auto;margin:0 auto;touch-action:none"></canvas><span data-agent-desktop-cursor style="position:absolute;width:12px;height:12px;border:2px solid #fff;border-radius:50%;background:#111;box-shadow:0 0 0 1px #111;pointer-events:none;transform:translate(-2px,-2px)"></span></div><div class="sirk-agent-desktop-input"><input data-agent-desktop-text placeholder="Tekst do aktywnego okna"><button type="button" data-agent-desktop-send>Wyślij tekst</button><select data-agent-desktop-key><option>Enter</option><option>Tab</option><option>Escape</option><option>Backspace</option><option>Delete</option><option>Up</option><option>Down</option><option>Left</option><option>Right</option><option>Home</option><option>End</option><option>PageUp</option><option>PageDown</option><option>F5</option></select><button type="button" data-agent-desktop-key-send>Klawisz</button></div><div class="sirk-agent-desktop-clipboard"><textarea data-agent-desktop-clipboard placeholder="Schowek wybranej sesji"></textarea><button type="button" data-agent-desktop-clipboard-get>Pobierz schowek</button><button type="button" data-agent-desktop-clipboard-set>Ustaw schowek</button></div><div class="sirk-agent-policy-action" data-agent-policy-action hidden><button type="button" data-agent-policy-enable>Włącz zdalny pulpit dla urządzenia</button></div><pre data-agent-operation-status>Gotowy do natychmiastowego połączenia.</pre></div>';
+        host.innerHTML = '<div class="sirk-agent-operation sirk-agent-desktop"><header><strong>Pulpit SIRK Agent Live</strong><small>Natychmiastowa pomoc zdalna w wybranej sesji użytkownika</small></header><div class="sirk-agent-desktop-controls"><label>Sesja<select data-agent-desktop-session disabled></select></label><label>Monitor<select data-agent-desktop-monitor disabled><option value="-1">Wszystkie monitory</option></select></label><label>Profil<select data-agent-desktop-profile><option value="auto">Auto</option><option value="smooth">Płynny GUI 120 Hz</option><option value="text">Ostry tekst</option><option value="video">Wideo H.264</option><option value="weak">Słabe łącze</option><option value="minimum">Minimalny transfer</option></select></label><label>Kodek<select data-agent-desktop-codec><option value="auto">Auto (profil)</option><option value="webp">WebP</option><option value="png">PNG</option><option value="jpeg">JPEG</option><option value="h264">H.264</option></select></label><label>Jakość<select data-agent-desktop-quality><option value="auto">Auto (profil)</option><option value="40">40%</option><option value="50">50%</option><option value="60">60%</option><option value="70">70%</option><option value="80">80%</option><option value="85">85%</option><option value="90">90%</option><option value="100">100%</option></select></label><button type="button" data-agent-desktop-connect>Połącz</button><button type="button" data-agent-desktop-disconnect disabled>Rozłącz</button></div><div class="sirk-agent-desktop-stats" data-agent-desktop-stats><span>FPS <b data-stat-fps>0</b></span><span>latencja p50/p95 <b data-stat-latency>—</b></span><span>input dispatch <b data-stat-input>—</b></span><span>capture/encode/session/decode/render <b data-stat-pipeline>—</b></span><span>bitrate <b data-stat-bitrate>0</b></span><span>delta <b data-stat-delta>—</b></span><span>łącze <b data-stat-link>pomiar…</b></span><span>backend <b data-stat-backend>—</b></span></div><div class="sirk-agent-desktop-admin"><strong>Pulpit administracyjny</strong><select data-agent-admin-tool><option value="powershell">PowerShell SYSTEM</option><option value="computer-management">Zarządzanie komputerem</option><option value="services">Usługi</option><option value="registry">Edytor rejestru</option><option value="task-manager">Menedżer zadań</option><option value="event-viewer">Podgląd zdarzeń</option><option value="device-manager">Menedżer urządzeń</option></select><button type="button" data-agent-admin-start disabled>Uruchom w sesji użytkownika</button></div><div class="sirk-agent-desktop-stage" style="position:relative;display:flex;justify-content:center;align-items:center;overflow:hidden;min-height:240px"><canvas data-agent-desktop-image aria-label="Zdalny pulpit" tabindex="0" style="display:block;max-width:100%;max-height:calc(100vh - 360px);width:auto;height:auto;margin:0 auto;touch-action:none"></canvas><span data-agent-desktop-cursor style="position:absolute;width:12px;height:12px;border:2px solid #fff;border-radius:50%;background:#111;box-shadow:0 0 0 1px #111;pointer-events:none;transform:translate(-2px,-2px)"></span></div><div class="sirk-agent-desktop-input"><input data-agent-desktop-text placeholder="Tekst do aktywnego okna"><button type="button" data-agent-desktop-send>Wyślij tekst</button><select data-agent-desktop-key><option>Enter</option><option>Tab</option><option>Escape</option><option>Backspace</option><option>Delete</option><option>Up</option><option>Down</option><option>Left</option><option>Right</option><option>Home</option><option>End</option><option>PageUp</option><option>PageDown</option><option>F5</option></select><button type="button" data-agent-desktop-key-send>Klawisz</button></div><div class="sirk-agent-desktop-clipboard"><textarea data-agent-desktop-clipboard placeholder="Schowek wybranej sesji"></textarea><button type="button" data-agent-desktop-clipboard-get>Pobierz schowek</button><button type="button" data-agent-desktop-clipboard-set>Ustaw schowek</button></div><div class="sirk-agent-policy-action" data-agent-policy-action hidden><button type="button" data-agent-policy-enable>Włącz zdalny pulpit dla urządzenia</button></div><pre data-agent-operation-status>Gotowy do natychmiastowego połączenia.</pre></div>';
         var image = host.querySelector("[data-agent-desktop-image]");
         var imageContext = image.getContext("2d", { alpha: false, desynchronized: true });
         var moveCanvas = document.createElement("canvas");
@@ -319,6 +319,8 @@
         var session = host.querySelector("[data-agent-desktop-session]");
         var monitor = host.querySelector("[data-agent-desktop-monitor]");
         var profile = host.querySelector("[data-agent-desktop-profile]");
+        var codec = host.querySelector("[data-agent-desktop-codec]");
+        var quality = host.querySelector("[data-agent-desktop-quality]");
         var textInput = host.querySelector("[data-agent-desktop-text]");
         var keyInput = host.querySelector("[data-agent-desktop-key]");
         var clipboard = host.querySelector("[data-agent-desktop-clipboard]");
@@ -336,11 +338,16 @@
         var activeAutoProfile = "smooth", lastAutoChangeAt = 0, lastStatsPaintAt = 0, lastFrameAt = 0;
         var lastTargetFps = 0;
         var profiles = {
-            smooth: { maxWidth: 1920, quality: 72, targetKbps: 1000, targetFps: 120, frameMode: "tiles", deltaScalePercent: 25 },
-            text: { maxWidth: 1920, quality: 80, targetKbps: 1000, targetFps: 60, frameMode: "tiles", deltaScalePercent: 50 },
-            video: { maxWidth: 1920, quality: 72, targetKbps: 1000, targetFps: 60, frameMode: "h264", deltaScalePercent: 100 },
-            weak: { maxWidth: 1600, quality: 65, targetKbps: 700, targetFps: 30, frameMode: "tiles", deltaScalePercent: 35 },
-            minimum: { maxWidth: 1920, quality: 68, targetKbps: 550, targetFps: 15, frameMode: "tiles", deltaScalePercent: 50 }
+            smooth: { maxWidth: 1920, quality: 85, targetKbps: 2500, targetFps: 120,
+                codec: "webp", deltaScalePercent: 100 },
+            text: { maxWidth: 1920, quality: 100, targetKbps: 8000, targetFps: 30,
+                codec: "png", deltaScalePercent: 100 },
+            video: { maxWidth: 1920, quality: 85, targetKbps: 3000, targetFps: 60,
+                codec: "h264", deltaScalePercent: 100 },
+            weak: { maxWidth: 1600, quality: 60, targetKbps: 800, targetFps: 30,
+                codec: "jpeg", deltaScalePercent: 60 },
+            minimum: { maxWidth: 1280, quality: 40, targetKbps: 450, targetFps: 15,
+                codec: "jpeg", deltaScalePercent: 35 }
         };
         function percentile(values, fraction) {
             if (!values.length) return 0;
@@ -348,8 +355,31 @@
             return sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * fraction))];
         }
         function effectiveProfile() {
-            if (profile.value !== "auto") return profiles[profile.value];
-            return profiles[activeAutoProfile];
+            var base = profile.value !== "auto" ? profiles[profile.value] : profiles[activeAutoProfile];
+            var requestedCodec = codec.value === "auto" ? base.codec : codec.value;
+            var requestedQuality = quality.value === "auto" ? base.quality : Number(quality.value);
+            return Object.assign({}, base, {
+                codec: requestedCodec,
+                imageEncoding: requestedCodec === "h264" ? "webp" : requestedCodec,
+                frameMode: requestedCodec === "h264" ? "h264" : "tiles",
+                quality: requestedCodec === "png" ? 100 : requestedQuality
+            });
+        }
+        function updateCodecControls() {
+            var settings = effectiveProfile();
+            quality.disabled = settings.codec === "png" || settings.codec === "h264";
+            quality.title = settings.codec === "png"
+                ? "PNG jest bezstratny — jakość wynosi 100%."
+                : settings.codec === "h264"
+                    ? "Jakość H.264 jest sterowana limitem bitrate."
+                    : "Jakość kompresji obrazu.";
+        }
+        function streamProfileParameters(settings) {
+            return { action: "streamProfile", maxWidth: settings.maxWidth,
+                quality: settings.quality, targetKbps: settings.targetKbps,
+                targetFps: settings.targetFps, frameMode: settings.frameMode,
+                imageEncoding: settings.imageEncoding,
+                deltaScalePercent: settings.deltaScalePercent };
         }
         function setStreamStatus(message) {
             if (status.textContent !== message) status.textContent = message;
@@ -388,11 +418,9 @@
                 if (nextProfile !== activeAutoProfile) {
                     activeAutoProfile = nextProfile;
                     lastAutoChangeAt = now;
-                    var adaptive = profiles[nextProfile];
-                    input({ action: "streamProfile", maxWidth: adaptive.maxWidth,
-                        quality: adaptive.quality, targetKbps: adaptive.targetKbps,
-                        targetFps: adaptive.targetFps, frameMode: adaptive.frameMode,
-                        deltaScalePercent: adaptive.deltaScalePercent }).catch(function () {});
+                    var adaptive = effectiveProfile();
+                    updateCodecControls();
+                    input(streamProfileParameters(adaptive)).catch(function () {});
                 }
             }
             if (now - lastStatsPaintAt < 250) return;
@@ -550,10 +578,8 @@
             hasCompleteFrame = false;
             snapshot.sequence = 0;
             var settings = effectiveProfile();
-            var streamProfile = { action: "streamProfile", maxWidth: settings.maxWidth,
-                quality: settings.quality, targetKbps: settings.targetKbps,
-                targetFps: settings.targetFps, frameMode: settings.frameMode,
-                deltaScalePercent: settings.deltaScalePercent };
+            updateCodecControls();
+            var streamProfile = streamProfileParameters(settings);
             if (usesHttpTunnel()) {
                 var generation = streamGeneration;
                 var configureDeadline = Date.now() + 30000;
@@ -612,12 +638,13 @@
             });
             pendingInput.clear();
         }
-        function renderJpegFrame(buffer, data, generation, requestStarted) {
+        function renderImageFrame(buffer, data, generation, requestStarted) {
             var desktopWidth = Number(data.sourceWidth || data.width || 0);
             var desktopHeight = Number(data.sourceHeight || data.height || 0);
             if (!desktopWidth || !desktopHeight) return Promise.reject(new Error("Invalid desktop dimensions."));
             var decodeStarted = performance.now();
-            return createImageBitmap(new Blob([buffer], { type: "image/jpeg" })).then(function (decoded) {
+            var contentType = String(data.contentType || "image/webp");
+            return createImageBitmap(new Blob([buffer], { type: contentType })).then(function (decoded) {
                 if (generation !== streamGeneration) { decoded.close(); return; }
                 sourceWidth = desktopWidth; sourceHeight = desktopHeight;
                 nativeWidth = desktopWidth; nativeHeight = desktopHeight;
@@ -652,7 +679,8 @@
                     performance.now() - requestStarted, renderStarted - decodeStarted,
                     performance.now() - renderStarted);
                 setStreamStatus("Połączono · kafelki dirty-region · " + desktopWidth + " × " + desktopHeight +
-                    " · atlas " + Number(data.width || 0) + " × " + Number(data.height || 0));
+                    " · atlas " + Number(data.width || 0) + " × " + Number(data.height || 0) +
+                    " · " + String(data.encoding || contentType));
             });
         }
         function startDesktopSocket(generation, streamProfile) {
@@ -692,14 +720,14 @@
                     positionLocalCursor(data.cursorX, data.cursorY, sourceWidth, sourceHeight);
                     return;
                 }
-                if (data.contentType === "image/jpeg") {
+                if (/^image\/(?:jpeg|png|webp)$/i.test(String(data.contentType || ""))) {
                     if (data.fullFrame !== true && (!hasCompleteFrame ||
                         (previousSequence > 0 && snapshot.sequence !== previousSequence + 1))) {
                         hasCompleteFrame = false;
                         input({ action: "requestKeyframe" }).catch(function () {});
                         return;
                     }
-                    renderJpegFrame(packet.subarray(4 + metadataLength), data, generation, performance.now())
+                    renderImageFrame(packet.subarray(4 + metadataLength), data, generation, performance.now())
                         .catch(function () { input({ action: "requestKeyframe" }).catch(function () {}); });
                     return;
                 }
@@ -757,11 +785,11 @@
                     snapshot(generation);
                     return;
                 }
-                var jpegFrame = value.contentType.indexOf("image/jpeg") === 0;
+                var imageFrame = /^image\/(?:jpeg|png|webp)/i.test(value.contentType);
                 sourceWidth = Number(data.sourceWidth || data.width || 0);
                 sourceHeight = Number(data.sourceHeight || data.height || 0);
-                nativeWidth = jpegFrame ? sourceWidth : Number(data.width || sourceWidth);
-                nativeHeight = jpegFrame ? sourceHeight : Number(data.height || sourceHeight);
+                nativeWidth = imageFrame ? sourceWidth : Number(data.width || sourceWidth);
+                nativeHeight = imageFrame ? sourceHeight : Number(data.height || sourceHeight);
                 var decodeStarted = performance.now();
                 if (value.contentType.indexOf("video/h264") === 0 && "VideoDecoder" in window)
                     return decodeH264Frame(value, generation, requestStarted, true);
@@ -800,9 +828,10 @@
                         performance.now() - requestStarted;
                     updateStats(data, frameMs, renderStarted - decodeStarted,
                         performance.now() - renderStarted);
-                    var frameDescription = jpegFrame
+                    var frameDescription = imageFrame
                         ? sourceWidth + " × " + sourceHeight + " · atlas " +
-                            Number(data.width || 0) + " × " + Number(data.height || 0)
+                            Number(data.width || 0) + " × " + Number(data.height || 0) +
+                            " · " + String(data.encoding || value.contentType)
                         : sourceWidth + " × " + sourceHeight + " → " +
                             nativeWidth + " × " + nativeHeight;
                     setStreamStatus("Połączono · tunel Central HTTP · " + frameDescription +
@@ -1040,7 +1069,18 @@
             loadMonitors().then(restartStream);
         });
         monitor.addEventListener("change", restartStream);
-        profile.addEventListener("change", restartStream);
+        profile.addEventListener("change", function () {
+            codec.value = "auto";
+            quality.value = "auto";
+            updateCodecControls();
+            restartStream();
+        });
+        codec.addEventListener("change", function () {
+            updateCodecControls();
+            restartStream();
+        });
+        quality.addEventListener("change", restartStream);
+        updateCodecControls();
         connectButton.addEventListener("click", function () {
             connectButton.disabled = true;
             status.textContent = "Nawiązywanie połączenia live…";
