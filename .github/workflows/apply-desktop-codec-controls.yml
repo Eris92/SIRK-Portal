@@ -1,0 +1,41 @@
+name: Apply desktop codec controls
+
+on:
+  push:
+    branches:
+      - feat/desktop-codec-quality-controls
+
+permissions:
+  contents: write
+
+jobs:
+  apply-and-validate:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/desktop-codec-quality-controls
+          fetch-depth: 0
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Apply codec and quality controls
+        run: python3 .github/scripts/apply_desktop_codec_controls.py
+      - name: Validate JavaScript syntax
+        run: node --check public/portal/standalone/scripts/device-workspace.js
+      - name: Build Portal
+        run: dotnet build src/Sirk.Portal/Sirk.Portal.csproj --configuration Release
+      - name: Run protocol contracts
+        run: dotnet run --project tests/Sirk.Portal.ProtocolTests/Sirk.Portal.ProtocolTests.csproj --configuration Release
+      - name: Commit product changes
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add public/portal/standalone/scripts/device-workspace.js \
+                  tests/Sirk.Portal.ProtocolTests/DesktopImageCodecUiContract.cs \
+                  tests/Sirk.Portal.ProtocolTests/Program.cs
+          git commit -m 'feat: add desktop codec and quality controls'
+          git push origin HEAD:feat/desktop-codec-quality-controls
