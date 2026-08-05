@@ -16,6 +16,7 @@ using Sirk.Portal.ProtocolTests;
 CanonicalDesktopTransportContract.Run();
 CanonicalAgentManagementV1Contract.Run();
 DesktopCanvasContract.Run();
+DesktopImageCodecUiContract.Run();
 
 const string portalId = "portal-test";
 const string portalToken = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
