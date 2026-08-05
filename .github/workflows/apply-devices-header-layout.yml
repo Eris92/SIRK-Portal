@@ -1,0 +1,42 @@
+name: Apply Devices Header Layout
+
+on:
+  push:
+    branches:
+      - fix/devices-header-tabs
+    paths:
+      - tools/apply-devices-header-layout.py
+      - .github/workflows/apply-devices-header-layout.yml
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/devices-header-tabs
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - name: Apply Devices header layout
+        run: python tools/apply-devices-header-layout.py
+      - name: Validate browser JavaScript
+        run: |
+          node --check public/portal/standalone/scripts/app.js
+          node --check public/portal/standalone/scripts/device-tabs.js
+          node --check public/portal/standalone/scripts/view-mode.js
+      - name: Remove migration helpers
+        run: |
+          rm tools/apply-devices-header-layout.py
+          rm .github/workflows/apply-devices-header-layout.yml
+      - name: Commit product changes
+        run: |
+          git config user.name "Eris92"
+          git config user.email "43513086+Eris92@users.noreply.github.com"
+          git add -A
+          git commit -m "fix(ui): move device tabs into header"
+          git push origin HEAD:fix/devices-header-tabs
