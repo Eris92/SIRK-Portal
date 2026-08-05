@@ -1,0 +1,63 @@
+name: Apply Portal Event Source Registration
+
+on:
+  push:
+    branches:
+      - fix/register-portal-event-source
+    paths:
+      - .github/scripts/apply-event-source-registration.py
+      - .github/workflows/apply-event-source-registration.yml
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/register-portal-event-source
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Apply installer fix
+        shell: pwsh
+        run: |
+          python .github/scripts/apply-event-source-registration.py
+          if ($LASTEXITCODE -ne 0) { throw 'Event source migration failed.' }
+      - name: Validate Windows PowerShell 5.1 syntax
+        shell: powershell
+        run: |
+          $tokens = $null
+          $errors = $null
+          [void][System.Management.Automation.Language.Parser]::ParseFile(
+            (Resolve-Path .\install-dotnet10.ps1),
+            [ref]$tokens,
+            [ref]$errors)
+          if ($errors.Count -gt 0) {
+            $errors | ForEach-Object { Write-Error $_.Message }
+            throw 'install-dotnet10.ps1 contains PowerShell syntax errors.'
+          }
+      - name: Validate installer contracts
+        shell: pwsh
+        run: dotnet run --project tests/Sirk.Portal.ProtocolTests/Sirk.Portal.ProtocolTests.csproj --configuration Release
+      - name: Remove migration helpers
+        shell: bash
+        run: rm -f .github/scripts/apply-event-source-registration.py .github/workflows/apply-event-source-registration.yml
+      - name: Commit product changes
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add install-dotnet10.ps1 \
+                  tests/Sirk.Portal.ProtocolTests/Program.cs \
+                  tests/Sirk.Portal.ProtocolTests/InstallerEventLogSourceContract.cs \
+                  .github/scripts/apply-event-source-registration.py \
+                  .github/workflows/apply-event-source-registration.yml
+          git commit -m "fix(installer): register Portal event source before service start"
+          git push origin HEAD:fix/register-portal-event-source
