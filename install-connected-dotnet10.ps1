@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param(
     [string]$Branch = 'main',
     [string]$ConnectionFile = '',
@@ -11,6 +11,7 @@ param(
     [switch]$TrustCertificate,
     [switch]$DoNotTrustCertificate,
     [switch]$RemoveData,
+    [switch]$KeepBuildSdk,
     [switch]$KeepSourceConnectionFile,
     [switch]$ValidateOnly
 )
@@ -326,6 +327,7 @@ try {
     if ($trustValue) { $installerArguments += '-TrustCertificate' }
     else { $installerArguments += '-DoNotTrustCertificate' }
     if ($RemoveData) { $installerArguments += '-RemoveData' }
+    if ($KeepBuildSdk) { $installerArguments += '-KeepBuildSdk' }
 
     & powershell.exe @installerArguments
     if ($LASTEXITCODE -ne 0) {
