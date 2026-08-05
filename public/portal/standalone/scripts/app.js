@@ -177,6 +177,16 @@
         root.style.setProperty("--sirk-active-accent", viewAccent(view));
     }
 
+    function applyHeaderView(view) {
+        var header = title && title.closest(".sirk-standalone-header");
+        var devices = view === "devices";
+        if (header) header.classList.toggle("is-devices-view", devices);
+        if (title) {
+            title.hidden = devices;
+            title.setAttribute("aria-hidden", devices ? "true" : "false");
+        }
+    }
+
     function clearLoadingOverlay() {
         var overlay = content.querySelector(".sirk-standalone-loading-overlay");
         if (overlay) overlay.remove();
@@ -263,6 +273,7 @@
             syncThemeButton(portalRoot.classList.contains("sirk-theme-dark"));
         }
         title.textContent = viewName(activeView);
+        applyHeaderView(activeView);
     }
 
     function applyUserProfile() {
@@ -720,6 +731,7 @@
         activeView = view;
         var sequence = ++renderSequence;
         applyViewSurface(view);
+        applyHeaderView(view);
         applyShellLanguage();
         title.textContent = viewName(view);
         Array.prototype.forEach.call(document.querySelectorAll(".sirk-standalone-nav [data-view]"), function (button) {

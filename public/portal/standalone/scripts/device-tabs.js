@@ -7,6 +7,7 @@
     var STORAGE_KEY = "sirkPortal.deviceTabs";
     var state = {
         main: null,
+        header: null,
         content: null,
         bar: null,
         panes: Object.create(null),
@@ -287,6 +288,7 @@
     function sync() {
         if (!state.bar || !state.content) return;
         var visible = devicesActive();
+        if (state.header) state.header.classList.toggle("is-devices-view", visible);
         state.bar.hidden = !visible;
         state.bar.style.display = visible ? "flex" : "none";
         if (!visible) return;
@@ -322,9 +324,11 @@
     function ensureInfrastructure() {
         var content = document.getElementById("sirkStandaloneContent");
         var main = content && content.closest(".sirk-standalone-main");
-        if (!content || !main) return false;
+        var header = main && main.querySelector(".sirk-standalone-header");
+        if (!content || !main || !header) return false;
         state.content = content;
         state.main = main;
+        state.header = header;
 
         document.querySelectorAll(".sirk-standalone-sidebar .sirk-device-tabs,.sirk-standalone-nav .sirk-device-tabs,.sirk-device-session-layer").forEach(function (obsolete) {
             obsolete.remove();
@@ -334,7 +338,11 @@
             state.bar = document.createElement("div");
             state.bar.className = "sirk-device-tabs sirk-device-tabs-standalone";
             state.bar.setAttribute("role", "tablist");
-            main.insertBefore(state.bar, content);
+        }
+        var userMenu = header.querySelector("#sirkUserMenu");
+        var anchor = header.querySelector(".sirk-device-view-mode") || userMenu;
+        if (state.bar.parentNode !== header || state.bar.nextElementSibling !== anchor) {
+            header.insertBefore(state.bar, anchor || null);
         }
         restoreMetadata();
         bind();
