@@ -1,0 +1,51 @@
+name: Apply Device Connection Workspace
+
+on:
+  push:
+    branches:
+      - fix/device-connection-workspace
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/device-connection-workspace
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Apply workspace changes
+        run: python tools/apply_device_connection_workspace.py
+
+      - name: Validate browser JavaScript
+        run: |
+          node --check public/portal/standalone/scripts/device-workspace.js
+          node --check public/portal/standalone/scripts/view-mode.js
+          node --check public/portal/standalone/scripts/device-tabs.js
+
+      - name: Validate .NET contracts
+        run: dotnet run --project tests/Sirk.Portal.ProtocolTests/Sirk.Portal.ProtocolTests.csproj --configuration Release
+
+      - name: Remove migration helpers
+        run: |
+          rm -f tools/apply_device_connection_workspace.py
+          rm -f .github/workflows/apply-device-connection-workspace.yml
+
+      - name: Commit product changes
+        run: |
+          git config user.name "Eris92"
+          git config user.email "43513086+Eris92@users.noreply.github.com"
+          git add -A
+          git commit -m "fix(ui): keep host tabs above connected desktop"
+          git push origin HEAD:fix/device-connection-workspace
