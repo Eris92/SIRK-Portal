@@ -125,6 +125,8 @@ if not legacy_path.is_file():
 legacy_path.unlink()
 
 for path in (root / '.github/scripts').glob('*'):
+    if path.name == Path(__file__).name:
+        continue
     if not path.is_file() or path.suffix not in {'.py', '.sh'}:
         continue
     content = path.read_text(encoding='utf-8', errors='replace')
