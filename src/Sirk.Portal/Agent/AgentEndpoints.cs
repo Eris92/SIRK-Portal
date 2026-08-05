@@ -23,6 +23,11 @@ internal sealed record AgentDeviceAdminRequest(
     string? Name,
     bool? Enabled);
 
+internal sealed record DesktopInputRequest(
+    string? TenantId,
+    string DeviceId,
+    JsonElement Input);
+
 internal static class AgentEndpoints
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
@@ -69,6 +74,10 @@ internal static class AgentEndpoints
                 string deviceId,
                 DesktopRelayHub desktop) => Results.Ok(desktop.Status(deviceId)))
             .RequireAuthorization(PortalPolicies.DeviceRead);
+        endpoints.MapGet("/api/v1/desktop/frame", ViewerDesktopFrameAsync)
+            .RequireAuthorization(PortalPolicies.DeviceOperate);
+        endpoints.MapPost("/api/v1/desktop/input", ViewerDesktopInputAsync)
+            .RequireAuthorization(PortalPolicies.DeviceOperate);
 
         return endpoints;
     }
@@ -518,6 +527,84 @@ internal static class AgentEndpoints
         }
         using var socket = await context.WebSockets.AcceptWebSocketAsync();
         await desktop.AttachViewerAsync(deviceId, socket, context.RequestAborted);
+    }
+
+
+    private static async Task<IResult> ViewerDesktopFrameAsync(
+        HttpContext context,
+        AgentStore agents,
+        DesktopRelayHub desktop)
+    {
+        var deviceId = context.Request.Query["deviceId"].ToString().Trim().ToLowerInvariant();
+        var device = agents.GetDevice(deviceId);
+        if (device is not { Enabled: true })
+            return PortalAuthenticationEndpoints.Error(404, "AGENT_NOT_FOUND", "Device was not found.");
+
+        var after = long.TryParse(context.Request.Query["after"], out var parsedAfter)
+            ? Math.Max(0, parsedAfter)
+            : 0;
+        var wait = int.TryParse(context.Request.Query["waitMilliseconds"], out var parsedWait)
+            ? Math.Clamp(parsedWait, 0, 25_000)
+            : 0;
+        var frame = await desktop.WaitForFrameAsync(
+            device.Id,
+            after,
+            TimeSpan.FromMilliseconds(wait),
+            context.RequestAborted);
+        if (frame is null) return Results.NoContent();
+
+        context.Response.Headers["X-SIRK-Sequence"] = frame.Sequence.ToString(
+            System.Globalization.CultureInfo.InvariantCulture);
+        context.Response.Headers["X-SIRK-Metadata"] = frame.MetadataBase64;
+        context.Response.Headers.CacheControl = "no-store";
+        return Results.Bytes(frame.Payload, frame.ContentType);
+    }
+
+    private static async Task<IResult> ViewerDesktopInputAsync(
+        HttpContext context,
+        IAntiforgery antiforgery,
+        AgentStore agents,
+        DesktopRelayHub desktop)
+    {
+        if (context.Items["Sirk.InternalTunnel"] is not true)
+        {
+            var csrf = await PortalAuthenticationEndpoints.ValidateCsrfAsync(context, antiforgery);
+            if (csrf is not null) return csrf;
+        }
+
+        try
+        {
+            var request = await context.Request.ReadFromJsonAsync<DesktopInputRequest>(
+                              cancellationToken: context.RequestAborted)
+                          ?? throw new InvalidDataException("Desktop input is required.");
+            var device = agents.GetDevice(request.DeviceId)
+                         ?? throw new KeyNotFoundException("Device was not found.");
+            if (!string.IsNullOrWhiteSpace(request.TenantId) &&
+                !string.Equals(device.TenantId, request.TenantId, StringComparison.Ordinal))
+            {
+                throw new InvalidDataException("Agent tenant does not match the device.");
+            }
+
+            var message = JsonSerializer.Serialize(new
+            {
+                type = "input",
+                id = 0,
+                input = request.Input
+            }, JsonOptions);
+            var delivery = await desktop.SendOrQueueInputAsync(
+                device.Id,
+                message,
+                context.RequestAborted);
+            return Results.Ok(new { ok = true, delivery });
+        }
+        catch (KeyNotFoundException exception)
+        {
+            return PortalAuthenticationEndpoints.Error(404, "AGENT_NOT_FOUND", exception.Message);
+        }
+        catch (Exception exception) when (exception is InvalidDataException or JsonException)
+        {
+            return PortalAuthenticationEndpoints.Error(400, "DESKTOP_INPUT_INVALID", exception.Message);
+        }
     }
 
     private static IResult SignedJson(

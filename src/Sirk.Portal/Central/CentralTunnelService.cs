@@ -334,6 +334,8 @@ internal sealed class CentralTunnelService : BackgroundService
             AddResponseHeader(localResponse, headers, "location");
             AddResponseHeader(localResponse, headers, "etag");
             AddResponseHeader(localResponse, headers, "last-modified");
+            AddResponseHeader(localResponse, headers, "x-sirk-sequence");
+            AddResponseHeader(localResponse, headers, "x-sirk-metadata");
             return new CentralTunnelResponseInput(
                 (int)localResponse.StatusCode,
                 contentTypeValue,

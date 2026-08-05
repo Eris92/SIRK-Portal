@@ -13,10 +13,6 @@ internal sealed record LegacyAgentOperationRequest(
     string DeviceId,
     string Type,
     JsonElement Parameters);
-internal sealed record LegacyDesktopInputRequest(
-    string? TenantId,
-    string DeviceId,
-    JsonElement Input);
 internal sealed record LegacyIdentityMutation(
     string? Action,
     string? Id,
@@ -53,10 +49,6 @@ internal static class PortalUiCompatibilityEndpoints
         endpoints.MapPost("/api/agent-operations", LegacyAgentOperationCreateAsync)
             .RequireAuthorization(PortalPolicies.DeviceOperate);
         endpoints.MapGet("/api/agent-operations", LegacyAgentOperationStatusAsync)
-            .RequireAuthorization(PortalPolicies.DeviceOperate);
-        endpoints.MapGet("/api/agent-desktop/frame", LegacyDesktopFrameAsync)
-            .RequireAuthorization(PortalPolicies.DeviceOperate);
-        endpoints.MapPost("/api/agent-desktop/input", LegacyDesktopInputAsync)
             .RequireAuthorization(PortalPolicies.DeviceOperate);
 
         endpoints.MapGet("/api/admin/agent-groups", LegacyAgentGroups)
@@ -153,77 +145,6 @@ internal static class PortalUiCompatibilityEndpoints
         return value is null
             ? PortalAuthenticationEndpoints.Error(404, "AGENT_OPERATION_NOT_FOUND", "Operation was not found.")
             : Results.Ok(new { ok = true, value = LegacyCommandValue(value) });
-    }
-
-    private static async Task<IResult> LegacyDesktopFrameAsync(
-        HttpContext context,
-        AgentStore agents,
-        DesktopRelayHub desktop)
-    {
-        var deviceId = context.Request.Query["deviceId"].ToString().Trim().ToLowerInvariant();
-        var device = agents.GetDevice(deviceId);
-        if (device is not { Enabled: true })
-            return PortalAuthenticationEndpoints.Error(404, "AGENT_NOT_FOUND", "Device was not found.");
-        var after = long.TryParse(context.Request.Query["after"], out var parsedAfter)
-            ? Math.Max(0, parsedAfter)
-            : 0;
-        var wait = int.TryParse(context.Request.Query["waitMilliseconds"], out var parsedWait)
-            ? Math.Clamp(parsedWait, 0, 25_000)
-            : 0;
-        var frame = await desktop.WaitForFrameAsync(
-            device.Id,
-            after,
-            TimeSpan.FromMilliseconds(wait),
-            context.RequestAborted);
-        if (frame is null) return Results.NoContent();
-        context.Response.Headers["X-SIRK-Sequence"] = frame.Sequence.ToString(
-            System.Globalization.CultureInfo.InvariantCulture);
-        context.Response.Headers["X-SIRK-Metadata"] = frame.MetadataBase64;
-        context.Response.Headers.CacheControl = "no-store";
-        return Results.Bytes(frame.Payload, frame.ContentType);
-    }
-
-    private static async Task<IResult> LegacyDesktopInputAsync(
-        HttpContext context,
-        IAntiforgery antiforgery,
-        AgentStore agents,
-        DesktopRelayHub desktop)
-    {
-        if (context.Items["Sirk.InternalTunnel"] is not true)
-        {
-            var csrf = await PortalAuthenticationEndpoints.ValidateCsrfAsync(context, antiforgery);
-            if (csrf is not null) return csrf;
-        }
-        try
-        {
-            var request = await context.Request.ReadFromJsonAsync<LegacyDesktopInputRequest>(
-                              cancellationToken: context.RequestAborted)
-                          ?? throw new InvalidDataException("Desktop input is required.");
-            var device = agents.GetDevice(request.DeviceId)
-                         ?? throw new KeyNotFoundException("Device was not found.");
-            if (!string.IsNullOrWhiteSpace(request.TenantId) &&
-                !string.Equals(device.TenantId, request.TenantId, StringComparison.Ordinal))
-                throw new InvalidDataException("Agent tenant does not match the device.");
-            var message = JsonSerializer.Serialize(new
-            {
-                type = "input",
-                id = 0,
-                input = request.Input
-            }, new JsonSerializerOptions(JsonSerializerDefaults.Web));
-            var delivery = await desktop.SendOrQueueInputAsync(
-                device.Id,
-                message,
-                context.RequestAborted);
-            return Results.Ok(new { ok = true, delivery });
-        }
-        catch (KeyNotFoundException exception)
-        {
-            return PortalAuthenticationEndpoints.Error(404, "AGENT_NOT_FOUND", exception.Message);
-        }
-        catch (Exception exception) when (exception is InvalidDataException or JsonException)
-        {
-            return PortalAuthenticationEndpoints.Error(400, "DESKTOP_INPUT_INVALID", exception.Message);
-        }
     }
 
     private static string CanonicalOperationType(string? value) =>
