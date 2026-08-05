@@ -1,0 +1,47 @@
+name: Apply short installer work root
+
+on:
+  push:
+    branches: [fix/windows-sdk-long-path]
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/windows-sdk-long-path
+          fetch-depth: 0
+
+      - name: Apply installer fix and regression test
+        run: python3 tools/ci/apply_short_installer_workroot.py
+
+      - name: Validate PowerShell syntax
+        shell: pwsh
+        run: |
+          foreach ($path in @('install.ps1','install-dotnet10.ps1','.github/scripts/Test-NodeFreeWindowsInstall.ps1')) {
+            $tokens = $null
+            $errors = $null
+            [void][System.Management.Automation.Language.Parser]::ParseFile(
+              (Resolve-Path $path),
+              [ref]$tokens,
+              [ref]$errors)
+            if ($errors.Count -gt 0) {
+              $errors | ForEach-Object { Write-Error ("${path}: " + $_.Message) }
+              throw "PowerShell syntax validation failed: $path"
+            }
+          }
+
+      - name: Commit final product change
+        shell: bash
+        run: |
+          git rm tools/ci/apply_short_installer_workroot.py .github/workflows/apply-short-installer-workroot.yml
+          git add install.ps1 install-dotnet10.ps1 .github/scripts/Test-NodeFreeWindowsInstall.ps1
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git commit -m "fix: avoid .NET SDK extraction path limit on Windows"
+          git push origin HEAD:fix/windows-sdk-long-path
