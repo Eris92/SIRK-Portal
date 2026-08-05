@@ -246,6 +246,22 @@
     font-weight:700;
 }
 #sirkPortalRoot .sirk-quick-commands-toggle svg{width:18px;height:18px}
+#sirkPortalRoot .sirk-quick-commands-toggle.is-header-mounted{
+    position:static!important;
+    inset:auto!important;
+    flex:0 0 44px;
+    width:44px;
+    min-width:44px;
+    height:44px;
+    min-height:44px;
+    margin:0;
+    padding:0;
+    gap:0;
+    border-radius:12px;
+    box-shadow:0 3px 10px rgba(15,23,42,.08);
+}
+#sirkPortalRoot .sirk-quick-commands-toggle.is-header-mounted span{display:none}
+#sirkPortalRoot .sirk-quick-commands-toggle.is-header-mounted svg{width:20px;height:20px}
 
 #sirkPortalRoot .sirk-agent-desktop{position:relative}
 #sirkPortalRoot .sirk-quick-commands-panel{

@@ -29,14 +29,22 @@ internal static class DeviceHostTabSplitContract
                 tabsCss.Contains("border-color:#16a34a", StringComparison.Ordinal),
             "Online host tabs must keep a green outline.");
         Require(tabsCss.Contains("html.sirk-device-focus-mode #sirkPortalRoot .sirk-device-tab-actions", StringComparison.Ordinal) &&
-                tabsCss.Contains("html.sirk-device-focus-mode #sirkPortalRoot .sirk-device-tab-menu-toggle{display:grid}", StringComparison.Ordinal),
-            "The lower split-menu control must only appear in wide mode.");
+                tabsCss.Contains("html.sirk-device-connection-mode #sirkPortalRoot .sirk-device-tab-actions", StringComparison.Ordinal) &&
+                tabsCss.Contains("html.sirk-device-connection-mode #sirkPortalRoot .sirk-device-tab-menu-toggle{display:grid}", StringComparison.Ordinal),
+            "The lower split-menu control must appear in both expanded device modes.");
         Require(tabsCss.Contains("sirk-device-tab-all", StringComparison.Ordinal) ||
                 tabsScript.Contains("sirk-device-tab sirk-device-tab-all", StringComparison.Ordinal),
             "All must remain a plain tab without host split controls.");
 
         Require(viewMode.Contains("width:44px;height:44px", StringComparison.Ordinal),
             "The view-mode and user controls must use the same 44px footprint.");
+        Require(tabsScript.Contains("syncQuickCommandsToggle", StringComparison.Ordinal) &&
+                tabsScript.Contains("is-header-mounted", StringComparison.Ordinal) &&
+                File.ReadAllText(Path.Combine(root, "public", "shared", "ui", "commands.css")).Contains(".sirk-quick-commands-toggle.is-header-mounted", StringComparison.Ordinal),
+            "Quick Commands must mount in the expanded header instead of being clipped by the desktop stage.");
+        Require(tabsCss.Contains("padding:2px 22px!important", StringComparison.Ordinal) &&
+                viewMode.Contains("padding:0!important;gap:0!important;border-radius:0!important", StringComparison.Ordinal),
+            "Expanded connection mode must remove content spacing and rounded desktop framing.");
         Require(viewMode.Contains("sirk-device-focus-mode .sirk-device-workspace>.sirk-device-compact-header", StringComparison.Ordinal) &&
                 viewMode.Contains("sirk-device-focus-mode .sirk-device-tab-body", StringComparison.Ordinal) &&
                 viewMode.Contains("sirk-agent-desktop-stage canvas{max-width:100%!important;max-height:100%!important", StringComparison.Ordinal),
