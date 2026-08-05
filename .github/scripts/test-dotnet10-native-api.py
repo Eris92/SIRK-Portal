@@ -1,33 +1,20 @@
 #!/usr/bin/env python3
 
-import base64
-import hashlib
-import hmac
 import http.cookiejar
 import json
 import os
-import secrets
 import signal
 import subprocess
 import sys
 import tempfile
 import time
 import urllib.error
-import urllib.parse
 import urllib.request
 from pathlib import Path
 
 PORTAL_URL = "http://127.0.0.1:18082"
 PASSWORD = "Sirk-Portal-Test!2026-Strong"
 ACCESS_CODE = "sirk-break-glass-test-access-code-2026"
-
-
-def b64url(value: bytes) -> str:
-    return base64.urlsafe_b64encode(value).decode("ascii").rstrip("=")
-
-
-def decode_b64url(value: str) -> bytes:
-    return base64.urlsafe_b64decode(value + "=" * ((4 - len(value) % 4) % 4))
 
 
 class Client:
@@ -95,93 +82,6 @@ def wait_ready(timeout_seconds: int = 30) -> None:
             last_error = error
         time.sleep(0.2)
     raise RuntimeError(f"Portal did not become ready: {last_error}")
-
-
-def signed_agent_headers(
-    method: str,
-    path: str,
-    body: bytes,
-    device_id: str,
-    device_token: str,
-    nonce: str | None = None,
-    timestamp: str | None = None,
-) -> tuple[dict[str, str], str, str]:
-    timestamp = timestamp or str(int(time.time() * 1000))
-    nonce = nonce or b64url(secrets.token_bytes(18))
-    body_hash = b64url(hashlib.sha256(body).digest())
-    canonical = f"{method.upper()}\n{path}\n{timestamp}\n{nonce}\n{body_hash}".encode("utf-8")
-    signing_key = hashlib.sha256(device_token.encode("utf-8")).digest()
-    signature = b64url(hmac.new(signing_key, canonical, hashlib.sha256).digest())
-    return (
-        {
-            "Authorization": "SIRK-Agent " + b64url(device_id.encode("utf-8")),
-            "X-SIRK-Timestamp": timestamp,
-            "X-SIRK-Nonce": nonce,
-            "X-SIRK-Signature": signature,
-            "Accept": "application/json",
-        },
-        timestamp,
-        nonce,
-    )
-
-
-def agent_request(
-    method: str,
-    path: str,
-    device_id: str,
-    device_token: str,
-    payload: object | None = None,
-    expected: int = 200,
-    fixed_nonce: str | None = None,
-    fixed_timestamp: str | None = None,
-) -> tuple[dict, bytes, dict[str, str], str, str]:
-    body = b"" if payload is None else json.dumps(payload, separators=(",", ":")).encode("utf-8")
-    headers, timestamp, nonce = signed_agent_headers(
-        method,
-        path,
-        body,
-        device_id,
-        device_token,
-        nonce=fixed_nonce,
-        timestamp=fixed_timestamp,
-    )
-    if payload is not None:
-        headers["Content-Type"] = "application/json"
-    request = urllib.request.Request(
-        PORTAL_URL + path,
-        data=body if method in {"POST", "PUT", "PATCH", "DELETE"} else None,
-        headers=headers,
-        method=method,
-    )
-    try:
-        response = urllib.request.urlopen(request, timeout=10)
-        status = response.status
-        raw = response.read()
-        response_headers = {key.lower(): value for key, value in response.headers.items()}
-    except urllib.error.HTTPError as error:
-        status = error.code
-        raw = error.read()
-        response_headers = {key.lower(): value for key, value in error.headers.items()}
-    if status != expected:
-        raise RuntimeError(
-            f"Agent {method} {path}: expected HTTP {expected}, got {status}: {raw.decode('utf-8', errors='replace')}"
-        )
-    value = json.loads(raw.decode("utf-8")) if raw else {}
-    return value, raw, response_headers, timestamp, nonce
-
-
-def verify_agent_response(raw: bytes, headers: dict[str, str], device_token: str) -> None:
-    timestamp = headers.get("x-sirk-timestamp", "")
-    nonce = headers.get("x-sirk-nonce", "")
-    signature = headers.get("x-sirk-signature", "")
-    if not timestamp or not nonce or not signature:
-        raise RuntimeError("Signed Agent response headers are missing.")
-    body_hash = b64url(hashlib.sha256(raw).digest())
-    canonical = f"{timestamp}\n{nonce}\n{body_hash}".encode("utf-8")
-    signing_key = hashlib.sha256(device_token.encode("utf-8")).digest()
-    expected = hmac.new(signing_key, canonical, hashlib.sha256).digest()
-    if not hmac.compare_digest(expected, decode_b64url(signature)):
-        raise RuntimeError("Agent response HMAC is invalid.")
 
 
 def main() -> int:
@@ -264,119 +164,43 @@ def main() -> int:
             if not enrollment_token or "SIRK Agent" not in group_result["bootstrapScript"]:
                 raise RuntimeError("Agent group credential or bootstrap script is missing.")
 
-            enrollment, _, _ = client.request(
-                "POST",
-                "/api/v1/agent/enroll",
-                {
-                    "groupId": "test-group",
-                    "enrollmentToken": enrollment_token,
-                    "tenantId": "tenant-test",
-                    "name": "Native Test Device",
-                    "hostName": "native-test",
-                    "platform": "windows-x64",
-                    "agentVersion": "1.0.0-test",
-                    "metadata": {"serial": "TEST-001"},
-                },
-                expected=201,
-            )
-            device_id = enrollment["credential"]["deviceId"]
-            device_token = enrollment["credential"]["deviceToken"]
-            if not device_id.startswith("dev-"):
-                raise RuntimeError("Portal did not assign the canonical Agent device ID.")
-
-            heartbeat_payload = {
-                "name": "Native Test Device",
-                "hostName": "native-test",
-                "platform": "windows-x64",
-                "agentVersion": "1.0.0-test",
-                "status": "online",
-                "metadata": {"serial": "TEST-001", "os": "Windows"},
-            }
-            heartbeat, raw, response_headers, timestamp, nonce = agent_request(
-                "POST",
-                "/api/v1/agent/heartbeat",
-                device_id,
-                device_token,
-                heartbeat_payload,
-            )
-            verify_agent_response(raw, response_headers, device_token)
-            if heartbeat.get("device", {}).get("online") is not True:
-                raise RuntimeError("Agent heartbeat did not mark the device online.")
-
-            agent_request(
-                "POST",
-                "/api/v1/agent/heartbeat",
-                device_id,
-                device_token,
-                heartbeat_payload,
-                expected=401,
-                fixed_nonce=nonce,
-                fixed_timestamp=timestamp,
-            )
-
-            client.request(
+            updated_policy, _, _ = client.request(
                 "PUT",
                 "/api/v1/admin/agent-policies",
                 {
                     "scopeType": "group",
                     "scopeId": "test-group",
-                    "policy": {"desktop": {"enabled": True}, "commandPollingSeconds": 5},
+                    "policy": {"remoteDesktopEnabled": True},
                 },
             )
-            policy, raw, response_headers, _, _ = agent_request(
-                "GET",
-                "/api/v1/agent/policy",
-                device_id,
-                device_token,
+            if updated_policy.get("value", {}).get("version") != 1:
+                raise RuntimeError("Agent policy revision was not created.")
+            listed_policies, _, _ = client.request(
+                "GET", "/api/v1/admin/agent-policies"
             )
-            verify_agent_response(raw, response_headers, device_token)
-            if policy["value"]["policy"]["desktop"]["enabled"] is not True:
-                raise RuntimeError("Effective Agent policy is invalid.")
+            matching = [
+                value
+                for value in listed_policies.get("value", [])
+                if value.get("scopeType") == "group"
+                and value.get("scopeId") == "test-group"
+            ]
+            if len(matching) != 1 or matching[0].get("policy", {}).get(
+                "remoteDesktopEnabled"
+            ) is not True:
+                raise RuntimeError("Agent policy administration is invalid.")
 
-            queued, _, _ = client.request(
-                "POST",
-                "/api/v1/admin/agent-commands",
-                {
-                    "deviceId": device_id,
-                    "type": "system.info",
-                    "parameters": {},
-                    "timeoutSeconds": 60,
-                },
-                expected=202,
+            client.request(
+                "DELETE", "/api/v1/admin/agent-policies/group/test-group"
             )
-            command_id = queued["value"]["id"]
-            polled, raw, response_headers, _, _ = agent_request(
-                "GET",
-                "/api/v1/agent/commands?limit=8",
-                device_id,
-                device_token,
+            policies_after_delete, _, _ = client.request(
+                "GET", "/api/v1/admin/agent-policies"
             )
-            verify_agent_response(raw, response_headers, device_token)
-            if [value["id"] for value in polled["commands"]] != [command_id]:
-                raise RuntimeError("Agent did not receive the queued command.")
-
-            completed, raw, response_headers, _, _ = agent_request(
-                "POST",
-                "/api/v1/agent/commands/results",
-                device_id,
-                device_token,
-                {
-                    "commandId": command_id,
-                    "success": True,
-                    "result": {"hostname": "native-test", "ok": True},
-                    "error": None,
-                },
-            )
-            verify_agent_response(raw, response_headers, device_token)
-            if completed["command"]["status"] != "completed":
-                raise RuntimeError("Agent command acknowledgement was not persisted.")
-
-            command, _, _ = client.request(
-                "GET",
-                f"/api/v1/admin/agent-commands/{urllib.parse.quote(command_id)}",
-            )
-            if command["value"]["status"] != "completed":
-                raise RuntimeError("Administrator command status is not completed.")
+            if any(
+                value.get("scopeType") == "group"
+                and value.get("scopeId") == "test-group"
+                for value in policies_after_delete.get("value", [])
+            ):
+                raise RuntimeError("Deleted Agent policy is still listed.")
 
             bootstrap, _, _ = client.request("GET", "/api/v1/bootstrap")
             if bootstrap.get("version") != "3.0.0-dev.1" or not bootstrap.get("modules"):
@@ -386,9 +210,9 @@ def main() -> int:
             actions = {entry["event"]["action"] for entry in audit["entries"]}
             required_actions = {
                 "authentication.login",
-                "agent.enroll",
-                "agent.command.queue",
-                "agent.command.complete",
+                "agent-group.create",
+                "agent.policy.update",
+                "agent.policy.delete",
             }
             if not required_actions.issubset(actions):
                 raise RuntimeError(f"Audit log is missing actions: {sorted(required_actions - actions)}")

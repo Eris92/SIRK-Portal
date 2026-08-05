@@ -14,8 +14,11 @@ internal sealed record AgentPolicyRecord(
 
 internal sealed record AgentPolicyDocument(
     int SchemaVersion,
+    long Revision,
     IReadOnlyList<AgentPolicyRecord> Policies,
     DateTimeOffset UpdatedAtUtc);
+
+internal sealed record AgentEffectivePolicy(long Revision, JsonElement Policy);
 
 internal sealed record AgentPolicyUpdateRequest(
     string ScopeType,
@@ -36,7 +39,7 @@ internal sealed class AgentPolicyStore
         _agents = agents;
         _document = File.Exists(_path)
             ? Validate(AtomicJsonFile.Read<AgentPolicyDocument>(_path))
-            : new AgentPolicyDocument(SchemaVersion, [], DateTimeOffset.UtcNow);
+            : new AgentPolicyDocument(SchemaVersion, 1, [], DateTimeOffset.UtcNow);
     }
 
     public AgentPolicyRecord Update(
@@ -75,7 +78,8 @@ internal sealed class AgentPolicyStore
                 actorName);
             if (index < 0) policies.Add(value);
             else policies[index] = value;
-            Save(new AgentPolicyDocument(SchemaVersion, policies, now));
+            Save(new AgentPolicyDocument(
+                SchemaVersion, checked(_document.Revision + 1), policies, now));
             return value;
         }
     }
@@ -93,10 +97,35 @@ internal sealed class AgentPolicyStore
             {
                 deviceId = device.Id,
                 groupId = device.GroupId,
-                version = $"{group?.Version ?? 0}.{direct?.Version ?? 0}",
+                version = _document.Revision.ToString(
+                    System.Globalization.CultureInfo.InvariantCulture),
                 policy = merged,
                 generatedAtUtc = DateTimeOffset.UtcNow
             };
+        }
+    }
+
+
+    public AgentEffectivePolicy? EffectiveForDelivery(AgentDeviceRecord device)
+    {
+        lock (_sync)
+        {
+            var group = _document.Policies.FirstOrDefault(value =>
+                value.ScopeType == "group" && value.ScopeId == device.GroupId);
+            var direct = _document.Policies.FirstOrDefault(value =>
+                value.ScopeType == "device" && value.ScopeId == device.Id);
+            var restricted = JsonSerializer.SerializeToElement(new
+            {
+                remoteDesktopEnabled = false,
+                remoteAdministrativeDesktopEnabled = false,
+                remoteTerminalEnabled = false,
+                remoteFilesEnabled = false
+            });
+            var effective = Merge(restricted, group?.Policy);
+            effective = Merge(effective, direct?.Policy);
+            return new AgentEffectivePolicy(
+                Math.Max(1, _document.Revision),
+                effective);
         }
     }
 
@@ -124,6 +153,7 @@ internal sealed class AgentPolicyStore
             }
             Save(new AgentPolicyDocument(
                 SchemaVersion,
+                checked(_document.Revision + 1),
                 _document.Policies.Where(value =>
                     value.ScopeType != normalizedType || value.ScopeId != normalizedId).ToArray(),
                 DateTimeOffset.UtcNow));
@@ -146,7 +176,14 @@ internal sealed class AgentPolicyStore
         {
             throw new InvalidDataException("Agent policy store contains duplicate scopes.");
         }
-        return value;
+        if (value.Revision < 0)
+            throw new InvalidDataException("Agent policy revision is invalid.");
+        var revision = value.Revision <= 0
+            ? value.Policies.Count > 0
+                ? Math.Max(1, value.Policies.Max(item => item.Version))
+                : 1
+            : value.Revision;
+        return value with { Revision = revision };
     }
 
     private static JsonElement Merge(JsonElement? group, JsonElement? direct)

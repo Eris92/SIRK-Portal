@@ -35,25 +35,6 @@ internal static class AgentEndpoints
     public static IEndpointRouteBuilder MapAgentEndpoints(
         this IEndpointRouteBuilder endpoints)
     {
-        endpoints.MapPost("/api/v1/agent/enroll", EnrollAsync)
-            .AllowAnonymous()
-            .DisableAntiforgery();
-        endpoints.MapPost("/api/v1/agent/heartbeat", HeartbeatAsync)
-            .AllowAnonymous()
-            .DisableAntiforgery();
-        endpoints.MapGet("/api/v1/agent/commands", PollCommandsAsync)
-            .AllowAnonymous()
-            .DisableAntiforgery();
-        endpoints.MapPost("/api/v1/agent/commands/results", CompleteCommandAsync)
-            .AllowAnonymous()
-            .DisableAntiforgery();
-        endpoints.MapGet("/api/v1/agent/policy", GetPolicyAsync)
-            .AllowAnonymous()
-            .DisableAntiforgery();
-        endpoints.MapGet("/api/v1/agent/desktop/stream", AgentDesktopAsync)
-            .AllowAnonymous()
-            .DisableAntiforgery();
-
         var admin = endpoints
             .MapGroup("/api/v1/admin")
             .RequireAuthorization(PortalPolicies.PortalAdministration);

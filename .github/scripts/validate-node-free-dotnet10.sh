@@ -182,7 +182,7 @@ python3 .github/scripts/test-dotnet10-native-api.py "$portal_dll"
 python3 .github/scripts/test-dotnet10-native-settings-v2.py "$portal_dll"
 python3 .github/scripts/test-dotnet10-full-ui.py "$portal_dll"
 python3 .github/scripts/test-dotnet10-modules-v2.py "$portal_dll"
-python3 .github/scripts/test-dotnet10-agent-v1-compat.py "$portal_dll"
+python3 .github/scripts/test-dotnet10-agent-v1.py "$portal_dll"
 
 docker build --tag sirk-portal:dotnet10 .
 docker run --detach --name sirk-portal-smoke \

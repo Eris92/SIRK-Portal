@@ -10,6 +10,7 @@ import tempfile
 import time
 import urllib.error
 import urllib.request
+from datetime import datetime, timezone
 from pathlib import Path
 
 BASE_URL = "http://127.0.0.1:18085"
@@ -107,6 +108,57 @@ def main() -> int:
     with tempfile.TemporaryDirectory(prefix="sirk-portal-modules-") as temporary:
         data_root = Path(temporary) / "data"
         data_root.mkdir(mode=0o700)
+        now = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+        device_id = "module-test-device"
+        (data_root / "agents.json").write_text(
+            json.dumps(
+                {
+                    "schemaVersion": 1,
+                    "groups": [
+                        {
+                            "id": "source",
+                            "name": "Source",
+                            "description": "Native module E2E",
+                            "enrollmentTokenHashBase64": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+                            "enabled": True,
+                            "createdAtUtc": now,
+                            "updatedAtUtc": now,
+                        },
+                        {
+                            "id": "target",
+                            "name": "Target",
+                            "description": "Native module E2E",
+                            "enrollmentTokenHashBase64": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+                            "enabled": True,
+                            "createdAtUtc": now,
+                            "updatedAtUtc": now,
+                        },
+                    ],
+                    "devices": [
+                        {
+                            "id": device_id,
+                            "groupId": "source",
+                            "tenantId": "tenant-modules",
+                            "name": "Module Test Device",
+                            "hostName": "module-test",
+                            "platform": "windows-x64",
+                            "agentVersion": "1.0.16-test",
+                            "protectedSigningKey": "not-used-by-module-smoke",
+                            "enabled": True,
+                            "status": "offline",
+                            "remoteAddress": "127.0.0.1",
+                            "enrolledAtUtc": now,
+                            "lastSeenAtUtc": None,
+                            "updatedAtUtc": now,
+                            "metadata": {"serial": "MODULE-001", "protocol": "test-seed"},
+                        }
+                    ],
+                    "updatedAtUtc": now,
+                },
+                separators=(",", ":"),
+            ),
+            encoding="utf-8",
+        )
         environment = os.environ.copy()
         environment.update({
             "ASPNETCORE_ENVIRONMENT": "Development",
@@ -129,30 +181,6 @@ def main() -> int:
             wait_ready()
             browser = Browser()
             browser.authenticate()
-
-            credentials = {}
-            for group_id, name in (("source", "Source"), ("target", "Target")):
-                result = browser.call("POST", "/api/v1/admin/agent-groups", {
-                    "action": "create",
-                    "id": group_id,
-                    "name": name,
-                    "description": "Native module E2E",
-                    "portalOrigin": "https://portal.example",
-                    "interactive": False,
-                })
-                credentials[group_id] = result["credential"]["enrollmentToken"]
-
-            enrolled = browser.call("POST", "/api/v1/agent/enroll", {
-                "groupId": "source",
-                "enrollmentToken": credentials["source"],
-                "tenantId": "tenant-modules",
-                "name": "Module Test Device",
-                "hostName": "module-test",
-                "platform": "windows-x64",
-                "agentVersion": "1.0.0-test",
-                "metadata": {"serial": "MODULE-001"},
-            }, expected=201)
-            device_id = enrolled["credential"]["deviceId"]
 
             inventory = browser.call("GET", "/api/v1/modules/portal/devices")
             if device_id not in [row.get("id") for row in inventory.get("nodes", [])]:

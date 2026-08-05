@@ -14,6 +14,7 @@ using Microsoft.Extensions.Configuration;
 using Sirk.Portal.ProtocolTests;
 
 CanonicalDesktopTransportContract.Run();
+CanonicalAgentManagementV1Contract.Run();
 
 const string portalId = "portal-test";
 const string portalToken = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
@@ -264,14 +265,14 @@ using var legacyMetadataDocument = JsonDocument.Parse("""
   }
 }
 """);
-var compactLegacyMetadata = LegacyAgentCompatibilityEndpoints.Summarize(
+var compactAgentMetadata = AgentManagementV1Endpoints.Summarize(
     legacyMetadataDocument.RootElement.Clone());
 Assert(
-    compactLegacyMetadata == "{\"status\":\"Healthy\",\"nested\":{\"value\":1}}",
-    "Legacy Agent check-in metadata must be serialized as compact JSON.");
+    compactAgentMetadata == "{\"status\":\"Healthy\",\"nested\":{\"value\":1}}",
+    "Canonical Agent check-in metadata must be serialized as compact JSON.");
 Assert(
-    !compactLegacyMetadata.Any(char.IsControl),
-    "Legacy Agent check-in metadata must not contain control characters.");
+    !compactAgentMetadata.Any(char.IsControl),
+    "Canonical Agent check-in metadata must not contain control characters.");
 
 Console.WriteLine("SIRK Portal signed heartbeat, protected config, filesystem script, Agent check-in metadata and single-use Agent installer contracts: OK");
 

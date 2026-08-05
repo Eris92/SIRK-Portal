@@ -280,6 +280,35 @@ internal sealed partial class AgentStore
         }
     }
 
+    public AgentDeviceRecord RotateDevicePublicKey(string deviceId, string publicKeySpki)
+    {
+        var normalized = NormalizeId(deviceId, "Device ID");
+        if (string.IsNullOrWhiteSpace(publicKeySpki) || publicKeySpki.Length > 1024)
+            throw new InvalidDataException("Agent public key is invalid.");
+
+        lock (_sync)
+        {
+            var devices = _document.Devices.ToArray();
+            var index = Array.FindIndex(devices, value => value.Id == normalized);
+            if (index < 0) throw new KeyNotFoundException("Device was not found.");
+            var current = devices[index];
+            if (!current.Enabled) throw new UnauthorizedAccessException("Device is disabled.");
+            var metadata = new Dictionary<string, string>(current.Metadata, StringComparer.Ordinal)
+            {
+                ["publicKeySpki"] = publicKeySpki,
+                ["protocol"] = "agent-v1-ecdsa"
+            };
+            var now = DateTimeOffset.UtcNow;
+            devices[index] = current with
+            {
+                Metadata = NormalizeMetadata(metadata),
+                UpdatedAtUtc = now
+            };
+            Save(_document with { Devices = devices, UpdatedAtUtc = now });
+            return devices[index];
+        }
+    }
+
     public AgentDeviceRecord UpdateDevice(
         string deviceId,
         string? groupId,

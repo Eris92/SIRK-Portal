@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 import base64
-import hashlib
 import json
 import os
 import signal
@@ -20,6 +19,10 @@ PASSWORD = "Sirk-Agent-V1-Test!2026"
 ACCESS_CODE = "sirk-agent-v1-access-code-2026"
 GROUP_ID = "agent-v1-test"
 ENROLLMENT_TOKEN = "AgentV1EnrollmentToken_0123456789abcdefghijklmnopqrstuvwxyz"
+
+
+def b64url_decode(value: str) -> bytes:
+    return base64.urlsafe_b64decode(value + "=" * ((4 - len(value) % 4) % 4))
 
 
 def wait_ready(timeout_seconds: int = 30) -> None:
@@ -57,9 +60,7 @@ def raw_call(method: str, path: str, body: bytes | None, headers: dict[str, str]
             f"{raw.decode(errors='replace')}"
         )
     content_type = response_headers.get("content-type", "")
-    if raw and "json" in content_type:
-        return json.loads(raw.decode("utf-8"))
-    if raw and raw[:1] in (b"{", b"["):
+    if raw and ("json" in content_type or raw[:1] in (b"{", b"[")):
         return json.loads(raw.decode("utf-8"))
     return raw.decode("utf-8") if raw else ""
 
@@ -99,6 +100,27 @@ def der_signature_to_p1363(value: bytes) -> bytes:
     return integers[0] + integers[1]
 
 
+def der_length(length: int) -> bytes:
+    if length < 0x80:
+        return bytes([length])
+    encoded = length.to_bytes((length.bit_length() + 7) // 8, "big")
+    return bytes([0x80 | len(encoded)]) + encoded
+
+
+def p1363_signature_to_der(value: bytes) -> bytes:
+    if len(value) != 64:
+        raise RuntimeError("ES256 P1363 signature must contain 64 bytes.")
+
+    def integer(part: bytes) -> bytes:
+        part = part.lstrip(b"\x00") or b"\x00"
+        if part[0] & 0x80:
+            part = b"\x00" + part
+        return b"\x02" + der_length(len(part)) + part
+
+    payload = integer(value[:32]) + integer(value[32:])
+    return b"\x30" + der_length(len(payload)) + payload
+
+
 def signed_headers(key_path: Path, body: bytes, root: Path, token: str):
     timestamp = str(int(time.time()))
     nonce = uuid.uuid4().hex
@@ -131,18 +153,77 @@ def signed_headers(key_path: Path, body: bytes, root: Path, token: str):
     }
 
 
-def seed_agent_group(data_root: Path) -> None:
+def system_text_json_canonical(value: object) -> bytes:
+    # Portal and Agent both use Utf8JsonWriter with the default encoder.
+    # The default .NET encoder escapes HTML-sensitive Basic Latin characters,
+    # including '+' in DateTimeOffset strings, unlike Python's json module.
+    encoded = json.dumps(
+        value, sort_keys=True, separators=(",", ":"), ensure_ascii=True
+    )
+    for character, escape in (
+        ("+", "\\u002B"),
+        ("&", "\\u0026"),
+        ("'", "\\u0027"),
+        ("<", "\\u003C"),
+        (">", "\\u003E"),
+    ):
+        encoded = encoded.replace(character, escape)
+    return encoded.encode("utf-8")
+
+
+def verify_signed_policy(envelope: dict, trusted_key: dict, root: Path) -> None:
+    signature = envelope.get("signature") or {}
+    if signature.get("algorithm") != "ES256":
+        raise RuntimeError("Signed policy does not use ES256.")
+    if signature.get("keyId") != trusted_key.get("keyId"):
+        raise RuntimeError("Signed policy key ID does not match the delivered trust anchor.")
+
+    payload = {key: value for key, value in envelope.items() if key != "signature"}
+    canonical = system_text_json_canonical(payload)
+    canonical_path = root / "policy-canonical.json"
+    signature_path = root / "policy-signature.der"
+    public_key_path = root / "policy-public.pem"
+    canonical_path.write_bytes(canonical)
+    signature_path.write_bytes(
+        p1363_signature_to_der(b64url_decode(str(signature.get("value") or "")))
+    )
+    public_key_path.write_text(str(trusted_key.get("publicKeyPem") or ""), encoding="utf-8")
+    result = subprocess.run(
+        [
+            "openssl",
+            "dgst",
+            "-sha256",
+            "-verify",
+            str(public_key_path),
+            "-signature",
+            str(signature_path),
+            str(canonical_path),
+        ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(
+            "Portal policy ES256 signature is invalid: "
+            + (result.stdout + result.stderr).strip()
+        )
+
+
+def seed_agent_state(data_root: Path) -> None:
     now = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    import hashlib
+
     token_hash = base64.b64encode(
         hashlib.sha256(ENROLLMENT_TOKEN.encode("utf-8")).digest()
     ).decode("ascii")
-    document = {
+    agents = {
         "schemaVersion": 1,
         "groups": [
             {
                 "id": GROUP_ID,
                 "name": "Agent V1 Test",
-                "description": "Signed compatibility E2E",
+                "description": "Signed canonical E2E",
                 "enrollmentTokenHashBase64": token_hash,
                 "enabled": True,
                 "createdAtUtc": now,
@@ -152,14 +233,33 @@ def seed_agent_group(data_root: Path) -> None:
         "devices": [],
         "updatedAtUtc": now,
     }
+    policies = {
+        "schemaVersion": 1,
+        "revision": 2,
+        "policies": [
+            {
+                "scopeType": "group",
+                "scopeId": GROUP_ID,
+                "version": 1,
+                "policy": {"remoteDesktopEnabled": True},
+                "updatedAtUtc": now,
+                "updatedById": "test",
+                "updatedByName": "Canonical Agent E2E",
+            }
+        ],
+        "updatedAtUtc": now,
+    }
     (data_root / "agents.json").write_text(
-        json.dumps(document, separators=(",", ":")), encoding="utf-8"
+        json.dumps(agents, separators=(",", ":")), encoding="utf-8"
+    )
+    (data_root / "agent-policies.json").write_text(
+        json.dumps(policies, separators=(",", ":")), encoding="utf-8"
     )
 
 
 def main() -> int:
     if len(sys.argv) != 2:
-        raise RuntimeError("Usage: test-dotnet10-agent-v1-compat.py <Sirk.Portal.dll>")
+        raise RuntimeError("Usage: test-dotnet10-agent-v1.py <Sirk.Portal.dll>")
     portal_dll = Path(sys.argv[1]).resolve()
     if not portal_dll.is_file():
         raise RuntimeError(f"Portal assembly was not found: {portal_dll}")
@@ -168,7 +268,7 @@ def main() -> int:
         root = Path(temporary)
         data_root = root / "data"
         data_root.mkdir(mode=0o700)
-        seed_agent_group(data_root)
+        seed_agent_state(data_root)
         environment = os.environ.copy()
         environment.update(
             {
@@ -191,23 +291,6 @@ def main() -> int:
         )
         try:
             wait_ready()
-
-            installer = raw_call(
-                "GET",
-                "/api/v1/agent/install-script",
-                None,
-                {"Accept": "text/plain"},
-                200,
-            )
-            for marker in (
-                "SIRK-Agent-Setup.exe.sha256",
-                "Get-FileHash",
-                "--portal-url",
-                "$GroupId + '.' + $EnrollmentToken",
-                "SIRK_AGENT_PORTAL_INSTALL_OK",
-            ):
-                if marker not in installer:
-                    raise RuntimeError(f"Agent install script is missing marker: {marker}")
 
             key_path = root / "device-key.pem"
             public_der = root / "device-public.der"
@@ -250,15 +333,13 @@ def main() -> int:
                     "tenantId": "investa",
                     "deviceId": device_id,
                     "machineName": "AGENT-V1-DEVICE",
-                    "publicKeySpki": base64.b64encode(public_der.read_bytes()).decode(
-                        "ascii"
-                    ),
+                    "publicKeySpki": base64.b64encode(public_der.read_bytes()).decode("ascii"),
                 },
                 separators=(",", ":"),
             ).encode("utf-8")
             enrolled = raw_call(
                 "POST",
-                "/api/agent/v1/enroll",
+                "/api/v1/agent/enroll",
                 enrollment_body,
                 {
                     "Accept": "application/json",
@@ -268,50 +349,83 @@ def main() -> int:
                 201,
             )
             device_token = str(enrolled.get("deviceToken") or "")
+            enrollment_keys = enrolled.get("trustedPolicyKeys") or []
             if enrolled.get("deviceId") != device_id or not device_token:
-                raise RuntimeError("Agent enrollment response is incomplete.")
-            if enrolled.get("checkInEndpoint") != "/api/agent/v1/checkin":
-                raise RuntimeError("Agent check-in endpoint is invalid.")
+                raise RuntimeError("Canonical Agent enrollment response is incomplete.")
+            if enrolled.get("checkInEndpoint") != "/api/v1/agent/checkin":
+                raise RuntimeError("Canonical Agent check-in endpoint is invalid.")
+            if len(enrollment_keys) != 1:
+                raise RuntimeError("Canonical Agent enrollment did not deliver one policy trust anchor.")
 
-            checkin_body = json.dumps(
-                {
-                    "protocolVersion": 1,
-                    "tenantId": "investa",
-                    "deviceId": device_id,
-                    "machineName": "AGENT-V1-DEVICE",
-                    "agentVersion": "1.0.16-test",
-                    "heartbeat": {"status": "healthy"},
-                    "management": {"status": "Healthy"},
-                    "runtimeHealth": {"status": "healthy"},
-                    "security": {"status": "protected"},
-                    "quarantine": {"active": False},
-                    "risk": {"score": 0},
-                    "commandResults": [],
-                    "waitMilliseconds": 0,
-                    "events": [],
-                },
-                separators=(",", ":"),
-            ).encode("utf-8")
+            checkin_payload = {
+                "protocolVersion": 1,
+                "tenantId": "investa",
+                "deviceId": device_id,
+                "machineName": "AGENT-V1-DEVICE",
+                "agentVersion": "1.0.16-test",
+                "heartbeat": {"status": "healthy"},
+                "management": {"status": "Healthy"},
+                "runtimeHealth": {"status": "healthy"},
+                "security": {"status": "protected"},
+                "quarantine": {"active": False},
+                "risk": {"score": 0},
+                "acknowledgedPolicyIds": [],
+                "commandResults": [],
+                "waitMilliseconds": 0,
+                "events": [],
+            }
+            checkin_body = json.dumps(checkin_payload, separators=(",", ":")).encode("utf-8")
             headers = signed_headers(key_path, checkin_body, root, device_token)
             checked = raw_call(
-                "POST", "/api/agent/v1/checkin", checkin_body, headers, 200
+                "POST", "/api/v1/agent/checkin", checkin_body, headers, 200
             )
-            if checked.get("ok") is not True or not isinstance(
-                checked.get("commands"), list
+            policies = checked.get("policies") or []
+            trusted_keys = checked.get("trustedPolicyKeys") or []
+            if checked.get("ok") is not True or not isinstance(checked.get("commands"), list):
+                raise RuntimeError("Canonical signed Agent check-in response is invalid.")
+            if len(policies) != 1 or len(trusted_keys) != 1:
+                raise RuntimeError("Canonical check-in did not deliver one signed effective policy.")
+            if trusted_keys[0] != enrollment_keys[0]:
+                raise RuntimeError("Enrollment and check-in policy trust anchors differ.")
+
+            policy = policies[0]
+            settings = policy.get("settings") or {}
+            if policy.get("tenantId") != "investa" or policy.get("deviceId") != device_id:
+                raise RuntimeError("Signed policy target is invalid.")
+            if policy.get("version") != 2 or policy.get("epoch") != 1 or policy.get("mode") != "Normal":
+                raise RuntimeError("Signed policy anti-rollback coordinates are invalid.")
+            if settings.get("remoteDesktopEnabled") is not True:
+                raise RuntimeError("Signed policy did not enable remote desktop.")
+            for key in (
+                "remoteAdministrativeDesktopEnabled",
+                "remoteTerminalEnabled",
+                "remoteFilesEnabled",
             ):
-                raise RuntimeError("Signed Agent check-in response is invalid.")
+                if settings.get(key) is not False:
+                    raise RuntimeError(f"Restrictive signed policy default is invalid: {key}")
+            verify_signed_policy(policy, trusted_keys[0], root)
 
             raw_call(
-                "POST", "/api/agent/v1/checkin", checkin_body, headers, 401
+                "POST", "/api/v1/agent/checkin", checkin_body, headers, 401
             )
+
+            checkin_payload["acknowledgedPolicyIds"] = [policy["policyId"]]
+            acknowledged_body = json.dumps(
+                checkin_payload, separators=(",", ":")
+            ).encode("utf-8")
+            acknowledged = raw_call(
+                "POST",
+                "/api/v1/agent/checkin",
+                acknowledged_body,
+                signed_headers(key_path, acknowledged_body, root, device_token),
+                200,
+            )
+            if acknowledged.get("policies") != []:
+                raise RuntimeError("Acknowledged policy was delivered again.")
 
             stored = json.loads((data_root / "agents.json").read_text(encoding="utf-8"))
             device = next(
-                (
-                    item
-                    for item in stored.get("devices", [])
-                    if item.get("id") == device_id
-                ),
+                (item for item in stored.get("devices", []) if item.get("id") == device_id),
                 None,
             )
             if not device or not device.get("lastSeenAtUtc"):
@@ -319,9 +433,15 @@ def main() -> int:
             if device.get("agentVersion") != "1.0.16-test":
                 raise RuntimeError("Agent version was not updated by signed check-in.")
             if device.get("metadata", {}).get("protocol") != "agent-v1-ecdsa":
-                raise RuntimeError("Agent protocol metadata is missing.")
+                raise RuntimeError("Canonical Agent protocol metadata is missing.")
 
-            print("SIRK Agent Setup v1 signed enrollment and check-in E2E: OK")
+            signing_document = json.loads(
+                (data_root / "agent-policy-signing-key.json").read_text(encoding="utf-8")
+            )
+            if not signing_document.get("protectedPrivateKey") or "PRIVATE KEY" in json.dumps(signing_document):
+                raise RuntimeError("Portal policy signing private key is not protected at rest.")
+
+            print("SIRK Agent canonical ECDSA enrollment, check-in and signed policy E2E: OK")
             return 0
         finally:
             if process.poll() is None:
