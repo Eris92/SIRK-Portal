@@ -17,26 +17,8 @@
         });
     }
 
-    function removeExecutedCommandForm(host) {
-        host.querySelectorAll(".sirk-command-inline-result").forEach(function (result) {
-            if (result.getAttribute("data-result-only") === "1") return;
-            var card = result.parentElement;
-            if (!card || !card.classList.contains("sirk-card")) return;
-            var text = String(result.textContent || "").trim();
-            if (!text || /^Select Run or Request/i.test(text)) return;
-
-            var detailsHost = card.parentElement;
-            if (!detailsHost) return;
-            result.setAttribute("data-result-only", "1");
-            detailsHost.innerHTML = "";
-            detailsHost.appendChild(result);
-        });
-    }
-
     function normalize(host) {
-        host = host || document;
-        moveCopyBelowResult(host);
-        removeExecutedCommandForm(host);
+        moveCopyBelowResult(host || document);
     }
 
     var scheduled = false;
@@ -51,8 +33,7 @@
 
     new MutationObserver(schedule).observe(document.documentElement, {
         childList: true,
-        subtree: true,
-        characterData: true
+        subtree: true
     });
 
     normalize(document);
