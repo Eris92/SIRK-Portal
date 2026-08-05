@@ -1,8 +1,8 @@
 (function () {
     "use strict";
 
-    if (window.__sirkPlatformDeviceTabsV13Loaded) return;
-    window.__sirkPlatformDeviceTabsV13Loaded = true;
+    if (window.__sirkPlatformDeviceTabsV14Loaded) return;
+    window.__sirkPlatformDeviceTabsV14Loaded = true;
 
     var STORAGE_KEY = "sirkPortal.deviceTabs";
     var state = {
@@ -57,7 +57,10 @@
         return active ? String(active.getAttribute("data-view") || "") : "";
     }
     function devicesActive() { return currentView() === "devices"; }
-    function wideMode() { return document.documentElement.classList.contains("sirk-device-focus-mode"); }
+    function wideMode() {
+        return document.documentElement.classList.contains("sirk-device-focus-mode") ||
+            document.documentElement.classList.contains("sirk-device-connection-mode");
+    }
     function desktopMode() {
         return wideMode() || document.documentElement.classList.contains("sirk-device-connection-mode");
     }
@@ -128,6 +131,22 @@
         Array.prototype.forEach.call(document.querySelectorAll("[data-device-tab-menu-toggle]"), function (button) {
             button.setAttribute("aria-expanded", "false");
         });
+    }
+
+    function syncQuickCommandsToggle() {
+        if (!state.header || !state.content) return;
+        var panel = state.content.querySelector("#sirkQuickCommandsPanel");
+        var toggle = document.getElementById("sirkQuickCommandsToggle");
+        if (!panel) {
+            if (toggle && toggle.classList.contains("is-header-mounted")) toggle.remove();
+            return;
+        }
+        if (!toggle || !desktopMode()) return;
+        var anchor = state.header.querySelector(".sirk-device-view-mode") || state.header.querySelector("#sirkUserMenu");
+        toggle.classList.add("is-header-mounted");
+        if (toggle.parentNode !== state.header || toggle.nextElementSibling !== anchor) {
+            state.header.insertBefore(toggle, anchor || null);
+        }
     }
 
     function positionMenu(toggle) {
@@ -454,6 +473,7 @@
         state.bar.style.display = visible ? "flex" : "none";
         if (!visible) {
             hideMenu();
+            syncQuickCommandsToggle();
             return;
         }
 
@@ -488,6 +508,7 @@
         state.desktopModeWasActive = nowDesktopMode;
         if (!wideMode()) hideMenu();
         if (statusesChanged) persist();
+        syncQuickCommandsToggle();
         renderTabs();
     }
 
