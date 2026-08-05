@@ -141,8 +141,15 @@
         });
     }
 
+    function portalHttpUrl(pathAndQuery) {
+        var rewritten = core && typeof core.portalUrl === "function"
+            ? core.portalUrl(pathAndQuery)
+            : pathAndQuery;
+        return new URL(rewritten, window.location.href).href;
+    }
+
     function agentOperationUrl(action, parameters) {
-        var endpoint = new URL("/api/agent-operations", window.location.href);
+        var endpoint = new URL(portalHttpUrl("/api/agent-operations"), window.location.href);
         Object.keys(parameters || {}).forEach(function (key) {
             endpoint.searchParams.set(key, parameters[key]);
         });
@@ -421,7 +428,7 @@
             }
             var runtime = window.SirkPlatformRuntime && window.SirkPlatformRuntime.state;
             var csrfToken = runtime && runtime.bootstrap && runtime.bootstrap.csrfToken || "";
-            return fetch("/api/agent-desktop/input", {
+            return fetch(portalHttpUrl("/api/agent-desktop/input"), {
                 method: "POST",
                 credentials: "same-origin",
                 headers: { "Content-Type": "application/json", "X-SIRK-CSRF": csrfToken },
@@ -490,11 +497,37 @@
                 targetFps: settings.targetFps, frameMode: settings.frameMode,
                 deltaScalePercent: settings.deltaScalePercent };
             if (usesHttpTunnel()) {
-                input(streamProfile).then(function () { snapshot(streamGeneration); })
-                    .catch(function (error) {
-                        status.textContent = error.message || String(error);
+                var generation = streamGeneration;
+                var configureDeadline = Date.now() + 30000;
+                status.textContent = "Uruchamianie kanału SIRK Agenta…";
+
+                // The frame long-poll marks the HTTP viewer as active. The Agent uses
+                // that state to establish its authenticated desktop WebSocket. Start
+                // polling before sending the first profile to avoid a viewer/Agent
+                // startup deadlock through the Central request/response tunnel.
+                snapshot(generation);
+
+                function configureStream() {
+                    if (stopped || !connected || !host.isConnected || generation !== streamGeneration) return;
+                    input(Object.assign({}, streamProfile)).then(function () {
+                        if (stopped || !connected || !host.isConnected || generation !== streamGeneration) return;
+                        setStreamStatus("Kanał Agenta gotowy · oczekiwanie na pierwszą klatkę…");
+                    }).catch(function (error) {
+                        if (stopped || !connected || !host.isConnected || generation !== streamGeneration) return;
+                        var message = error.message || String(error);
+                        if (Date.now() < configureDeadline &&
+                            /desktop stream is offline|DESKTOP_STREAM_OFFLINE|HTTP 409/i.test(message)) {
+                            status.textContent = "Oczekiwanie na kanał pulpitu SIRK Agenta…";
+                            status.classList.remove("is-error");
+                            setTimeout(configureStream, 500);
+                            return;
+                        }
+                        status.textContent = message;
                         status.classList.add("is-error");
                     });
+                }
+
+                configureStream();
                 return;
             }
             startDesktopSocket(streamGeneration, streamProfile);
@@ -638,9 +671,9 @@
         function snapshot(generation) {
             if (stopped || !connected || !host.isConnected || generation !== streamGeneration) return;
             var requestStarted = performance.now();
-            var url = "/api/agent-desktop/frame?tenantId=" + encodeURIComponent(node.tenantId) +
+            var url = portalHttpUrl("/api/agent-desktop/frame?tenantId=" + encodeURIComponent(node.tenantId) +
                 "&deviceId=" + encodeURIComponent(node.deviceId) +
-                "&after=" + encodeURIComponent(snapshot.sequence || 0) + "&waitMilliseconds=25000";
+                "&after=" + encodeURIComponent(snapshot.sequence || 0) + "&waitMilliseconds=25000");
             fetch(url, { credentials: "same-origin", cache: "no-store" }).then(function (response) {
                 if (response.status === 204) return null;
                 if (!response.ok) throw new Error("HTTP " + response.status);
