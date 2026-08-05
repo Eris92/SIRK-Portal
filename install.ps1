@@ -1,4 +1,4 @@
-#Requires -Version 5.1
+﻿#Requires -Version 5.1
 #Requires -RunAsAdministrator
 [CmdletBinding()]
 param(
@@ -12,6 +12,7 @@ param(
     [switch]$DoNotTrustCertificate,
     [switch]$NonInteractive,
     [switch]$RemoveData,
+    [switch]$KeepBuildSdk,
     [switch]$SkipUpdater
 )
 
@@ -144,6 +145,7 @@ try {
     if ($TrustCertificate) { $parameters.TrustCertificate = $true }
     if ($DoNotTrustCertificate) { $parameters.DoNotTrustCertificate = $true }
     if ($RemoveData) { $parameters.RemoveData = $true }
+    if ($KeepBuildSdk) { $parameters.KeepBuildSdk = $true }
 
     Invoke-Utf8Script -Path $installerPath -Parameters $parameters
 

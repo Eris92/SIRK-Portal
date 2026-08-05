@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param(
     [string]$Branch = 'main',
     [string]$InstallRoot = 'C:\Program Files\SIRK\Portal',
@@ -9,7 +9,8 @@ param(
     [switch]$TrustCertificate,
     [switch]$DoNotTrustCertificate,
     [switch]$NonInteractive,
-    [switch]$RemoveData
+    [switch]$RemoveData,
+    [switch]$KeepBuildSdk
 )
 
 $ErrorActionPreference = 'Stop'
@@ -145,6 +146,30 @@ function Install-DotNet10Component {
     }
 }
 
+function Test-IsolatedDotNetSdk {
+    param(
+        [Parameter(Mandatory)][string]$DotNetRoot,
+        [Parameter(Mandatory)][string]$SdkVersion
+    )
+
+    $candidateExe = Join-Path $DotNetRoot 'dotnet.exe'
+    $candidateSdk = Join-Path $DotNetRoot (Join-Path 'sdk' (Join-Path $SdkVersion 'dotnet.dll'))
+    if (-not (Test-Path -LiteralPath $candidateExe -PathType Leaf) -or
+        -not (Test-Path -LiteralPath $candidateSdk -PathType Leaf)) {
+        return $false
+    }
+
+    try {
+        $installedSdks = @(& $candidateExe --list-sdks 2>$null)
+        if ($LASTEXITCODE -ne 0) { return $false }
+        $escapedVersion = [regex]::Escape($SdkVersion)
+        return [bool]($installedSdks | Where-Object { $_ -match ("^" + $escapedVersion + "\s+\[") })
+    }
+    catch {
+        return $false
+    }
+}
+
 function Ensure-SystemDotNet10([string]$DownloadRoot) {
     Write-Step 'Instalacja współdzielonego .NET 10 Runtime'
     Install-DotNet10Component `
@@ -262,6 +287,7 @@ $sourceExtract = Join-Path $workRoot 'source'
 $publishRoot = Join-Path $workRoot 'publish'
 $dotnetRoot = Join-Path $workRoot 'dotnet-sdk'
 $runtimeDownloadRoot = Join-Path $workRoot 'runtime-installers'
+$persistentBuildSdkRoot = Join-Path $commonDataRoot 'SIRK\Build Cache\dotnet-sdk'
 $dotnetExe = Join-Path $dotnetRoot 'dotnet.exe'
 $logRoot = 'C:\ProgramData\SIRK\Logs'
 $installLog = Join-Path $logRoot 'Portal-DotNet10-Install.log'
@@ -285,13 +311,36 @@ try {
     if (-not (Test-Path -LiteralPath $project)) { throw "Brak projektu .NET 10: $project" }
     if (-not (Test-Path -LiteralPath $globalJsonPath)) { throw 'Brak global.json.' }
 
-    Write-Step 'Instalacja izolowanego .NET 10 SDK wyłącznie do kompilacji'
-    $sdkVersion = (Get-Content -LiteralPath $globalJsonPath -Raw | ConvertFrom-Json).sdk.version
-    $dotnetInstall = Join-Path $workRoot 'dotnet-install.ps1'
-    Invoke-WebRequest 'https://dot.net/v1/dotnet-install.ps1' -OutFile $dotnetInstall -UseBasicParsing
-    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $dotnetInstall -Version $sdkVersion -InstallDir $dotnetRoot -NoPath
-    if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $dotnetExe)) {
-        throw "Instalacja .NET SDK $sdkVersion nie powiodła się. ExitCode=$LASTEXITCODE"
+    Write-Step 'Izolowane .NET 10 SDK wyłącznie do kompilacji'
+    $sdkVersion = [string](Get-Content -LiteralPath $globalJsonPath -Raw | ConvertFrom-Json).sdk.version
+    if ([string]::IsNullOrWhiteSpace($sdkVersion)) {
+        throw 'global.json nie zawiera wymaganej wersji SDK.'
+    }
+
+    if ($KeepBuildSdk) {
+        $dotnetRoot = Join-Path $persistentBuildSdkRoot $sdkVersion
+        $dotnetExe = Join-Path $dotnetRoot 'dotnet.exe'
+        Write-Host "Tryb testowy: zachowuję izolowane SDK w $dotnetRoot" -ForegroundColor DarkCyan
+    }
+
+    if (Test-IsolatedDotNetSdk -DotNetRoot $dotnetRoot -SdkVersion $sdkVersion) {
+        Write-Host ".NET SDK $sdkVersion jest już w cache. Pomijam pobieranie." -ForegroundColor DarkGreen
+    }
+    else {
+        if (Test-Path -LiteralPath $dotnetRoot) {
+            Write-Warning "Cache SDK jest niekompletny albo ma inną wersję. Odtwarzam: $dotnetRoot"
+            Remove-Item -LiteralPath $dotnetRoot -Recurse -Force
+        }
+        New-Item -ItemType Directory -Path $dotnetRoot -Force | Out-Null
+
+        $dotnetInstall = Join-Path $workRoot 'dotnet-install.ps1'
+        Write-Host "Pobieranie izolowanego .NET SDK $sdkVersion..." -ForegroundColor DarkCyan
+        Invoke-WebRequest 'https://dot.net/v1/dotnet-install.ps1' -OutFile $dotnetInstall -UseBasicParsing
+        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $dotnetInstall -Version $sdkVersion -InstallDir $dotnetRoot -NoPath
+        if ($LASTEXITCODE -ne 0 -or
+            -not (Test-IsolatedDotNetSdk -DotNetRoot $dotnetRoot -SdkVersion $sdkVersion)) {
+            throw "Instalacja .NET SDK $sdkVersion nie powiodła się. ExitCode=$LASTEXITCODE"
+        }
     }
 
     Write-Step 'Publikowanie framework-dependent Windows x64'
@@ -498,6 +547,7 @@ try {
     Write-Host "Access Code zapisano w: $accessFile" -ForegroundColor DarkYellow
     Write-Host "Certyfikat: $($certificate.Thumbprint)" -ForegroundColor Cyan
     Write-Host "Log instalacji: $installLog"
+    if ($KeepBuildSdk) { Write-Host "Cache izolowanego SDK: $dotnetRoot" -ForegroundColor DarkGreen }
     if (-not $NonInteractive) { Start-Process "$publicUrl/login" }
 }
 catch {
