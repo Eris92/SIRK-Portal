@@ -30,7 +30,9 @@ jobs:
         shell: pwsh
         run: |
           python .github/scripts/fix-build-sdk-cache-migration.py
+          if ($LASTEXITCODE -ne 0) { throw 'Migration normalization failed.' }
           python .github/scripts/apply-build-sdk-cache.py
+          if ($LASTEXITCODE -ne 0) { throw 'SDK cache migration failed.' }
       - name: Validate PowerShell 5.1 syntax
         shell: powershell
         run: |
@@ -54,14 +56,14 @@ jobs:
         shell: pwsh
         run: dotnet run --project tests/Sirk.Portal.ProtocolTests/Sirk.Portal.ProtocolTests.csproj --configuration Release
       - name: Validate exact-version reuse markers
-        shell: powershell
+        shell: pwsh
         run: |
           $source = Get-Content .\install-dotnet10.ps1 -Raw -Encoding UTF8
           foreach ($marker in @(
             '[switch]$KeepBuildSdk',
             'Test-IsolatedDotNetSdk',
             "SIRK\Build Cache\dotnet-sdk",
-            'jest już w cache. Pomijam pobieranie',
+            'Pomijam pobieranie',
             'Join-Path $persistentBuildSdkRoot $sdkVersion'
           )) {
             if (-not $source.Contains($marker)) { throw "Missing SDK cache marker: $marker" }
