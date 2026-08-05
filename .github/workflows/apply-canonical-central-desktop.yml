@@ -1,0 +1,48 @@
+name: Apply canonical Central desktop transport
+
+on:
+  push:
+    branches:
+      - fix/canonical-central-desktop-transport
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/canonical-central-desktop-transport
+          fetch-depth: 0
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Apply canonical desktop transport
+        run: python3 .github/scripts/apply_canonical_central_desktop.py
+      - name: Build Portal
+        run: dotnet build src/Sirk.Portal/Sirk.Portal.csproj --configuration Release
+      - name: Run protocol contracts
+        run: dotnet run --project tests/Sirk.Portal.ProtocolTests/Sirk.Portal.ProtocolTests.csproj --configuration Release
+      - name: Validate legacy desktop route removal
+        shell: bash
+        run: |
+          if grep -R '/api/agent-desktop/' src public tests --exclude='*.py'; then
+            echo 'Legacy desktop compatibility route remains.' >&2
+            exit 1
+          fi
+          grep -F 'AddResponseHeader(localResponse, headers, "x-sirk-sequence")' src/Sirk.Portal/Central/CentralTunnelService.cs
+          grep -F 'AddResponseHeader(localResponse, headers, "x-sirk-metadata")' src/Sirk.Portal/Central/CentralTunnelService.cs
+      - name: Commit final product change
+        shell: bash
+        run: |
+          rm -f .github/workflows/apply-canonical-central-desktop.yml
+          rm -f .github/scripts/apply_canonical_central_desktop.py
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'fix: use canonical desktop transport through Central'
+          git push origin HEAD:fix/canonical-central-desktop-transport
