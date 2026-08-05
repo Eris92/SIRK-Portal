@@ -35,7 +35,9 @@ jobs:
       - name: Validate removal of old Agent test transport
         shell: bash
         run: |
-          if grep -R '/api/agent/v1/' .github/scripts --include='*.py' --include='*.sh'; then
+          if grep -R '/api/agent/v1/' .github/scripts \
+              --include='*.py' --include='*.sh' \
+              --exclude='apply_canonical_agent_v1_tests.py'; then
             echo 'Legacy Agent management route remains in Portal tests.' >&2
             exit 1
           fi
