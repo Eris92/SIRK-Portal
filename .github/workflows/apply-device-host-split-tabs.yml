@@ -1,0 +1,54 @@
+name: Apply Device Host Split Tabs
+
+on:
+  push:
+    branches:
+      - fix/device-host-split-tabs
+    paths:
+      - tools/apply-device-host-split-tabs.py
+      - .github/workflows/apply-device-host-split-tabs.yml
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: fix/device-host-split-tabs
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Apply host tab changes
+        run: python tools/apply-device-host-split-tabs.py
+
+      - name: Validate browser JavaScript
+        run: |
+          node --check public/portal/standalone/scripts/device-tabs.js
+          node --check public/portal/standalone/scripts/view-mode.js
+          node --check public/portal/standalone/scripts/device-workspace.js
+
+      - name: Validate .NET contracts
+        run: dotnet run --project tests/Sirk.Portal.ProtocolTests/Sirk.Portal.ProtocolTests.csproj -c Release
+
+      - name: Remove migration helpers
+        run: |
+          rm tools/apply-device-host-split-tabs.py
+          rm .github/workflows/apply-device-host-split-tabs.yml
+
+      - name: Commit product changes
+        run: |
+          git config user.name "Eris92"
+          git config user.email "43513086+Eris92@users.noreply.github.com"
+          git add -A
+          git commit -m "fix(ui): add split host tabs and default wide desktop"
+          git push origin HEAD:fix/device-host-split-tabs
