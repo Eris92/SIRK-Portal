@@ -27,6 +27,10 @@ internal static class CanonicalAgentManagementV1Contract
         Require(policies.Contains("Revision", StringComparison.Ordinal) &&
                 policies.Contains("EffectiveForDelivery", StringComparison.Ordinal),
             "Policy anti-rollback revision is missing.");
+        Require(policies.Contains("remoteDesktopEnabled = false", StringComparison.Ordinal) &&
+                policies.Contains("remoteTerminalEnabled = false", StringComparison.Ordinal) &&
+                policies.Contains("remoteFilesEnabled = false", StringComparison.Ordinal),
+            "Restrictive default Agent policy is missing.");
         Require(signer.Contains("ES256", StringComparison.Ordinal) &&
                 signer.Contains("IDataProtector", StringComparison.Ordinal) &&
                 signer.Contains("IeeeP1363FixedFieldConcatenation", StringComparison.Ordinal),

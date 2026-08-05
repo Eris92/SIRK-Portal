@@ -39,7 +39,7 @@ internal sealed class AgentPolicyStore
         _agents = agents;
         _document = File.Exists(_path)
             ? Validate(AtomicJsonFile.Read<AgentPolicyDocument>(_path))
-            : new AgentPolicyDocument(SchemaVersion, 0, [], DateTimeOffset.UtcNow);
+            : new AgentPolicyDocument(SchemaVersion, 1, [], DateTimeOffset.UtcNow);
     }
 
     public AgentPolicyRecord Update(
@@ -114,10 +114,18 @@ internal sealed class AgentPolicyStore
                 value.ScopeType == "group" && value.ScopeId == device.GroupId);
             var direct = _document.Policies.FirstOrDefault(value =>
                 value.ScopeType == "device" && value.ScopeId == device.Id);
-            if (group is null && direct is null) return null;
+            var restricted = JsonSerializer.SerializeToElement(new
+            {
+                remoteDesktopEnabled = false,
+                remoteAdministrativeDesktopEnabled = false,
+                remoteTerminalEnabled = false,
+                remoteFilesEnabled = false
+            });
+            var effective = Merge(restricted, group?.Policy);
+            effective = Merge(effective, direct?.Policy);
             return new AgentEffectivePolicy(
                 Math.Max(1, _document.Revision),
-                Merge(group?.Policy, direct?.Policy));
+                effective);
         }
     }
 
@@ -170,8 +178,10 @@ internal sealed class AgentPolicyStore
         }
         if (value.Revision < 0)
             throw new InvalidDataException("Agent policy revision is invalid.");
-        var revision = value.Revision == 0 && value.Policies.Count > 0
-            ? Math.Max(1, value.Policies.Max(item => item.Version))
+        var revision = value.Revision <= 0
+            ? value.Policies.Count > 0
+                ? Math.Max(1, value.Policies.Max(item => item.Version))
+                : 1
             : value.Revision;
         return value with { Revision = revision };
     }
