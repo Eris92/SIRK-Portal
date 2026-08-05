@@ -210,16 +210,15 @@ internal static class PortalUiCompatibilityEndpoints
                 id = 0,
                 input = request.Input
             }, new JsonSerializerOptions(JsonSerializerDefaults.Web));
-            await desktop.SendInputAsync(device.Id, message, context.RequestAborted);
-            return Results.Ok(new { ok = true });
+            var delivery = await desktop.SendOrQueueInputAsync(
+                device.Id,
+                message,
+                context.RequestAborted);
+            return Results.Ok(new { ok = true, delivery });
         }
         catch (KeyNotFoundException exception)
         {
             return PortalAuthenticationEndpoints.Error(404, "AGENT_NOT_FOUND", exception.Message);
-        }
-        catch (InvalidOperationException exception)
-        {
-            return PortalAuthenticationEndpoints.Error(409, "DESKTOP_STREAM_OFFLINE", exception.Message);
         }
         catch (Exception exception) when (exception is InvalidDataException or JsonException)
         {
