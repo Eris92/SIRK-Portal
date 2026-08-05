@@ -233,7 +233,7 @@
 
 #sirkPortalRoot .sirk-quick-commands-toggle{
     position:absolute;
-    z-index:24;
+    z-index:40;
     top:8px;
     right:8px;
     display:inline-flex;
@@ -250,7 +250,7 @@
 #sirkPortalRoot .sirk-agent-desktop{position:relative}
 #sirkPortalRoot .sirk-quick-commands-panel{
     position:absolute;
-    z-index:23;
+    z-index:39;
     top:52px;
     right:8px;
     bottom:8px;

@@ -1269,7 +1269,8 @@
         panel.id = "sirkQuickCommandsPanel";
         panel.className = "sirk-quick-commands-panel";
         panel.hidden = true;
-        operation.appendChild(toggle);
+        var desktopStage = operation.querySelector(".sirk-agent-desktop-stage");
+        (desktopStage || operation).appendChild(toggle);
         operation.appendChild(panel);
         toggle.addEventListener("click", function (event) {
             event.preventDefault();
