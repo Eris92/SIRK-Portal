@@ -2,6 +2,12 @@ name: SIRK Portal .NET 10 CI
 
 on:
   workflow_dispatch:
+    inputs:
+      binary_only:
+        description: Build and publish only the verified Portal binary update package
+        required: true
+        type: boolean
+        default: true
   push:
     branches: [main, develop, rewrite/dotnet10-node-free]
   pull_request:
@@ -16,6 +22,7 @@ concurrency:
 
 jobs:
   linux-build-api-ui:
+    if: github.event_name != 'workflow_dispatch' || inputs.binary_only != true
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -30,6 +37,7 @@ jobs:
         run: bash .github/scripts/validate-node-free-dotnet10.sh
 
   windows-clean-install:
+    if: github.event_name != 'workflow_dispatch' || inputs.binary_only != true
     runs-on: windows-latest
     timeout-minutes: 55
     steps:
