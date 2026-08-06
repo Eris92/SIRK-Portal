@@ -26,6 +26,18 @@ Instalator pyta o FQDN, hasło Break-Glass i zaufanie certyfikatu. Następnie:
 - generuje TLS oraz Access URL,
 - wykonuje health/readiness i test pełnego frontendu.
 
+## Aktualizacja istniejącej instalacji
+
+Aktualizacja z `main` nie wykonuje ponownej kompilacji na serwerze. CI publikuje gotową paczkę `sirk-portal-win-x64.zip` oraz metadane zawierające rozmiar, commit i SHA-256. Bootstrap aktualizacji:
+
+1. pobiera metadane oraz paczkę binarną,
+2. weryfikuje nazwę aplikacji, kanał, rozmiar i SHA-256,
+3. dołącza lokalny `appsettings.Production.json` wyłącznie w zabezpieczonym katalogu tymczasowym,
+4. przekazuje paczkę do `SirkUpdater`,
+5. wykonuje transactional stop, backup, atomic replacement, start, health check i automatyczny rollback.
+
+Aktualizacja nie instaluje SDK, nie uruchamia `dotnet publish`, nie generuje ponownie certyfikatu, nie zmienia firewalla i nie rejestruje ponownie usługi. Pełny source build można wymusić diagnostycznie parametrem `-ForceSourceBuild`.
+
 ## Runtime i aktualizacje bezpieczeństwa
 
 - `SirkPortal` — usługa ASP.NET Core korzystająca ze współdzielonego runtime 10.0.x,
@@ -41,6 +53,6 @@ Na Windows Server aktualizacje .NET można dystrybuować przez WSUS/Microsoft Up
 
 ## Walidacja
 
-Workflow `SIRK Portal .NET 10 CI` wykonuje build, kontrakty bezpieczeństwa, framework-dependent publish, kontrolę braku prywatnego runtime, smoke test pełnego UI/API, test kontenera oraz rzeczywistą instalację od zera na Windows.
+Workflow `SIRK Portal .NET 10 CI` wykonuje build, kontrakty bezpieczeństwa, framework-dependent publish, kontrolę braku prywatnego runtime, smoke test pełnego UI/API, test kontenera oraz rzeczywistą instalację od zera na Windows. Dla kanału `main` tworzy również zweryfikowaną paczkę binarną i aktualizuje release `portal-main-latest`.
 
 Repozytorium nie zawiera `package.json`, backendu `server/`, `npm`, `node.exe`, `node-windows` ani serwerowych testów JavaScript.
