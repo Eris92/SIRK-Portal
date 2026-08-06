@@ -60,18 +60,22 @@
         return button;
     }
     function paintToggle(button, connected, isOnline) {
-        button.disabled = !isOnline;
+        if (button.disabled !== !isOnline) button.disabled = !isOnline;
         button.classList.toggle("is-connected", connected);
         button.classList.toggle("is-disconnected", !connected);
         button.setAttribute("aria-pressed", connected ? "true" : "false");
         button.title = !isOnline ? tx("Urządzenie jest offline", "Device is offline") : connected ? tx("Rozłącz", "Disconnect") : tx("Połącz", "Connect");
-        button.innerHTML = (connected ? unlink : link) + "<span>" + (connected ? tx("Rozłącz", "Disconnect") : tx("Połącz", "Connect")) + "</span>";
+        var signature = (connected ? "1" : "0") + ":" + (isOnline ? "1" : "0") + ":" + lang();
+        if (button.dataset.sirkConnectionSignature !== signature) {
+            button.dataset.sirkConnectionSignature = signature;
+            button.innerHTML = (connected ? unlink : link) + "<span>" + (connected ? tx("Rozłącz", "Disconnect") : tx("Połącz", "Connect")) + "</span>";
+        }
     }
     function gate(ws, s, isOnline) {
         var connected = s.connected && isOnline;
         Array.prototype.forEach.call(nav(ws).querySelectorAll("[data-device-tab]"), function (button) {
             var type = button.getAttribute("data-device-tab") || "general", allowed = type === "general" || connected;
-            button.disabled = !allowed;
+            if (button.disabled !== !allowed) button.disabled = !allowed;
             button.setAttribute("aria-disabled", allowed ? "false" : "true");
             button.title = allowed ? "" : tx("Najpierw połącz z urządzeniem", "Connect to the device first");
         });
