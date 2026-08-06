@@ -1,0 +1,62 @@
+name: Apply Scoped Wide Desktop Follow-up
+
+on:
+  push:
+    branches:
+      - fix/scope-wide-desktop-to-devices
+    paths:
+      - .github/scripts/apply-scoped-wide-desktop-followup.py
+      - .github/workflows/apply-scoped-wide-desktop-followup.yml
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/scope-wide-desktop-to-devices
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Apply scoped Desktop migrations
+        run: |
+          python .github/scripts/apply-scoped-wide-desktop.py
+          python .github/scripts/apply-scoped-wide-desktop-followup.py
+      - name: Validate browser JavaScript
+        run: |
+          node --check public/portal/standalone/scripts/view-mode.js
+          node --check public/portal/standalone/scripts/device-tabs.js
+          node --check public/portal/standalone/scripts/device-workspace.js
+      - name: Validate complete Portal contracts
+        run: dotnet run --project tests/Sirk.Portal.ProtocolTests/Sirk.Portal.ProtocolTests.csproj --configuration Release
+      - name: Remove migration helpers
+        run: |
+          rm -f .github/scripts/apply-scoped-wide-desktop.py \
+                .github/scripts/apply-scoped-wide-desktop-followup.py \
+                .github/workflows/apply-scoped-wide-desktop.yml \
+                .github/workflows/apply-scoped-wide-desktop-followup.yml
+      - name: Commit product changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/portal/standalone/scripts/device-tabs.js \
+                  public/portal/standalone/scripts/view-mode.js \
+                  public/shared/ui/commands.css \
+                  tests/Sirk.Portal.ProtocolTests/CanonicalAgentManagementV1Contract.cs \
+                  tests/Sirk.Portal.ProtocolTests/CommandWorkspaceStyleContract.cs \
+                  tests/Sirk.Portal.ProtocolTests/DesktopCanvasContract.cs \
+                  tests/Sirk.Portal.ProtocolTests/DeviceConnectionWorkspaceContract.cs \
+                  tests/Sirk.Portal.ProtocolTests/DeviceHostTabSplitContract.cs \
+                  .github/scripts/apply-scoped-wide-desktop.py \
+                  .github/scripts/apply-scoped-wide-desktop-followup.py \
+                  .github/workflows/apply-scoped-wide-desktop.yml \
+                  .github/workflows/apply-scoped-wide-desktop-followup.yml
+          git commit -m "fix(ui): scope screen-only Desktop to Devices wide mode"
+          git push origin HEAD:fix/scope-wide-desktop-to-devices
