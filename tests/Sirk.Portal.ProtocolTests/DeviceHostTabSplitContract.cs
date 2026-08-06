@@ -78,15 +78,19 @@ internal static class DeviceHostTabSplitContract
                 lifecycleScript.Contains("#sirkPortalRoot.sirk-theme-dark", StringComparison.Ordinal),
             "Host tabs and their dropdown must follow the active light or dark Portal theme.");
 
-        Require(selectionScript.Contains(".sirk-device-tab-all.is-active", StringComparison.Ordinal) &&
-                selectionScript.Contains(".sirk-device-host-tab.is-active", StringComparison.Ordinal) &&
-                selectionScript.Contains("inset 0 -3px 0 #2563eb", StringComparison.Ordinal),
-            "The selected All or host tab must have a distinct blue fill and underline independent of online status.");
-        Require(selectionScript.Contains(".is-online.is-active", StringComparison.Ordinal) &&
-                selectionScript.Contains(".is-offline.is-active", StringComparison.Ordinal) &&
-                selectionScript.Contains("inset 3px 0 0 #16a34a", StringComparison.Ordinal) &&
-                selectionScript.Contains("inset 3px 0 0 #dc2626", StringComparison.Ordinal),
-            "Online and offline accents must remain visible while the selected state uses a separate blue marker.");
+        Require(selectionScript.Contains("pointerdown", StringComparison.Ordinal) &&
+                selectionScript.Contains("element.removeAttribute(\"data-device-workspace-key\")", StringComparison.Ordinal) &&
+                selectionScript.Contains("function findDeviceRow", StringComparison.Ordinal) &&
+                selectionScript.Contains("row.click()", StringComparison.Ordinal),
+            "Device host and All tabs must complete navigation on the first pointer interaction instead of requiring a second click.");
+        Require(selectionScript.Contains("background:var(--sirk-sidebar-active,#2b3b55)", StringComparison.Ordinal) &&
+                selectionScript.Contains("inset 3px 0 0 var(--sirk-view-accent", StringComparison.Ordinal),
+            "The selected All or host tab must reuse the active left-menu surface and selection accent.");
+        Require(selectionScript.Contains("inset -3px 0 0 #16a34a", StringComparison.Ordinal) &&
+                selectionScript.Contains("inset -3px 0 0 #dc2626", StringComparison.Ordinal) &&
+                selectionScript.Contains(".is-online.is-active", StringComparison.Ordinal) &&
+                selectionScript.Contains(".is-offline.is-active", StringComparison.Ordinal),
+            "Online and offline status accents must remain on the right edge independently of the selected state.");
 
         Require(headerContextScript.Contains("#sirkConnectionHeaderToggle", StringComparison.Ordinal) &&
                 headerContextScript.Contains("contextmenu", StringComparison.Ordinal) &&
@@ -113,7 +117,7 @@ internal static class DeviceHostTabSplitContract
         Require(transportIndex >= 0 && workspaceIndex > transportIndex && tabsIndex > workspaceIndex &&
                 connectionIndex > tabsIndex && lifecycleIndex > connectionIndex && selectionIndex > lifecycleIndex &&
                 legacyLifecycleIndex < 0 && headerContextIndex > selectionIndex && terminalIndex > headerContextIndex,
-            "Workspace prerequisites, lifecycle, and selected-tab styling must load in a deterministic order.");
+            "Workspace prerequisites, lifecycle, and selected-tab behavior must load in a deterministic order.");
     }
 
     private static string FindRepositoryRoot()
