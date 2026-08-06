@@ -1,0 +1,53 @@
+name: Retry single workspace connection macOS
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/one-shot-single-workspace-connect-macos.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: ${{ contains(github.event.head_commit.message, '[retry-single-workspace-connect-macos]') }}
+    runs-on: macos-14
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Apply single workspace connection model
+        shell: bash
+        run: |
+          ENCODED=$(python3 - <<'PY'
+          import re
+          from pathlib import Path
+          value = Path('.github/workflows/one-shot-single-workspace-connect.yml').read_text(encoding='utf-8')
+          match = re.search(r"echo '([^']+)' \| base64 -d", value)
+          if not match:
+              raise SystemExit('Encoded patch was not found.')
+          print(match.group(1))
+          PY
+          )
+          printf '%s' "$ENCODED" | base64 --decode | gzip --decompress > /tmp/sirk-patch.py
+          python3 /tmp/sirk-patch.py
+      - name: Validate Portal contracts
+        shell: bash
+        run: dotnet run --project tests/Sirk.Portal.ProtocolTests/Sirk.Portal.ProtocolTests.csproj --configuration Release
+      - name: Commit validated connection model
+        shell: bash
+        run: |
+          rm -f .github/workflows/one-shot-single-workspace-connect.yml
+          rm -f .github/workflows/one-shot-single-workspace-connect-retry.yml
+          rm -f .github/workflows/one-shot-single-workspace-connect-macos.yml
+          git config user.name 'SIRK Automation'
+          git config user.email 'sirk-automation@users.noreply.github.com'
+          git add -A
+          git commit -m 'feat(ui): use one explicit workspace connection'
+          git push origin HEAD:main
