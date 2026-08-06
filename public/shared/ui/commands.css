@@ -231,74 +231,60 @@
     font:inherit;
 }
 
-#sirkPortalRoot .sirk-agent-desktop{position:relative}
-#sirkPortalRoot .sirk-quick-commands-dock{
+#sirkPortalRoot .sirk-quick-commands-toggle{
     position:absolute;
-    z-index:45;
+    z-index:40;
     top:8px;
     right:8px;
-    bottom:8px;
-    display:flex;
-    flex-direction:row-reverse;
-    align-items:flex-start;
-    gap:6px;
-    max-width:calc(100% - 16px);
-    pointer-events:none;
+    display:inline-flex;
+    align-items:center;
+    gap:7px;
+    width:auto;
+    min-width:0;
+    padding:0 11px;
+    font-size:13px;
+    font-weight:700;
 }
-#sirkPortalRoot .sirk-quick-commands-dock[hidden]{display:none!important}
-#sirkPortalRoot .sirk-quick-commands-toggle{
-    position:relative;
-    z-index:2;
-    display:grid;
-    place-items:center;
-    flex:0 0 34px;
-    width:34px;
-    min-width:34px;
-    height:34px;
-    min-height:34px;
+#sirkPortalRoot .sirk-quick-commands-toggle svg{width:18px;height:18px}
+#sirkPortalRoot .sirk-quick-commands-toggle.is-header-mounted{
+    position:static!important;
+    inset:auto!important;
+    flex:0 0 44px;
+    width:44px;
+    min-width:44px;
+    height:44px;
+    min-height:44px;
+    margin:0;
     padding:0;
-    border-radius:9px;
-    background:rgba(15,23,42,.9);
-    color:#fff;
-    box-shadow:0 6px 18px rgba(0,0,0,.28);
-    pointer-events:auto;
+    gap:0;
+    border-radius:12px;
+    box-shadow:0 3px 10px rgba(15,23,42,.08);
 }
-#sirkPortalRoot .sirk-quick-commands-toggle span{display:none}
-#sirkPortalRoot .sirk-quick-commands-toggle svg{width:17px;height:17px}
+#sirkPortalRoot .sirk-quick-commands-toggle.is-header-mounted span{display:none}
+#sirkPortalRoot .sirk-quick-commands-toggle.is-header-mounted svg{width:20px;height:20px}
+
+#sirkPortalRoot .sirk-agent-desktop{position:relative}
 #sirkPortalRoot .sirk-quick-commands-panel{
-    --sirk-command-primary:135px;
-    --sirk-command-secondary:210px;
-    --sirk-command-details:190px;
-    --sirk-command-collapsed:48px;
-    position:relative;
-    z-index:1;
+    position:absolute;
+    z-index:39;
+    top:52px;
+    right:8px;
+    bottom:8px;
     display:grid;
     grid-template-rows:auto minmax(0,1fr);
-    width:min(560px,calc(100vw - 92px));
-    height:min(480px,100%);
+    width:min(845px,calc(100% - 16px));
     min-width:0;
-    min-height:240px;
+    min-height:320px;
     overflow:hidden;
     border:1px solid var(--sirk-command-border);
-    border-radius:9px;
+    border-radius:10px;
     background:var(--sirk-command-panel);
-    box-shadow:0 14px 34px rgba(15,23,42,.26);
-    pointer-events:auto;
+    box-shadow:0 18px 44px rgba(15,23,42,.24);
 }
 #sirkPortalRoot .sirk-quick-commands-panel[hidden]{display:none}
-#sirkPortalRoot .sirk-quick-command-browser{
-    grid-template-columns:minmax(110px,var(--sirk-command-primary)) minmax(170px,var(--sirk-command-secondary)) minmax(170px,1fr);
-    font-size:12px;
-}
-#sirkPortalRoot .sirk-quick-command-browser.is-collapsed{
-    grid-template-columns:var(--sirk-command-collapsed) minmax(180px,var(--sirk-command-secondary)) minmax(170px,1fr);
-}
-#sirkPortalRoot .sirk-quick-command-browser.is-details-collapsed{
-    grid-template-columns:minmax(110px,var(--sirk-command-primary)) minmax(200px,1fr) 0;
-}
-#sirkPortalRoot .sirk-quick-command-browser.is-collapsed.is-details-collapsed{
-    grid-template-columns:var(--sirk-command-collapsed) minmax(200px,1fr) 0;
-}
+#sirkPortalRoot .sirk-quick-commands-panel:has(.sirk-quick-command-browser.is-collapsed){width:min(704px,calc(100% - 16px))}
+#sirkPortalRoot .sirk-quick-commands-panel:has(.sirk-quick-command-browser.is-details-collapsed){width:min(545px,calc(100% - 16px))}
+#sirkPortalRoot .sirk-quick-commands-panel:has(.sirk-quick-command-browser.is-collapsed.is-details-collapsed){width:min(404px,calc(100% - 16px))}
 
 #sirkPortalRoot .sirk-command-details,
 #sirkPortalRoot .sirk-device-commands-host .sirk-column-details{
@@ -354,18 +340,22 @@
 #sirkPortalRoot .sirk-quick-command-status:empty{display:none}
 #sirkPortalRoot .sirk-quick-command-status.is-error{color:#b42318;border-color:#efb4b4;background:#fff4f4}
 #sirkPortalRoot .sirk-command-loading,
-#sirkPortalRoot .sirk-command-message{padding:20px;text-align:center;color:var(--sirk-command-muted)}
-#sirkPortalRoot .sirk-command-message.is-error{color:#b42318}
+#sirkPortalRoot .sirk-command-error{padding:20px;text-align:center;color:var(--sirk-command-muted)}
+#sirkPortalRoot .sirk-command-error{color:#b42318}
 
 @media(max-width:1100px){
-    #sirkPortalRoot .sirk-device-commands-host .sirk-layout-host{
+    #sirkPortalRoot .sirk-device-commands-host .sirk-layout-host,
+    #sirkPortalRoot .sirk-quick-command-browser{
         grid-template-columns:minmax(145px,185px) minmax(250px,320px) minmax(220px,1fr);
     }
+    #sirkPortalRoot .sirk-quick-commands-panel{width:min(765px,calc(100% - 16px))}
+    #sirkPortalRoot .sirk-quick-commands-panel:has(.sirk-quick-command-browser.is-collapsed){width:min(644px,calc(100% - 16px))}
+    #sirkPortalRoot .sirk-quick-commands-panel:has(.sirk-quick-command-browser.is-details-collapsed){width:min(485px,calc(100% - 16px))}
+    #sirkPortalRoot .sirk-quick-commands-panel:has(.sirk-quick-command-browser.is-collapsed.is-details-collapsed){width:min(364px,calc(100% - 16px))}
 }
 
 @media(max-width:760px){
-    #sirkPortalRoot .sirk-quick-commands-dock{top:6px;right:6px;bottom:6px;max-width:calc(100% - 12px)}
-    #sirkPortalRoot .sirk-quick-commands-panel{width:min(520px,calc(100vw - 58px));height:100%;min-height:0}
+    #sirkPortalRoot .sirk-quick-commands-panel{top:48px;left:6px;right:6px;bottom:6px;width:auto!important}
     #sirkPortalRoot .sirk-quick-command-browser,
     #sirkPortalRoot .sirk-quick-command-browser.is-collapsed,
     #sirkPortalRoot .sirk-quick-command-browser.is-details-collapsed,

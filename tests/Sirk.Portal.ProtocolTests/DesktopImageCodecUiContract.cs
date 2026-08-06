@@ -10,16 +10,13 @@ internal static class DesktopImageCodecUiContract
 
         foreach (var marker in new[]
                  {
-                     "function effectiveProfile()", "imageEncoding: settings.imageEncoding",
-                     "codec: \"webp\"", "codec: \"png\"", "codec: \"jpeg\"",
-                     "image\\/(?:jpeg|png|webp)", "activeAutoProfile"
+                     "data-agent-desktop-codec", "data-agent-desktop-quality",
+                     "imageEncoding: settings.imageEncoding", "codec: \"webp\"",
+                     "codec: \"png\"", "codec: \"jpeg\"",
+                     "image\\/(?:jpeg|png|webp)", "Math"
                  })
             Require(workspace.Contains(marker, StringComparison.Ordinal),
-                "Desktop automatic codec marker is missing: " + marker);
-
-        Require(!workspace.Contains("data-agent-desktop-codec", StringComparison.Ordinal) &&
-                !workspace.Contains("data-agent-desktop-quality", StringComparison.Ordinal),
-            "The screen-only desktop must not expose codec or quality controls.");
+                "Desktop codec UI marker is missing: " + marker);
 
         Require(workspace.Contains("deltaScalePercent: 100", StringComparison.Ordinal),
             "Readable WebP and PNG profiles must use full-resolution dirty regions.");

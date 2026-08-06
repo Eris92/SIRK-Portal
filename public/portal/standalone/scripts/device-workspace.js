@@ -311,23 +311,34 @@
 
     function renderAgentDesktop(host, node) {
         var stopped = false;
-        host.innerHTML = '<div class=\"sirk-agent-desktop\"><div class=\"sirk-agent-desktop-stage\"><canvas data-agent-desktop-image aria-label=\"Zdalny pulpit\" tabindex=\"0\"></canvas><span data-agent-desktop-cursor style=\"display:none\"></span></div></div>';
+        host.innerHTML = '<div class="sirk-agent-operation sirk-agent-desktop"><header><strong>Pulpit SIRK Agent Live</strong><small>Natychmiastowa pomoc zdalna w wybranej sesji użytkownika</small></header><div class="sirk-agent-desktop-controls"><label>Sesja<select data-agent-desktop-session disabled></select></label><label>Monitor<select data-agent-desktop-monitor disabled><option value="-1">Wszystkie monitory</option></select></label><label>Profil<select data-agent-desktop-profile><option value="auto">Auto</option><option value="smooth">Płynny GUI 120 Hz</option><option value="text">Ostry tekst</option><option value="video">Wideo H.264</option><option value="weak">Słabe łącze</option><option value="minimum">Minimalny transfer</option></select></label><label>Kodek<select data-agent-desktop-codec><option value="auto">Auto (profil)</option><option value="webp">WebP</option><option value="png">PNG</option><option value="jpeg">JPEG</option><option value="h264">H.264</option></select></label><label>Jakość<select data-agent-desktop-quality><option value="auto">Auto (profil)</option><option value="40">40%</option><option value="50">50%</option><option value="60">60%</option><option value="70">70%</option><option value="80">80%</option><option value="85">85%</option><option value="90">90%</option><option value="100">100%</option></select></label><button type="button" data-agent-desktop-connect>Połącz</button><button type="button" data-agent-desktop-disconnect disabled>Rozłącz</button></div><div class="sirk-agent-desktop-stats" data-agent-desktop-stats><span>FPS <b data-stat-fps>0</b></span><span>latencja p50/p95 <b data-stat-latency>—</b></span><span>input dispatch <b data-stat-input>—</b></span><span>capture/encode/session/decode/render <b data-stat-pipeline>—</b></span><span>bitrate <b data-stat-bitrate>0</b></span><span>delta <b data-stat-delta>—</b></span><span>łącze <b data-stat-link>pomiar…</b></span><span>backend <b data-stat-backend>—</b></span></div><div class="sirk-agent-desktop-admin"><strong>Pulpit administracyjny</strong><select data-agent-admin-tool><option value="powershell">PowerShell SYSTEM</option><option value="computer-management">Zarządzanie komputerem</option><option value="services">Usługi</option><option value="registry">Edytor rejestru</option><option value="task-manager">Menedżer zadań</option><option value="event-viewer">Podgląd zdarzeń</option><option value="device-manager">Menedżer urządzeń</option></select><button type="button" data-agent-admin-start disabled>Uruchom w sesji użytkownika</button></div><div class="sirk-agent-desktop-stage" style="position:relative;display:flex;justify-content:center;align-items:center;overflow:hidden;min-height:240px"><canvas data-agent-desktop-image aria-label="Zdalny pulpit" tabindex="0" style="display:block;max-width:100%;max-height:calc(100vh - 360px);width:auto;height:auto;margin:0 auto;touch-action:none"></canvas><span data-agent-desktop-cursor style="position:absolute;width:12px;height:12px;border:2px solid #fff;border-radius:50%;background:#111;box-shadow:0 0 0 1px #111;pointer-events:none;transform:translate(-2px,-2px)"></span></div><div class="sirk-agent-desktop-input"><input data-agent-desktop-text placeholder="Tekst do aktywnego okna"><button type="button" data-agent-desktop-send>Wyślij tekst</button><select data-agent-desktop-key><option>Enter</option><option>Tab</option><option>Escape</option><option>Backspace</option><option>Delete</option><option>Up</option><option>Down</option><option>Left</option><option>Right</option><option>Home</option><option>End</option><option>PageUp</option><option>PageDown</option><option>F5</option></select><button type="button" data-agent-desktop-key-send>Klawisz</button></div><div class="sirk-agent-desktop-clipboard"><textarea data-agent-desktop-clipboard placeholder="Schowek wybranej sesji"></textarea><button type="button" data-agent-desktop-clipboard-get>Pobierz schowek</button><button type="button" data-agent-desktop-clipboard-set>Ustaw schowek</button></div><div class="sirk-agent-policy-action" data-agent-policy-action hidden><button type="button" data-agent-policy-enable>Włącz zdalny pulpit dla urządzenia</button></div><pre data-agent-operation-status>Gotowy do natychmiastowego połączenia.</pre></div>';
         ensureCompactCommands(host);
-        setCompactCommandsConnected(host, false);
         var image = host.querySelector("[data-agent-desktop-image]");
         var imageContext = image.getContext("2d", { alpha: false, desynchronized: true });
         var moveCanvas = document.createElement("canvas");
         var moveContext = moveCanvas.getContext("2d", { alpha: false });
         var localCursor = host.querySelector("[data-agent-desktop-cursor]");
-        var status = document.createElement("span");
-        var selectedSessionId = 0;
-        var selectedMonitorIndex = -1;
+        var status = host.querySelector("[data-agent-operation-status]");
+        var session = host.querySelector("[data-agent-desktop-session]");
+        var monitor = host.querySelector("[data-agent-desktop-monitor]");
+        var profile = host.querySelector("[data-agent-desktop-profile]");
+        var codec = host.querySelector("[data-agent-desktop-codec]");
+        var quality = host.querySelector("[data-agent-desktop-quality]");
+        var textInput = host.querySelector("[data-agent-desktop-text]");
+        var keyInput = host.querySelector("[data-agent-desktop-key]");
+        var clipboard = host.querySelector("[data-agent-desktop-clipboard]");
+        var connectButton = host.querySelector("[data-agent-desktop-connect]");
+        var disconnectButton = host.querySelector("[data-agent-desktop-disconnect]");
+        var adminTool = host.querySelector("[data-agent-admin-tool]");
+        var adminStart = host.querySelector("[data-agent-admin-start]");
+        var policyAction = host.querySelector("[data-agent-policy-action]");
+        var policyEnable = host.querySelector("[data-agent-policy-enable]");
         var nativeWidth = 0, nativeHeight = 0, sourceWidth = 0, sourceHeight = 0;
         var streamGeneration = 0, connected = false;
         var inputSequence = 0, pendingInput = new Map();
         var hasCompleteFrame = false;
         var frameTimes = [], inputTimes = [], byteSamples = [], frameRenderTimes = [];
-        var activeAutoProfile = "smooth", lastAutoChangeAt = 0, lastFrameAt = 0;
+        var activeAutoProfile = "smooth", lastAutoChangeAt = 0, lastStatsPaintAt = 0, lastFrameAt = 0;
         var lastTargetFps = 0;
         var profiles = {
             smooth: { maxWidth: 1920, quality: 85, targetKbps: 2500, targetFps: 120,
@@ -347,16 +358,25 @@
             return sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * fraction))];
         }
         function effectiveProfile() {
-            var base = profiles[activeAutoProfile];
-            var requestedCodec = base.codec;
+            var base = profile.value !== "auto" ? profiles[profile.value] : profiles[activeAutoProfile];
+            var requestedCodec = codec.value === "auto" ? base.codec : codec.value;
+            var requestedQuality = quality.value === "auto" ? base.quality : Number(quality.value);
             return Object.assign({}, base, {
                 codec: requestedCodec,
                 imageEncoding: requestedCodec === "h264" ? "webp" : requestedCodec,
                 frameMode: requestedCodec === "h264" ? "h264" : "tiles",
-                quality: requestedCodec === "png" ? 100 : base.quality
+                quality: requestedCodec === "png" ? 100 : requestedQuality
             });
         }
-        function updateCodecControls() {}
+        function updateCodecControls() {
+            var settings = effectiveProfile();
+            quality.disabled = settings.codec === "png" || settings.codec === "h264";
+            quality.title = settings.codec === "png"
+                ? "PNG jest bezstratny — jakość wynosi 100%."
+                : settings.codec === "h264"
+                    ? "Jakość H.264 jest sterowana limitem bitrate."
+                    : "Jakość kompresji obrazu.";
+        }
         function streamProfileParameters(settings) {
             return { action: "streamProfile", maxWidth: settings.maxWidth,
                 quality: settings.quality, targetKbps: settings.targetKbps,
@@ -392,7 +412,7 @@
             var fps = frameRenderTimes.length > 1 ? (frameRenderTimes.length - 1) / fpsSeconds : 0;
             var bits = byteSamples.reduce(function (sum, item) { return sum + item.bytes * 8; }, 0);
             var inputP95 = percentile(inputTimes, 0.95);
-            if (connected && now - lastAutoChangeAt > 2000) {
+            if (profile.value === "auto" && connected && now - lastAutoChangeAt > 2000) {
                 var latencyP95 = percentile(frameTimes, 0.95), nextProfile = activeAutoProfile;
                 if (activeAutoProfile === "smooth" && latencyP95 > 180) nextProfile = "weak";
                 else if (activeAutoProfile === "weak" && latencyP95 > 340) nextProfile = "minimum";
@@ -406,9 +426,36 @@
                     input(streamProfileParameters(adaptive)).catch(function () {});
                 }
             }
+            if (now - lastStatsPaintAt < 250) return;
+            lastStatsPaintAt = now;
+            host.querySelector("[data-stat-fps]").textContent = fps.toFixed(1) + " / " + lastTargetFps + " Hz";
+            host.querySelector("[data-stat-latency]").textContent = Math.round(percentile(frameTimes, 0.5)) + " / " + Math.round(percentile(frameTimes, 0.95)) + " ms";
+            host.querySelector("[data-stat-input]").textContent = inputP95 ? Math.round(inputP95) + " ms p95" : "—";
+            host.querySelector("[data-stat-pipeline]").textContent = Number(data.captureMilliseconds || 0).toFixed(1) + " / " + Number(data.encodeMilliseconds || 0).toFixed(1) + " / " + Number(data.sessionMilliseconds || 0).toFixed(1) + " / " + decodeMs.toFixed(1) + " / " + renderMs.toFixed(1) + " ms";
+            host.querySelector("[data-stat-bitrate]").textContent = (bits / 5000000).toFixed(2) + " Mb/s";
+            host.querySelector("[data-stat-delta]").textContent = data.fullFrame === true ? "pełna" :
+                (data.refinement === true ? "wyostrzenie" : Number(data.dirtyRectangleCount || 0) +
+                    " rect · " + Number(data.deltaScalePercent || 100) + "%");
+            host.querySelector("[data-stat-link]").textContent = percentile(frameTimes, 0.95) > 350 ? "bardzo słabe" : percentile(frameTimes, 0.95) > 190 ? "słabe" : "dobre";
+            host.querySelector("[data-stat-backend]").textContent = (data.captureBackend || "—") + " · " + (data.encoding || "—");
         }
+        var statsTimer = setInterval(function () {
+            if (!host.isConnected) { clearInterval(statsTimer); return; }
+            if (!connected) return;
+            var now = performance.now();
+            frameRenderTimes = frameRenderTimes.filter(function (at) { return now - at <= 2000; });
+            byteSamples = byteSamples.filter(function (item) { return now - item.at <= 5000; });
+            var fpsSeconds = frameRenderTimes.length > 1
+                ? Math.max(0.001, (now - frameRenderTimes[0]) / 1000) : 1;
+            var fps = frameRenderTimes.length > 1 ? (frameRenderTimes.length - 1) / fpsSeconds : 0;
+            var bits = byteSamples.reduce(function (sum, item) { return sum + item.bytes * 8; }, 0);
+            host.querySelector("[data-stat-fps]").textContent = fps.toFixed(1) + " / " + lastTargetFps + " Hz";
+            host.querySelector("[data-stat-bitrate]").textContent = (bits / 5000000).toFixed(2) + " Mb/s";
+            if (lastFrameAt && now - lastFrameAt > 250)
+                host.querySelector("[data-stat-delta]").textContent = "bez zmian · 0 B";
+        }, 250);
         function selected() {
-            return { sessionId: selectedSessionId, monitorIndex: selectedMonitorIndex };
+            return { sessionId: Number(session.value), monitorIndex: Number(monitor.value) };
         }
         function input(parameters) {
             var target = selected();
@@ -455,29 +502,79 @@
             return response;
         }
         function loadMonitors() {
-            return runAgentOperation(node, "desktop.monitors", { sessionId: selectedSessionId }, status)
+            monitor.disabled = true;
+            return runAgentOperation(node, "desktop.monitors", { sessionId: Number(session.value) }, status)
                 .then(function (value) {
                     var data = desktopData(value);
-                    var monitors = data.monitors || [];
-                    var selectedMonitor = monitors.find(function (item) { return item.primary === true; }) ||
-                        monitors[0] || null;
-                    selectedMonitorIndex = selectedMonitor ? Number(selectedMonitor.index) : -1;
-                });
+                    monitor.innerHTML = '<option value="-1">Wszystkie monitory</option>';
+                    var primaryIndex = null;
+                    (data.monitors || []).forEach(function (item) {
+                        var option = document.createElement("option");
+                        option.value = String(item.index);
+                        option.textContent = (item.primary ? "Główny · " : "") + item.name + " · " + item.width + "×" + item.height;
+                        monitor.appendChild(option);
+                        if (item.primary) primaryIndex = item.index;
+                    });
+                    if (primaryIndex !== null) monitor.value = String(primaryIndex);
+                }).finally(function () { monitor.disabled = false; });
         }
         function loadSessions() {
             return runAgentOperation(node, "desktop.sessions", {}, status).then(function (value) {
                 var result = value.result || {};
                 if (value.status === "failed") {
-                    throw new Error(String(result.output || result.code ||
-                        "Agent odrzucił pobranie sesji."));
+                    var code = String(result.code || "");
+                    var message = String(result.output || code || "Agent odrzucił pobranie sesji.");
+                    policyAction.hidden = code !== "OPERATION_NOT_ALLOWED";
+                    throw new Error(message);
                 }
+                policyAction.hidden = true;
                 var sessions = result.data || [];
+                session.innerHTML = "";
+                sessions.forEach(function (item) {
+                    var option = document.createElement("option");
+                    option.value = String(item.sessionId);
+                    option.textContent = "Sesja " + item.sessionId + (item.active ? " · aktywna" : "");
+                    session.appendChild(option);
+                });
                 if (!sessions.length) throw new Error("Agent nie zgłosił aktywnej sesji użytkownika.");
-                var selectedSession = sessions.find(function (item) { return item.active === true; }) || sessions[0];
-                selectedSessionId = Number(selectedSession.sessionId);
                 return loadMonitors();
             });
         }
+        policyEnable.addEventListener("click", function () {
+            var runtime = window.SirkPlatformRuntime && window.SirkPlatformRuntime.state;
+            var csrfToken = runtime && runtime.bootstrap && runtime.bootstrap.csrfToken || "";
+            policyEnable.disabled = true;
+            status.textContent = "Zapisywanie podpisanej polityki zdalnego pulpitu…";
+            status.classList.remove("is-error");
+            fetch(portalHttpUrl("/api/v1/admin/agent-policies"), {
+                method: "PUT",
+                credentials: "same-origin",
+                headers: { "Content-Type": "application/json", "X-SIRK-CSRF": csrfToken },
+                body: JSON.stringify({
+                    scopeType: "device",
+                    scopeId: node.deviceId,
+                    policy: { remoteDesktopEnabled: true }
+                })
+            }).then(function (response) {
+                return response.json().then(function (value) {
+                    if (!response.ok || value.ok === false)
+                        throw new Error(value.error || value.title || "Nie udało się zapisać polityki.");
+                    return value;
+                });
+            }).then(function () {
+                status.textContent = "Polityka zapisana. Oczekiwanie na podpisany check-in Agenta…";
+                policyAction.hidden = true;
+                setTimeout(function retryPolicy() {
+                    loadSessions().catch(function (error) {
+                        status.textContent = error.message || String(error);
+                        status.classList.add("is-error");
+                    });
+                }, 3000);
+            }).catch(function (error) {
+                status.textContent = error.message || String(error);
+                status.classList.add("is-error");
+            }).then(function () { policyEnable.disabled = false; });
+        });
         function restartStream() {
             if (!connected) return;
             streamGeneration += 1;
@@ -741,7 +838,7 @@
                         : sourceWidth + " × " + sourceHeight + " → " +
                             nativeWidth + " × " + nativeHeight;
                     setStreamStatus("Połączono · tunel Central HTTP · " + frameDescription +
-                        " · profil auto/" + activeAutoProfile);
+                        " · profil " + profile.options[profile.selectedIndex].text);
                     setTimeout(function () { snapshot(generation); }, 0);
                 });
             }).catch(function (error) {
@@ -952,45 +1049,94 @@
             };
             reader.readAsDataURL(file);
         });
-        var reconnectTimer = 0;
-        function scheduleReconnect() {
-            clearTimeout(reconnectTimer);
-            if (stopped || connected) return;
-            reconnectTimer = setTimeout(connectDesktop, 3000);
-        }
-        function connectDesktop() {
-            if (stopped || connected) return;
-            if (!host.isConnected) {
-                scheduleReconnect();
-                return;
-            }
-            clearTimeout(reconnectTimer);
+        host.querySelector("[data-agent-desktop-send]").addEventListener("click", function () {
+            if (!textInput.value) return;
+            input({ action: "text", text: textInput.value }).then(function () { textInput.value = ""; })
+                .catch(function (error) { status.textContent = error.message || String(error); status.classList.add("is-error"); });
+        });
+        host.querySelector("[data-agent-desktop-key-send]").addEventListener("click", function () {
+            input({ action: "key", key: keyInput.value, modifiers: "" })
+                .catch(function (error) { status.textContent = error.message || String(error); status.classList.add("is-error"); });
+        });
+        host.querySelector("[data-agent-desktop-clipboard-get]").addEventListener("click", function () {
+            runAgentOperation(node, "desktop.input", Object.assign(selected(), { action: "clipboardGet" }), status)
+                .then(function (value) { clipboard.value = desktopData(value).text || ""; })
+                .catch(function (error) { status.textContent = error.message || String(error); status.classList.add("is-error"); });
+        });
+        host.querySelector("[data-agent-desktop-clipboard-set]").addEventListener("click", function () {
+            input({ action: "clipboardSet", text: clipboard.value })
+                .catch(function (error) { status.textContent = error.message || String(error); status.classList.add("is-error"); });
+        });
+        session.addEventListener("change", function () {
+            streamGeneration += 1;
+            loadMonitors().then(restartStream);
+        });
+        monitor.addEventListener("change", restartStream);
+        profile.addEventListener("change", function () {
+            codec.value = "auto";
+            quality.value = "auto";
+            updateCodecControls();
+            restartStream();
+        });
+        codec.addEventListener("change", function () {
+            updateCodecControls();
+            restartStream();
+        });
+        quality.addEventListener("change", restartStream);
+        updateCodecControls();
+        connectButton.addEventListener("click", function () {
+            connectButton.disabled = true;
             status.textContent = "Nawiązywanie połączenia live…";
-            status.classList.remove("is-error");
             loadSessions().then(function () {
-                if (stopped || !host.isConnected) return;
                 frameTimes = []; inputTimes = []; byteSamples = []; frameRenderTimes = [];
-                activeAutoProfile = "smooth"; lastAutoChangeAt = 0; lastFrameAt = 0;
+                activeAutoProfile = "smooth"; lastAutoChangeAt = 0; lastStatsPaintAt = 0; lastFrameAt = 0;
                 lastTargetFps = effectiveProfile().targetFps;
                 connected = true;
-                setCompactCommandsConnected(host, true);
+                session.disabled = false;
+                monitor.disabled = false;
+                disconnectButton.disabled = false;
+                adminStart.disabled = false;
                 restartStream();
             }).catch(function (error) {
-                connected = false;
-                setCompactCommandsConnected(host, false);
+                connectButton.disabled = false;
                 status.textContent = error.message || String(error);
                 status.classList.add("is-error");
-                scheduleReconnect();
             });
-        }
-        connectDesktop();
+        });
+        disconnectButton.addEventListener("click", function () {
+            input({ action: "streamStop" }).catch(function () {});
+            connected = false;
+            streamGeneration += 1;
+            if (desktopSocket) { try { desktopSocket.close(); } catch (error) {} desktopSocket = null; }
+            if (desktopInputSocket) { try { desktopInputSocket.close(); } catch (error) {} desktopInputSocket = null; }
+            rejectPendingInputs("Desktop session disconnected.");
+            hasCompleteFrame = false;
+            snapshot.sequence = 0;
+            imageContext.clearRect(0, 0, image.width, image.height);
+            localCursor.style.display = "none";
+            connectButton.disabled = false;
+            disconnectButton.disabled = true;
+            adminStart.disabled = true;
+            session.disabled = true;
+            monitor.disabled = true;
+            status.textContent = "Rozłączono.";
+        });
+        adminStart.addEventListener("click", function () {
+            adminStart.disabled = true;
+            runAgentOperation(node, "desktop.admin.start", {
+                sessionId: Number(session.value),
+                tool: adminTool.value
+            }, status).then(function () {
+                status.textContent = "Narzędzie administracyjne działa jako SYSTEM na pulpicie użytkownika.";
+            }).catch(function (error) {
+                status.textContent = error.message || String(error);
+                status.classList.add("is-error");
+            }).then(function () { adminStart.disabled = !connected; });
+        });
         var observer = new MutationObserver(function () {
             if (!host.isConnected) {
                 stopped = true;
-                clearTimeout(reconnectTimer);
-                if (connected) input({ action: "streamStop" }).catch(function () {});
-                connected = false;
-                setCompactCommandsConnected(host, false);
+                clearInterval(statsTimer);
                 if (desktopSocket) { try { desktopSocket.close(); } catch (error) {} desktopSocket = null; }
                 if (desktopInputSocket) { try { desktopInputSocket.close(); } catch (error) {} desktopInputSocket = null; }
                 rejectPendingInputs("Desktop workspace closed.");
@@ -1109,24 +1255,9 @@
         });
     }
 
-    function setCompactCommandsConnected(host, connected) {
-        var dock = host.querySelector(".sirk-quick-commands-dock");
-        if (!dock) return;
-        dock.hidden = !connected;
-        if (connected) return;
-        var panel = dock.querySelector("#sirkQuickCommandsPanel");
-        var toggle = dock.querySelector("#sirkQuickCommandsToggle");
-        if (panel) panel.hidden = true;
-        if (toggle) toggle.setAttribute("aria-expanded", "false");
-    }
-
     function ensureCompactCommands(host) {
         var operation = host.querySelector(".sirk-agent-desktop") || host;
-        var desktopStage = operation.querySelector(".sirk-agent-desktop-stage");
-        if (!desktopStage || desktopStage.querySelector("#sirkQuickCommandsPanel")) return;
-        var dock = document.createElement("div");
-        dock.className = "sirk-quick-commands-dock";
-        dock.hidden = true;
+        if (operation.querySelector("#sirkQuickCommandsPanel")) return;
         var toggle = document.createElement("button");
         toggle.type = "button";
         toggle.id = "sirkQuickCommandsToggle";
@@ -1138,9 +1269,9 @@
         panel.id = "sirkQuickCommandsPanel";
         panel.className = "sirk-quick-commands-panel";
         panel.hidden = true;
-        dock.appendChild(toggle);
-        dock.appendChild(panel);
-        desktopStage.appendChild(dock);
+        var desktopStage = operation.querySelector(".sirk-agent-desktop-stage");
+        (desktopStage || operation).appendChild(toggle);
+        operation.appendChild(panel);
         toggle.addEventListener("click", function (event) {
             event.preventDefault();
             event.stopPropagation();
@@ -1149,8 +1280,7 @@
             toggle.setAttribute("aria-expanded", opening ? "true" : "false");
             if (!opening) return;
             loadCompactCommands(false).then(renderCompactCommands).catch(function (error) {
-                panel.innerHTML = '<div class="sirk-command-message is-error">' +
-                    esc(error.message || String(error)) + '</div>';
+                panel.innerHTML = '<div class="sirk-command-error">' + esc(error.message || String(error)) + '</div>';
             });
         });
     }
