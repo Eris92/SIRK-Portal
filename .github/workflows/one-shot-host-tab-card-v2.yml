@@ -1,0 +1,330 @@
+name: One-shot host tab card v2
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/one-shot-host-tab-card-v2.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: ${{ contains(github.event.head_commit.message, '[run-host-tab-card-v2]') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Refine host tab card and disconnect behavior
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          tabs_path = Path('public/portal/standalone/scripts/device-tabs.js')
+          css_path = Path('public/portal/standalone/styles/device-tabs.css')
+          test_path = Path('tests/Sirk.Portal.ProtocolTests/DeviceHostTabSplitContract.cs')
+          workflow_path = Path('.github/workflows/one-shot-host-tab-card-v2.yml')
+
+          tabs = tabs_path.read_text(encoding='utf-8')
+          tabs = tabs.replace(
+              'if (window.__sirkPlatformDeviceTabsV15Loaded) return;\n    window.__sirkPlatformDeviceTabsV15Loaded = true;',
+              'if (window.__sirkPlatformDeviceTabsV16Loaded) return;\n    window.__sirkPlatformDeviceTabsV16Loaded = true;',
+              1)
+
+          start = tabs.index('    function requestDesktopAction(key, shouldConnect) {')
+          end = tabs.index('    function closeTab(key) {', start)
+          request_action = '''    function requestDesktopAction(key, shouldConnect) {
+        var pane = state.panes[key];
+        if (!pane || (shouldConnect && !pane.online)) return;
+        hideMenu();
+        state.pendingDesktopAction[key] = shouldConnect ? "connect" : "disconnect-close";
+        activatePane(key, "desktop");
+
+        var attempts = 0;
+        function invoke() {
+            attempts += 1;
+            if (!state.pendingDesktopAction[key] || !state.panes[key]) return;
+            var currentId = clean(state.content && state.content.getAttribute("data-sirk-active-device-id"));
+            var selector = shouldConnect ? "[data-agent-desktop-connect]" : "[data-agent-desktop-disconnect]";
+            var button = state.content && state.content.querySelector(selector);
+            if (contentIsWorkspace() && currentId === pane.nodeId && button) {
+                if (shouldConnect) {
+                    delete state.pendingDesktopAction[key];
+                    if (!button.disabled) {
+                        try { button.click(); } catch (error) {}
+                    }
+                    return;
+                }
+
+                if (button.disabled) {
+                    delete state.pendingDesktopAction[key];
+                    closeTab(key);
+                    return;
+                }
+
+                try { button.click(); } catch (error) {
+                    delete state.pendingDesktopAction[key];
+                    return;
+                }
+
+                window.setTimeout(function () {
+                    if (state.pendingDesktopAction[key] !== "disconnect-close") return;
+                    var currentPane = state.panes[key];
+                    if (!currentPane || currentPane.connected === true) return;
+                    delete state.pendingDesktopAction[key];
+                    closeTab(key);
+                }, 500);
+                return;
+            }
+            if (attempts < 180) window.setTimeout(invoke, 50);
+            else delete state.pendingDesktopAction[key];
+        }
+        window.setTimeout(invoke, 0);
+    }
+
+'''
+          tabs = tabs[:start] + request_action + tabs[end:]
+
+          old_close = '''        delete state.panes[key];
+        delete state.pendingSection[key];
+'''
+          new_close = '''        delete state.panes[key];
+        delete state.pendingSection[key];
+        delete state.pendingDesktopAction[key];
+'''
+          if old_close not in tabs:
+              raise SystemExit('closeTab cleanup anchor not found')
+          tabs = tabs.replace(old_close, new_close, 1)
+
+          old_listener = '''        window.addEventListener("sirkportal:desktopconnectionstate", function (event) {
+            var detail = event && event.detail || {};
+            var nodeId = clean(detail.nodeId);
+            if (!nodeId) return;
+            Object.keys(state.panes).some(function (key) {
+                var pane = state.panes[key];
+                if (clean(pane.nodeId) !== nodeId) return false;
+                pane.connected = detail.connected === true;
+                renderTabs();
+                return true;
+            });
+        });
+'''
+          new_listener = '''        window.addEventListener("sirkportal:desktopconnectionstate", function (event) {
+            var detail = event && event.detail || {};
+            var nodeId = clean(detail.nodeId);
+            if (!nodeId) return;
+            Object.keys(state.panes).some(function (key) {
+                var pane = state.panes[key];
+                if (clean(pane.nodeId) !== nodeId) return false;
+                pane.connected = detail.connected === true;
+                if (detail.connected !== true && state.pendingDesktopAction[key] === "disconnect-close") {
+                    delete state.pendingDesktopAction[key];
+                    window.setTimeout(function () { closeTab(key); }, 0);
+                    return true;
+                }
+                renderTabs();
+                return true;
+            });
+        });
+'''
+          if old_listener not in tabs:
+              raise SystemExit('desktop connection listener anchor not found')
+          tabs = tabs.replace(old_listener, new_listener, 1)
+          tabs_path.write_text(tabs, encoding='utf-8', newline='')
+
+          css = css_path.read_text(encoding='utf-8')
+          marker = '/* SIRK_HOST_TAB_CARD_V2 */'
+          if marker in css:
+              css = css[:css.index(marker)].rstrip() + '\n'
+          css += r'''
+
+/* SIRK_HOST_TAB_CARD_V2 */
+#sirkPortalRoot .sirk-device-tabs{
+    align-items:flex-start!important;
+    height:84px!important;
+    min-height:84px!important;
+    padding:6px 12px!important;
+}
+#sirkPortalRoot .sirk-device-tabs-standalone{
+    height:72px!important;
+    min-height:72px!important;
+    padding:0!important;
+}
+#sirkPortalRoot .sirk-device-tab{
+    height:72px!important;
+    min-height:72px!important;
+}
+#sirkPortalRoot .sirk-device-tab-all{
+    align-self:flex-start!important;
+    height:38px!important;
+    min-height:38px!important;
+    margin-top:3px!important;
+}
+#sirkPortalRoot .sirk-device-host-tab{
+    display:grid!important;
+    grid-template-columns:minmax(200px,1fr) 44px!important;
+    grid-template-rows:38px 34px!important;
+    min-width:286px!important;
+    max-width:360px!important;
+    height:72px!important;
+    min-height:72px!important;
+    padding:0!important;
+    border-radius:12px!important;
+    overflow:hidden!important;
+}
+#sirkPortalRoot .sirk-device-tab-main{
+    grid-column:1!important;
+    grid-row:1!important;
+    justify-content:flex-start!important;
+    min-height:38px!important;
+    padding:0 12px!important;
+    border-radius:11px 0 0 0!important;
+}
+#sirkPortalRoot .sirk-device-tab-label{
+    font-size:13px!important;
+    font-weight:700!important;
+    line-height:1!important;
+}
+#sirkPortalRoot .sirk-device-tab-connection-actions{
+    grid-column:1!important;
+    grid-row:2!important;
+    display:grid!important;
+    grid-template-columns:1fr 1fr!important;
+    height:34px!important;
+    border-top:1px solid rgba(101,113,135,.30)!important;
+}
+#sirkPortalRoot .sirk-device-tab-connect,
+#sirkPortalRoot .sirk-device-tab-disconnect{
+    display:inline-flex!important;
+    align-items:center!important;
+    justify-content:center!important;
+    gap:6px!important;
+    height:34px!important;
+    min-height:34px!important;
+    padding:0 10px!important;
+    border:0!important;
+    font:700 12px/1 Segoe UI,Arial,sans-serif!important;
+}
+#sirkPortalRoot .sirk-device-tab-connect{
+    border-radius:0 0 0 11px!important;
+    color:#15803d!important;
+    background:linear-gradient(180deg,rgba(34,197,94,.24),rgba(34,197,94,.14))!important;
+}
+#sirkPortalRoot .sirk-device-tab-disconnect{
+    border-left:1px solid rgba(101,113,135,.30)!important;
+    color:#dc2626!important;
+    background:linear-gradient(180deg,rgba(220,38,38,.22),rgba(220,38,38,.12))!important;
+}
+#sirkPortalRoot .sirk-device-tab-connect svg,
+#sirkPortalRoot .sirk-device-tab-disconnect svg{
+    flex:0 0 15px!important;
+    width:15px!important;
+    height:15px!important;
+    stroke-width:2.2!important;
+}
+#sirkPortalRoot .sirk-device-tab-connect:hover:not(:disabled),
+#sirkPortalRoot .sirk-device-tab-connect:focus-visible{
+    background:linear-gradient(180deg,rgba(34,197,94,.34),rgba(34,197,94,.22))!important;
+}
+#sirkPortalRoot .sirk-device-tab-disconnect:hover:not(:disabled),
+#sirkPortalRoot .sirk-device-tab-disconnect:focus-visible{
+    background:linear-gradient(180deg,rgba(220,38,38,.32),rgba(220,38,38,.20))!important;
+}
+#sirkPortalRoot .sirk-device-tab-connect:disabled,
+#sirkPortalRoot .sirk-device-tab-disconnect:disabled{
+    opacity:.34!important;
+    cursor:default!important;
+}
+#sirkPortalRoot .sirk-device-tab-actions{
+    grid-column:2!important;
+    grid-row:1 / span 2!important;
+    display:grid!important;
+    grid-template-rows:1fr 1fr!important;
+    width:44px!important;
+    min-width:44px!important;
+    border-left:1px solid rgba(101,113,135,.30)!important;
+}
+#sirkPortalRoot .sirk-device-tab-close,
+#sirkPortalRoot .sirk-device-tab-menu-toggle{
+    display:grid!important;
+    place-items:center!important;
+    width:44px!important;
+    min-width:44px!important;
+    padding:0!important;
+    opacity:1!important;
+}
+#sirkPortalRoot .sirk-device-tab-close{
+    border-bottom:1px solid rgba(101,113,135,.30)!important;
+}
+#sirkPortalRoot .sirk-device-tab-close svg,
+#sirkPortalRoot .sirk-device-tab-menu-toggle svg{
+    width:18px!important;
+    height:18px!important;
+    stroke-width:2.4!important;
+}
+#sirkPortalRoot.sirk-theme-dark .sirk-device-tab-connect{
+    color:#86efac!important;
+    background:linear-gradient(180deg,rgba(22,163,74,.28),rgba(22,163,74,.16))!important;
+}
+#sirkPortalRoot.sirk-theme-dark .sirk-device-tab-disconnect{
+    color:#fca5a5!important;
+    background:linear-gradient(180deg,rgba(220,38,38,.26),rgba(220,38,38,.15))!important;
+}
+@media (max-width:900px){
+    #sirkPortalRoot .sirk-device-host-tab{
+        grid-template-columns:minmax(174px,1fr) 42px!important;
+        min-width:250px!important;
+    }
+    #sirkPortalRoot .sirk-device-tab-actions,
+    #sirkPortalRoot .sirk-device-tab-close,
+    #sirkPortalRoot .sirk-device-tab-menu-toggle{
+        width:42px!important;
+        min-width:42px!important;
+    }
+}
+'''
+          css_path.write_text(css, encoding='utf-8', newline='')
+
+          test = test_path.read_text(encoding='utf-8')
+          anchor = '''        Require(viewMode.Contains("sirk-device-focus-mode .sirk-device-workspace>.sirk-device-compact-header", StringComparison.Ordinal) &&
+                viewMode.Contains("sirk-device-focus-mode .sirk-device-tab-body", StringComparison.Ordinal) &&
+                viewMode.Contains("sirk-agent-desktop-stage canvas{max-width:100%!important;max-height:100%!important", StringComparison.Ordinal),
+            "Wide mode must replace the inner tabs and dedicate the content area to the selected workspace, including Desktop.");
+'''
+          addition = anchor + '''        Require(tabsCss.Contains("SIRK_HOST_TAB_CARD_V2", StringComparison.Ordinal) &&
+                tabsCss.Contains("height:72px!important", StringComparison.Ordinal) &&
+                tabsCss.Contains("grid-template-columns:minmax(200px,1fr) 44px!important", StringComparison.Ordinal) &&
+                tabsCss.Contains("linear-gradient(180deg,rgba(34,197,94,.24)", StringComparison.Ordinal) &&
+                tabsCss.Contains("linear-gradient(180deg,rgba(220,38,38,.22)", StringComparison.Ordinal),
+            "Host tabs must use the polished two-row card layout with readable connect, disconnect, close, and menu controls.");
+        Require(tabsScript.Contains("disconnect-close", StringComparison.Ordinal) &&
+                tabsScript.Contains("window.setTimeout(function () { closeTab(key); }, 0);", StringComparison.Ordinal) &&
+                tabsScript.Contains("delete state.pendingDesktopAction[key];", StringComparison.Ordinal),
+            "Disconnect must stop the desktop session and close the corresponding host tab.");
+'''
+          if anchor not in test:
+              raise SystemExit('contract insertion anchor not found')
+          test = test.replace(anchor, addition, 1)
+          test_path.write_text(test, encoding='utf-8', newline='')
+
+          workflow_path.unlink()
+          PY
+      - name: Validate Portal contracts
+        shell: bash
+        run: dotnet run --project tests/Sirk.Portal.ProtocolTests/Sirk.Portal.ProtocolTests.csproj --configuration Release
+      - name: Commit validated host tab refinement
+        shell: bash
+        run: |
+          git config user.name 'SIRK Automation'
+          git config user.email 'sirk-automation@users.noreply.github.com'
+          git add public/portal/standalone/scripts/device-tabs.js public/portal/standalone/styles/device-tabs.css tests/Sirk.Portal.ProtocolTests/DeviceHostTabSplitContract.cs .github/workflows/one-shot-host-tab-card-v2.yml
+          git commit -m 'fix(ui): refine host tab card and close on disconnect'
+          git push origin HEAD:main
