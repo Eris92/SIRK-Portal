@@ -72,12 +72,12 @@ internal sealed class PortalMaintenanceStore
                 {
                     version = VersionInfo.Current,
                     channel = _document.Channel,
-                    branch = "rewrite/dotnet10-clean"
+                    branch = "main"
                 },
                 remote = new
                 {
-                    availableVersion = VersionInfo.Current,
-                    updateAvailable = false,
+                    availableVersion = "main/latest",
+                    updateAvailable = OperatingSystem.IsWindows(),
                     error = (string?)null
                 },
                 jobs = new Dictionary<string, object>(),
@@ -104,7 +104,7 @@ internal sealed class PortalMaintenanceStore
                     channel = true,
                     restart = OperatingSystem.IsWindows(),
                     restore = OperatingSystem.IsWindows(),
-                    update = false
+                    update = OperatingSystem.IsWindows()
                 }
             };
         }
@@ -114,7 +114,7 @@ internal sealed class PortalMaintenanceStore
     {
         lock (_sync)
         {
-            AppendHistory("check", "Sprawdzono kanał aktualizacji.", null);
+            AppendHistory("check", "Sprawdzono kanał aktualizacji main/latest.", null);
             return Snapshot();
         }
     }
@@ -220,6 +220,103 @@ internal sealed class PortalMaintenanceStore
             Save();
         }
         return new { accepted = true, action = "restart" };
+    }
+
+    public object ScheduleUpdate()
+    {
+        if (!OperatingSystem.IsWindows())
+            throw new PlatformNotSupportedException("Aktualizacja Portalu jest dostępna tylko na Windows.");
+
+        var lockPath = Path.Combine(_paths.DataRoot, "maintenance-update.lock");
+        lock (_sync)
+        {
+            if (File.Exists(lockPath))
+            {
+                var lastWrite = new DateTimeOffset(
+                    File.GetLastWriteTimeUtc(lockPath),
+                    TimeSpan.Zero);
+                if (DateTimeOffset.UtcNow - lastWrite < TimeSpan.FromHours(2))
+                    throw new InvalidOperationException("Aktualizacja Portalu jest już uruchomiona.");
+                File.Delete(lockPath);
+            }
+            File.WriteAllText(lockPath, DateTimeOffset.UtcNow.ToString("O"));
+            AtomicJsonFile.SecureFile(lockPath);
+        }
+
+        var installRoot = AppContext.BaseDirectory.TrimEnd(
+            Path.DirectorySeparatorChar,
+            Path.AltDirectorySeparatorChar);
+        var settingsPath = Path.Combine(installRoot, "appsettings.Production.json");
+        if (!File.Exists(settingsPath))
+        {
+            File.Delete(lockPath);
+            throw new InvalidOperationException(
+                "Brak appsettings.Production.json wymaganych do aktualizacji.");
+        }
+
+        var logRoot = Path.Combine(_paths.DataRoot, "Logs");
+        Directory.CreateDirectory(logRoot);
+        AtomicJsonFile.SecureDirectory(logRoot);
+        var logPath = Path.Combine(
+            logRoot,
+            "gui-update-" + DateTimeOffset.UtcNow.ToString("yyyyMMdd-HHmmss") + ".log");
+
+        var script = $$"""
+Start-Sleep -Seconds 2
+$installRoot={{QuotePs(installRoot)}}
+$dataRoot={{QuotePs(_paths.DataRoot)}}
+$settingsPath={{QuotePs(settingsPath)}}
+$lockPath={{QuotePs(lockPath)}}
+$logPath={{QuotePs(logPath)}}
+$bootstrap=Join-Path ([IO.Path]::GetTempPath()) ('SIRK-Portal-Gui-Update-' + [guid]::NewGuid().ToString('N') + '.ps1')
+try {
+    ('Start GUI update: ' + [DateTimeOffset]::UtcNow.ToString('O')) | Set-Content -LiteralPath $logPath -Encoding UTF8
+    $settings=Get-Content -LiteralPath $settingsPath -Raw -Encoding UTF8 | ConvertFrom-Json
+    $httpsEndpoint=[uri][string]$settings.Kestrel.Endpoints.Https.Url
+    $publicUri=[uri][string]$settings.Sirk.Central.PublicUrl
+    $portalFqdn=[string]$publicUri.DnsSafeHost
+    $httpsPort=[int]$httpsEndpoint.Port
+    if([string]::IsNullOrWhiteSpace($portalFqdn)){throw 'Nie można ustalić FQDN Portalu z konfiguracji.'}
+    if($httpsPort -lt 1 -or $httpsPort -gt 65535){throw 'Nie można ustalić portu HTTPS Portalu z konfiguracji.'}
+    Invoke-WebRequest -UseBasicParsing -Uri ('https://raw.githubusercontent.com/Eris92/SIRK-Portal/main/install.ps1?nocache=' + [guid]::NewGuid()) -OutFile $bootstrap
+    & $bootstrap -Branch 'main' -InstallRoot $installRoot -DataRoot $dataRoot -HttpsPort $httpsPort -PortalFqdn $portalFqdn -TrustCertificate -NonInteractive -KeepBuildSdk *>> $logPath
+    if(-not $?){throw 'Instalator SIRK Portal zakończył się błędem.'}
+}
+catch {
+    ($_ | Out-String) | Add-Content -LiteralPath $logPath -Encoding UTF8
+    throw
+}
+finally {
+    Remove-Item -LiteralPath $bootstrap -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $lockPath -Force -ErrorAction SilentlyContinue
+}
+""";
+
+        try
+        {
+            StartHelperScript("update", script);
+        }
+        catch
+        {
+            File.Delete(lockPath);
+            throw;
+        }
+
+        lock (_sync)
+        {
+            AppendHistory(
+                "update",
+                "Uruchomiono aktualizację Portalu z main/latest. Log: " + logPath,
+                null);
+            Save();
+        }
+        return new
+        {
+            accepted = true,
+            action = "update",
+            channel = "main",
+            logPath
+        };
     }
 
     public object ScheduleRestore(string? id)
@@ -377,6 +474,7 @@ internal static class PortalMaintenanceEndpoints
         group.MapPost("/channel", ChannelAsync);
         group.MapPost("/delete-backup", DeleteBackupAsync);
         group.MapPost("/restart", RestartAsync);
+        group.MapPost("/update", UpdateAsync);
         group.MapPost("/restore", RestoreAsync);
         return endpoints;
     }
@@ -418,6 +516,19 @@ internal static class PortalMaintenanceEndpoints
         PortalMaintenanceStore store,
         PortalAuditLog audit) =>
         await MutateAsync(context, antiforgery, audit, "maintenance.restart", "SirkPortal", store.ScheduleRestart);
+
+    private static async Task<IResult> UpdateAsync(
+        HttpContext context,
+        IAntiforgery antiforgery,
+        PortalMaintenanceStore store,
+        PortalAuditLog audit) =>
+        await MutateAsync(
+            context,
+            antiforgery,
+            audit,
+            "maintenance.update",
+            "main/latest",
+            store.ScheduleUpdate);
 
     private static async Task<IResult> RestoreAsync(
         PortalMaintenanceMutation request,

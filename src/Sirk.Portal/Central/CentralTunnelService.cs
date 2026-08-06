@@ -69,7 +69,7 @@ internal sealed class CentralTunnelService : BackgroundService
             Math.Clamp(_options.MaximumConcurrency, 1, 32),
             Math.Clamp(_options.MaximumConcurrency, 1, 32));
         _localOrigin = _options.Enabled
-            ? ValidateLocalOrigin(_options.LocalOrigin)
+            ? ResolveLocalOrigin(_options.LocalOrigin)
             : new Uri("http://127.0.0.1/", UriKind.Absolute);
 
         var localHandler = new SocketsHttpHandler
@@ -465,6 +465,19 @@ internal sealed class CentralTunnelService : BackgroundService
 
     private static string ProxyPrefix(string portalId) =>
         "/connect/" + Uri.EscapeDataString(portalId);
+
+    private static Uri ResolveLocalOrigin(string value)
+    {
+        var configured = ValidateLocalOrigin(value);
+        var legacyLocalhost = configured.Host.Equals(
+            "localhost",
+            StringComparison.OrdinalIgnoreCase);
+        var ipv6Loopback = IPAddress.TryParse(configured.Host, out var address) &&
+                           address.Equals(IPAddress.IPv6Loopback);
+        return legacyLocalhost || ipv6Loopback
+            ? new Uri("http://127.0.0.1:8080/", UriKind.Absolute)
+            : configured;
+    }
 
     private static Uri ValidateLocalOrigin(string value)
     {
