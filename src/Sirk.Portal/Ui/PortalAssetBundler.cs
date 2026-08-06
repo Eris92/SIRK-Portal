@@ -24,7 +24,7 @@ internal static class PortalAssetBundler
                 "portal/standalone/scripts/device-workspace.js",
                 "portal/standalone/scripts/device-tabs.js",
                 "portal/standalone/scripts/workspace-connection.js",
-                "portal/standalone/scripts/device-tabs-lifecycle-v3.js",
+                "portal/standalone/scripts/device-tabs-lifecycle-v4.js",
                 "portal/standalone/scripts/header-toggle-context-menu.js",
                 "portal/standalone/scripts/terminal-connect.js"
             ]),
