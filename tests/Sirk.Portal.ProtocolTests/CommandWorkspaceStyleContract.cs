@@ -8,6 +8,7 @@ internal static class CommandWorkspaceStyleContract
         var commandsCss = File.ReadAllText(Path.Combine(root, "public", "shared", "ui", "commands.css"));
         var deviceCss = File.ReadAllText(Path.Combine(root, "public", "portal", "standalone", "styles", "device-workspace.css"));
         var workspace = File.ReadAllText(Path.Combine(root, "public", "portal", "standalone", "scripts", "device-workspace.js"));
+        var viewMode = File.ReadAllText(Path.Combine(root, "public", "portal", "standalone", "scripts", "view-mode.js"));
         var index = File.ReadAllText(Path.Combine(root, "public", "portal", "standalone", "index.html"));
 
         foreach (var marker in new[]
@@ -16,8 +17,7 @@ internal static class CommandWorkspaceStyleContract
                      ".sirk-quick-command-browser", ".sirk-command-toolbar",
                      "minmax(165px,var(--sirk-command-primary))",
                      "minmax(285px,var(--sirk-command-secondary))",
-                     "minmax(240px,1fr)", "is-details-collapsed",
-                     ".sirk-quick-commands-dock", "width:min(560px"
+                     "minmax(240px,1fr)", "is-details-collapsed"
                  })
             Require(commandsCss.Contains(marker, StringComparison.Ordinal),
                 "Canonical command workspace CSS marker is missing: " + marker);
@@ -40,6 +40,11 @@ internal static class CommandWorkspaceStyleContract
                  })
             Require(workspace.Contains(marker, StringComparison.Ordinal),
                 "Quick Commands shared configuration marker is missing: " + marker);
+
+        Require(viewMode.Contains("sirk-expanded-desktop-dock", StringComparison.Ordinal) &&
+                viewMode.Contains("width:min(560px", StringComparison.Ordinal) &&
+                viewMode.Contains("restoreStandardDesktop", StringComparison.Ordinal),
+            "Wide Devices mode must create its compact Quick dock without changing normal Desktop CSS.");
 
         var moduleShell = index.IndexOf("portal-module-shell.css", StringComparison.Ordinal);
         var commands = index.IndexOf("shared-ui/commands.css", StringComparison.Ordinal);

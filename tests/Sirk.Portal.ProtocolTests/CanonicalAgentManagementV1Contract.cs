@@ -38,10 +38,9 @@ internal static class CanonicalAgentManagementV1Contract
         Require(endpoints.Contains("policySigner.Sign(", StringComparison.Ordinal) &&
                 endpoints.Contains("trustedPolicyKeys = new[] { policySigner.TrustedKey() }", StringComparison.Ordinal),
             "Authenticated Agent check-in does not deliver the signed policy and trust anchor.");
-        Require(workspace.Contains("Agent odrzucił pobranie sesji", StringComparison.Ordinal) &&
-                workspace.Contains("scheduleReconnect", StringComparison.Ordinal) &&
-                !workspace.Contains("/api/v1/admin/agent-policies", StringComparison.Ordinal),
-            "The screen-only desktop must fail closed and retry without exposing a policy administration control.");
+        Require(workspace.Contains("sirk-agent-policy-action", StringComparison.Ordinal) &&
+                workspace.Contains("data-agent-policy-enable", StringComparison.Ordinal),
+            "The standard Desktop must retain the administrator policy action surface.");
     }
 
     private static string Read(string root, params string[] values) =>

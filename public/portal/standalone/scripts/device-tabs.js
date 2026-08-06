@@ -134,13 +134,8 @@
     }
 
     function syncQuickCommandsToggle() {
-        if (!state.content) return;
-        var stage = state.content.querySelector(".sirk-agent-desktop-stage");
-        var dock = stage && stage.querySelector(".sirk-quick-commands-dock");
-        var toggle = state.content.querySelector("#sirkQuickCommandsToggle");
-        var panel = state.content.querySelector("#sirkQuickCommandsPanel");
-        if (!dock || !toggle || !panel) return;
-        if (toggle.parentNode !== dock) dock.insertBefore(toggle, panel);
+        var toggle = document.getElementById("sirkQuickCommandsToggle");
+        if (toggle) toggle.classList.remove("is-header-mounted");
     }
 
     function positionMenu(toggle) {

@@ -38,11 +38,14 @@ internal static class DeviceHostTabSplitContract
 
         Require(viewMode.Contains("width:44px;height:44px", StringComparison.Ordinal),
             "The view-mode and user controls must use the same 44px footprint.");
-        Require(tabsScript.Contains("syncQuickCommandsToggle", StringComparison.Ordinal) &&
-                tabsScript.Contains("sirk-quick-commands-dock", StringComparison.Ordinal) &&
-                !tabsScript.Contains("state.header.insertBefore(toggle", StringComparison.Ordinal) &&
-                File.ReadAllText(Path.Combine(root, "public", "shared", "ui", "commands.css")).Contains(".sirk-quick-commands-dock", StringComparison.Ordinal),
-            "Quick Commands must remain pinned inside the connected desktop stage.");
+        Require(tabsScript.Contains("function syncQuickCommandsToggle()", StringComparison.Ordinal) &&
+                tabsScript.Contains("toggle.classList.remove(\"is-header-mounted\")", StringComparison.Ordinal) &&
+                !tabsScript.Contains("state.header.insertBefore(toggle", StringComparison.Ordinal),
+            "Device tabs must not compete with the scoped Desktop presenter for Quick Commands.");
+        Require(viewMode.Contains("sirk-expanded-desktop-dock", StringComparison.Ordinal) &&
+                viewMode.Contains("stage.appendChild(dock)", StringComparison.Ordinal) &&
+                viewMode.Contains("restoreStandardDesktop", StringComparison.Ordinal),
+            "Quick Commands must be pinned inside the stage only in expanded Devices mode.");
         Require(tabsCss.Contains("padding:2px 22px!important", StringComparison.Ordinal) &&
                 viewMode.Contains("padding:0!important;gap:0!important;border-radius:0!important", StringComparison.Ordinal),
             "Expanded connection mode must remove content spacing and rounded desktop framing.");
