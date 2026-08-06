@@ -215,6 +215,102 @@
     }
 
     function renderAgentTerminal(host, node) {
+        host.innerHTML = '<div class="sirk-agent-operation"><header><strong>Terminal SIRK Agent</strong><small>PowerShell uruchamiany przez usługę na urządzeniu</small></header><textarea data-agent-terminal-command spellcheck="false" placeholder="Get-ComputerInfo | Select-Object WindowsProductName, OsVersion"></textarea><div class="sirk-agent-operation-actions"><button type="button" data-agent-terminal-run>Uruchom</button></div><pre data-agent-operation-status>Gotowy.</pre></div>';
+        var command = host.querySelector("[data-agent-terminal-command]");
+        var button = host.querySelector("[data-agent-terminal-run]");
+        var status = host.querySelector("[data-agent-operation-status]");
+        button.addEventListener("click", function () {
+            if (!command.value.trim()) return;
+            button.disabled = true;
+            runAgentOperation(node, "terminal.execute", { command: command.value, timeoutSeconds: 30 }, status)
+                .then(function (value) {
+                    status.textContent = value.result && value.result.output || value.result && value.result.code || "Brak wyniku.";
+                    status.classList.toggle("is-error", value.status === "failed");
+                }).catch(function (error) {
+                    status.textContent = error.message || String(error);
+                    status.classList.add("is-error");
+                }).then(function () { button.disabled = false; });
+        });
+    }
+
+    function renderAgentFiles(host, node) {
+        host.innerHTML = '<div class="sirk-agent-operation"><header><strong>Pliki SIRK Agent</strong><small>Lista jest ograniczona do 1000 pozycji, transfer do 1 MiB</small></header><div class="sirk-agent-path"><input data-agent-files-path value="C:\\\\" spellcheck="false"><button type="button" data-agent-files-list>Otwórz</button><button type="button" data-agent-files-upload>Wyślij plik</button><input data-agent-files-picker type="file" hidden></div><pre data-agent-operation-status>Gotowy.</pre><div class="sirk-agent-file-list" data-agent-file-list></div></div>';
+        var input = host.querySelector("[data-agent-files-path]");
+        var button = host.querySelector("[data-agent-files-list]");
+        var status = host.querySelector("[data-agent-operation-status]");
+        var list = host.querySelector("[data-agent-file-list]");
+        var upload = host.querySelector("[data-agent-files-upload]");
+        var picker = host.querySelector("[data-agent-files-picker]");
+        function open(path) {
+            button.disabled = true;
+            runAgentOperation(node, "files.list", { path: path }, status).then(function (value) {
+                var entries = value.result && value.result.data || [];
+                status.textContent = value.status === "failed" ? (value.result.output || value.result.code) : entries.length + " pozycji";
+                status.classList.toggle("is-error", value.status === "failed");
+                list.innerHTML = entries.map(function (entry) {
+                    return '<button type="button" data-agent-file-path="' + esc(entry.path) + '" data-agent-directory="' + (entry.isDirectory ? "1" : "0") + '"><span>' + (entry.isDirectory ? "📁" : "📄") + '</span><strong>' + esc(entry.name) + '</strong><small>' + (entry.isDirectory ? "" : esc(String(entry.length) + " B")) + '</small></button>';
+                }).join("");
+            }).catch(function (error) {
+                status.textContent = error.message || String(error);
+                status.classList.add("is-error");
+            }).then(function () { button.disabled = false; });
+        }
+        button.addEventListener("click", function () { open(input.value); });
+        list.addEventListener("click", function (event) {
+            var item = event.target.closest("[data-agent-file-path]");
+            if (!item) return;
+            if (item.getAttribute("data-agent-directory") === "1") {
+                input.value = item.getAttribute("data-agent-file-path");
+                open(input.value);
+                return;
+            }
+            status.textContent = "Pobieranie pliku…";
+            runAgentOperation(node, "files.read", { path: item.getAttribute("data-agent-file-path") }, status)
+                .then(function (value) {
+                    var data = value.result && value.result.data;
+                    if (value.status === "failed" || !data || !data.contentBase64)
+                        throw new Error(value.result && (value.result.output || value.result.code) || "Brak danych pliku.");
+                    var binary = atob(data.contentBase64);
+                    var bytes = new Uint8Array(binary.length);
+                    for (var index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+                    var link = document.createElement("a");
+                    link.href = URL.createObjectURL(new Blob([bytes]));
+                    link.download = data.name || "download.bin";
+                    link.click();
+                    setTimeout(function () { URL.revokeObjectURL(link.href); }, 1000);
+                    status.textContent = "Pobrano " + link.download;
+                }).catch(function (error) {
+                    status.textContent = error.message || String(error);
+                    status.classList.add("is-error");
+                });
+        });
+        upload.addEventListener("click", function () { picker.click(); });
+        picker.addEventListener("change", function () {
+            var file = picker.files && picker.files[0];
+            if (!file) return;
+            if (file.size > 1024 * 1024) { status.textContent = "Plik przekracza limit 1 MiB."; status.classList.add("is-error"); return; }
+            file.arrayBuffer().then(function (buffer) {
+                var bytes = new Uint8Array(buffer), binary = "";
+
+                for (var index = 0; index < bytes.length; index += 1) binary += String.fromCharCode(bytes[index]);
+                var separator = /[\\/]$/.test(input.value) ? "" : "\\";
+                return runAgentOperation(node, "files.write", {
+                    path: input.value + separator + file.name,
+                    contentBase64: btoa(binary)
+                }, status);
+            }).then(function (value) {
+                if (value.status === "failed") throw new Error(value.result.output || value.result.code);
+                status.textContent = "Wysłano " + file.name;
+                open(input.value);
+            }).catch(function (error) {
+                status.textContent = error.message || String(error);
+                status.classList.add("is-error");
+            }).then(function () { picker.value = ""; });
+        });
+    }
+
+    function renderAgentDesktop(host, node) {
+        var stopped = false;
         host.innerHTML = '<div class=\"sirk-agent-desktop\"><div class=\"sirk-agent-desktop-stage\"><canvas data-agent-desktop-image aria-label=\"Zdalny pulpit\" tabindex=\"0\"></canvas><span data-agent-desktop-cursor style=\"display:none\"></span></div></div>';
         ensureCompactCommands(host);
         setCompactCommandsConnected(host, false);
@@ -859,11 +955,15 @@
         var reconnectTimer = 0;
         function scheduleReconnect() {
             clearTimeout(reconnectTimer);
-            if (stopped || !host.isConnected || connected) return;
+            if (stopped || connected) return;
             reconnectTimer = setTimeout(connectDesktop, 3000);
         }
         function connectDesktop() {
-            if (stopped || !host.isConnected || connected) return;
+            if (stopped || connected) return;
+            if (!host.isConnected) {
+                scheduleReconnect();
+                return;
+            }
             clearTimeout(reconnectTimer);
             status.textContent = "Nawiązywanie połączenia live…";
             status.classList.remove("is-error");

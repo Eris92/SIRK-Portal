@@ -10,6 +10,13 @@ internal static class DeviceConnectionWorkspaceContract
         var workspace = File.ReadAllText(Path.Combine(root, "public", "portal", "standalone", "scripts", "device-workspace.js"));
         var commandsCss = File.ReadAllText(Path.Combine(root, "public", "shared", "ui", "commands.css"));
 
+        Require(workspace.Contains("function renderAgentTerminal(host, node)", StringComparison.Ordinal) &&
+                workspace.Contains("data-agent-terminal-command", StringComparison.Ordinal) &&
+                workspace.Contains("function renderAgentFiles(host, node)", StringComparison.Ordinal) &&
+                workspace.Contains("data-agent-files-path", StringComparison.Ordinal) &&
+                workspace.Contains("function renderAgentDesktop(host, node)", StringComparison.Ordinal),
+            "Desktop simplification must preserve the Terminal and Files workspaces.");
+
         Require(tabsCss.Contains("padding:0 12px!important", StringComparison.Ordinal),
             "The Devices header must keep a 12px outer inset.");
         Require(tabsCss.Contains(".sirk-device-tabs-standalone{flex:1 1 auto", StringComparison.Ordinal) &&
