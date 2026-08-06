@@ -17,7 +17,7 @@ internal static class CommandWorkspaceStyleContract
                      "minmax(165px,var(--sirk-command-primary))",
                      "minmax(285px,var(--sirk-command-secondary))",
                      "minmax(240px,1fr)", "is-details-collapsed",
-                     "width:min(845px,calc(100% - 16px))"
+                     ".sirk-quick-commands-dock", "width:min(560px"
                  })
             Require(commandsCss.Contains(marker, StringComparison.Ordinal),
                 "Canonical command workspace CSS marker is missing: " + marker);
@@ -25,6 +25,9 @@ internal static class CommandWorkspaceStyleContract
         Require(!deviceCss.Contains(".sirk-quick-command", StringComparison.Ordinal) &&
                 !deviceCss.Contains(".sirk-quick-commands", StringComparison.Ordinal),
             "Quick Commands must not retain a second style implementation in device-workspace.css.");
+        Require(!commandsCss.Contains("sirk-command-error", StringComparison.Ordinal) &&
+                commandsCss.Contains(".sirk-command-message.is-error", StringComparison.Ordinal),
+            "Quick Commands errors must use the compact message state instead of sirk-command-error.");
 
         foreach (var marker in new[]
                  {

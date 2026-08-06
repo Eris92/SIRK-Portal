@@ -39,9 +39,10 @@ internal static class DeviceHostTabSplitContract
         Require(viewMode.Contains("width:44px;height:44px", StringComparison.Ordinal),
             "The view-mode and user controls must use the same 44px footprint.");
         Require(tabsScript.Contains("syncQuickCommandsToggle", StringComparison.Ordinal) &&
-                tabsScript.Contains("is-header-mounted", StringComparison.Ordinal) &&
-                File.ReadAllText(Path.Combine(root, "public", "shared", "ui", "commands.css")).Contains(".sirk-quick-commands-toggle.is-header-mounted", StringComparison.Ordinal),
-            "Quick Commands must mount in the expanded header instead of being clipped by the desktop stage.");
+                tabsScript.Contains("sirk-quick-commands-dock", StringComparison.Ordinal) &&
+                !tabsScript.Contains("state.header.insertBefore(toggle", StringComparison.Ordinal) &&
+                File.ReadAllText(Path.Combine(root, "public", "shared", "ui", "commands.css")).Contains(".sirk-quick-commands-dock", StringComparison.Ordinal),
+            "Quick Commands must remain pinned inside the connected desktop stage.");
         Require(tabsCss.Contains("padding:2px 22px!important", StringComparison.Ordinal) &&
                 viewMode.Contains("padding:0!important;gap:0!important;border-radius:0!important", StringComparison.Ordinal),
             "Expanded connection mode must remove content spacing and rounded desktop framing.");

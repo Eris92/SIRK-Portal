@@ -10,6 +10,13 @@ internal static class DeviceConnectionWorkspaceContract
         var workspace = File.ReadAllText(Path.Combine(root, "public", "portal", "standalone", "scripts", "device-workspace.js"));
         var commandsCss = File.ReadAllText(Path.Combine(root, "public", "shared", "ui", "commands.css"));
 
+        Require(workspace.Contains("function renderAgentTerminal(host, node)", StringComparison.Ordinal) &&
+                workspace.Contains("data-agent-terminal-command", StringComparison.Ordinal) &&
+                workspace.Contains("function renderAgentFiles(host, node)", StringComparison.Ordinal) &&
+                workspace.Contains("data-agent-files-path", StringComparison.Ordinal) &&
+                workspace.Contains("function renderAgentDesktop(host, node)", StringComparison.Ordinal),
+            "Desktop simplification must preserve the Terminal and Files workspaces.");
+
         Require(tabsCss.Contains("padding:0 12px!important", StringComparison.Ordinal),
             "The Devices header must keep a 12px outer inset.");
         Require(tabsCss.Contains(".sirk-device-tabs-standalone{flex:1 1 auto", StringComparison.Ordinal) &&
@@ -25,16 +32,27 @@ internal static class DeviceConnectionWorkspaceContract
         Require(viewMode.Contains(".sirk-device-workspace>.sirk-device-compact-header", StringComparison.Ordinal) &&
                 viewMode.Contains(".sirk-agent-desktop-stage canvas", StringComparison.Ordinal),
             "Connection view must dedicate the complete area below host tabs to the remote desktop.");
-        Require(viewMode.Contains(".sirk-quick-commands-panel{z-index:59", StringComparison.Ordinal),
-            "Quick Commands must remain above the connected desktop.");
+        Require(viewMode.Contains(".sirk-quick-commands-dock{z-index:60", StringComparison.Ordinal) &&
+                commandsCss.Contains("z-index:45", StringComparison.Ordinal),
+            "The pinned Quick Commands dock must remain above the connected desktop.");
 
-        Require(workspace.Contains("(desktopStage || operation).appendChild(toggle)", StringComparison.Ordinal),
-            "The Quick Commands toggle must be mounted on the remote desktop stage.");
-        Require(!workspace.Contains("operation.appendChild(toggle);", StringComparison.Ordinal),
-            "The Quick Commands toggle must not remain outside the visible connected stage.");
-        Require(commandsCss.Contains("z-index:40", StringComparison.Ordinal) &&
-                commandsCss.Contains("z-index:39", StringComparison.Ordinal),
-            "Quick Commands controls must have a stable overlay stacking order.");
+        foreach (var removed in new[]
+                 {
+                     "sirk-agent-desktop-controls", "sirk-agent-desktop-stats",
+                     "sirk-agent-desktop-admin", "sirk-agent-desktop-input",
+                     "sirk-agent-desktop-clipboard", "sirk-agent-policy-action",
+                     "sirk-agent-operation sirk-agent-desktop", "sirk-command-error"
+                 })
+            Require(!workspace.Contains(removed, StringComparison.Ordinal),
+                "The screen-only desktop must not contain: " + removed);
+        Require(workspace.Contains("desktopStage.appendChild(dock)", StringComparison.Ordinal) &&
+                workspace.Contains("setCompactCommandsConnected(host, true)", StringComparison.Ordinal) &&
+                workspace.Contains("connectDesktop();", StringComparison.Ordinal),
+            "Quick Commands must stay inside the desktop stage and appear only after automatic connection.");
+        Require(commandsCss.Contains(".sirk-quick-commands-dock", StringComparison.Ordinal) &&
+                commandsCss.Contains("right:8px", StringComparison.Ordinal) &&
+                commandsCss.Contains("width:min(560px", StringComparison.Ordinal),
+            "Quick Commands must be a smaller pinned right-side desktop dock.");
     }
 
     private static string FindRepositoryRoot()
