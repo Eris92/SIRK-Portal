@@ -1,0 +1,45 @@
+name: Apply Left Header Handle
+
+on:
+  push:
+    branches:
+      - fix/connection-header-handle-left
+    paths:
+      - .github/scripts/apply-left-header-handle.py
+      - .github/workflows/apply-left-header-handle.yml
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/connection-header-handle-left
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Apply layout fix
+        run: python .github/scripts/apply-left-header-handle.py
+      - name: Validate JavaScript
+        run: node --check public/portal/standalone/scripts/view-mode.js
+      - name: Validate contracts
+        run: dotnet run --project tests/Sirk.Portal.ProtocolTests/Sirk.Portal.ProtocolTests.csproj --configuration Release
+      - name: Remove migration helpers
+        run: rm -f .github/scripts/apply-left-header-handle.py .github/workflows/apply-left-header-handle.yml
+      - name: Commit product changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/portal/standalone/scripts/view-mode.js \
+                  tests/Sirk.Portal.ProtocolTests/DeviceConnectionWorkspaceContract.cs \
+                  .github/scripts/apply-left-header-handle.py \
+                  .github/workflows/apply-left-header-handle.yml
+          git commit -m "fix(ui): move connection header handle beside menu"
+          git push origin HEAD:fix/connection-header-handle-left
