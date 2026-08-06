@@ -36,9 +36,11 @@ internal static class DeviceConnectionWorkspaceContract
                 viewMode.Contains("enabled === true && isDevicesView()", StringComparison.Ordinal) &&
                 viewMode.Contains("navigation.getAttribute(\"data-view\") !== \"devices\"", StringComparison.Ordinal),
             "Wide and connection modes must be scoped to the top-level Devices view.");
-        Require(viewMode.Contains("function exitExpandedModes()", StringComparison.Ordinal) &&
-                viewMode.Contains("localStorage.setItem(\"sirkPortal.focusMode\", \"0\")", StringComparison.Ordinal),
-            "Leaving Devices must immediately reset every expanded mode.");
+        Require(viewMode.Contains("function suspendExpandedModes()", StringComparison.Ordinal) &&
+                viewMode.Contains("function restorePreferredExpandedMode()", StringComparison.Ordinal) &&
+                viewMode.Contains("sirkPortal.devicesExpandedMode", StringComparison.Ordinal) &&
+                viewMode.Contains("navigation.getAttribute(\"data-view\") !== \"devices\") suspendExpandedModes()", StringComparison.Ordinal),
+            "Other top-level views must stay normal while Devices remembers and restores its expanded mode.");
 
         Require(viewMode.Contains("function syncDesktopPresentation()", StringComparison.Ordinal) &&
                 viewMode.Contains(".sirk-agent-desktop-controls", StringComparison.Ordinal) &&
@@ -53,10 +55,12 @@ internal static class DeviceConnectionWorkspaceContract
 
         Require(tabsCss.Contains("padding:0 12px!important", StringComparison.Ordinal),
             "The Devices header must keep its 12px inset.");
-        Require(viewMode.Contains("html.sirk-device-focus-mode .sirk-connection-sidebar-toggle", StringComparison.Ordinal) &&
-                viewMode.Contains("html.sirk-device-connection-mode .sirk-connection-sidebar-toggle", StringComparison.Ordinal) &&
-                viewMode.Contains("var active = expandedModeActive();", StringComparison.Ordinal),
-            "Both expanded Devices modes must expose the left-menu overlay control.");
+        Require(viewMode.Contains("top:54px", StringComparison.Ordinal) &&
+                viewMode.Contains("width:12px", StringComparison.Ordinal) &&
+                viewMode.Contains("width:34px", StringComparison.Ordinal) &&
+                viewMode.Contains("--sirk-expanded-sidebar-width", StringComparison.Ordinal) &&
+                viewMode.Contains("collapsed ? \"76px\" : \"248px\"", StringComparison.Ordinal),
+            "Expanded Devices must use a tiny top-edge hover handle and match collapsed or expanded sidebar width.");
         Require(viewMode.Contains("if (button.contains(event.target) || sidebar.contains(event.target)) return;", StringComparison.Ordinal) &&
                 viewMode.Contains("setConnectionSidebarOpen(false);", StringComparison.Ordinal),
             "Clicking the expanded workspace outside the menu must hide the overlay.");

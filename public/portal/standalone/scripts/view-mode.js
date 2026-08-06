@@ -41,13 +41,13 @@
             ".sirk-device-view-mode-menu button{display:flex;align-items:center;gap:9px;min-height:36px;padding:8px 10px;border:0;border-radius:7px;background:transparent;color:inherit;text-align:left;font:600 13px Segoe UI,Arial,sans-serif;cursor:pointer}",
             ".sirk-device-view-mode-menu button:hover,.sirk-device-view-mode-menu button:focus-visible{background:var(--sirk-hover,#eef3f9);outline:none}",
             ".sirk-device-view-mode-menu button.is-active{background:rgba(59,130,246,.12);color:#2563eb}",
-            ".sirk-connection-sidebar-toggle{position:fixed!important;left:0;top:50%;z-index:2147483500;display:none!important;align-items:center;justify-content:center;width:34px;height:48px;padding:0;border:1px solid rgba(148,163,184,.72);border-left:0;border-radius:0 10px 10px 0;background:rgba(13,23,40,.9);color:#edf4ff;box-shadow:0 8px 22px rgba(15,23,42,.28);cursor:pointer;transform:translateY(-50%);transition:left .18s ease,background .18s ease,border-color .18s ease}",
-            ".sirk-connection-sidebar-toggle:hover,.sirk-connection-sidebar-toggle:focus-visible{border-color:#60a5fa;background:#17263d;color:#fff;outline:none}",
-            ".sirk-connection-sidebar-toggle svg{display:block;width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;transition:transform .18s ease}",
+            ".sirk-connection-sidebar-toggle{position:fixed!important;left:0;top:54px;z-index:2147483500;display:none!important;align-items:center;justify-content:flex-end;width:12px;height:34px;padding:0 5px 0 0;overflow:hidden;border:1px solid rgba(148,163,184,.72);border-left:0;border-radius:0 8px 8px 0;background:rgba(13,23,40,.9);color:#edf4ff;box-shadow:0 7px 18px rgba(15,23,42,.24);cursor:pointer;transition:left .18s ease,width .16s ease,padding .16s ease,background .18s ease,border-color .18s ease}",
+            ".sirk-connection-sidebar-toggle:hover,.sirk-connection-sidebar-toggle:focus-visible{width:34px;padding-right:8px;border-color:#60a5fa;background:#17263d;color:#fff;outline:none}",
+            ".sirk-connection-sidebar-toggle svg{display:block;flex:0 0 17px;width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;transition:transform .18s ease}",
             "html.sirk-device-focus-mode .sirk-connection-sidebar-toggle,html.sirk-device-connection-mode .sirk-connection-sidebar-toggle{display:flex!important}",
-            "html.sirk-device-focus-mode.sirk-device-connection-sidebar-open .sirk-connection-sidebar-toggle,html.sirk-device-connection-mode.sirk-device-connection-sidebar-open .sirk-connection-sidebar-toggle{left:248px}",
+            "html.sirk-device-focus-mode.sirk-device-connection-sidebar-open .sirk-connection-sidebar-toggle,html.sirk-device-connection-mode.sirk-device-connection-sidebar-open .sirk-connection-sidebar-toggle{left:var(--sirk-expanded-sidebar-width,248px);width:34px;padding-right:8px}",
             "html.sirk-device-focus-mode.sirk-device-connection-sidebar-open .sirk-connection-sidebar-toggle svg,html.sirk-device-connection-mode.sirk-device-connection-sidebar-open .sirk-connection-sidebar-toggle svg{transform:rotate(180deg)}",
-            "html.sirk-device-focus-mode.sirk-device-connection-sidebar-open .sirk-standalone-sidebar,html.sirk-device-connection-mode.sirk-device-connection-sidebar-open .sirk-standalone-sidebar{position:fixed!important;inset:0 auto 0 0!important;z-index:2147483400!important;display:flex!important;width:248px!important;height:100dvh!important;box-shadow:12px 0 30px rgba(15,23,42,.34)}",
+            "html.sirk-device-focus-mode.sirk-device-connection-sidebar-open .sirk-standalone-sidebar,html.sirk-device-connection-mode.sirk-device-connection-sidebar-open .sirk-standalone-sidebar{position:fixed!important;inset:0 auto 0 0!important;z-index:2147483400!important;display:flex!important;width:var(--sirk-expanded-sidebar-width,248px)!important;height:100dvh!important;box-shadow:12px 0 30px rgba(15,23,42,.34)}",
             "html.sirk-device-focus-mode:not(.sirk-device-connection-sidebar-open) .sirk-standalone-sidebar{display:none!important}",
             "html.sirk-device-focus-mode .sirk-standalone-root{grid-template-columns:minmax(0,1fr)!important}",
             "html.sirk-device-focus-mode .sirk-standalone-topbar{display:none!important}",
@@ -93,6 +93,24 @@
     }
 
     var desktopPresentationTimer = 0;
+    var expandedPreferenceKey = "sirkPortal.devicesExpandedMode";
+    var restoringExpandedPreference = false;
+
+    function readExpandedPreference() {
+        try {
+            var value = localStorage.getItem(expandedPreferenceKey);
+            return value === "focus" || value === "connection" ? value : "";
+        }
+        catch (error) { return ""; }
+    }
+
+    function writeExpandedPreference(value) {
+        try {
+            if (value === "focus" || value === "connection") localStorage.setItem(expandedPreferenceKey, value);
+            else localStorage.removeItem(expandedPreferenceKey);
+        }
+        catch (error) {}
+    }
 
     function scheduleDesktopPresentation() {
         if (desktopPresentationTimer) return;
@@ -163,13 +181,12 @@
         }
     }
 
-    function exitExpandedModes() {
+    function suspendExpandedModes() {
         var changed = expandedModeActive() ||
             document.documentElement.classList.contains("sirk-device-connection-sidebar-open");
         document.documentElement.classList.remove("sirk-device-focus-mode");
         document.documentElement.classList.remove("sirk-device-connection-mode");
         document.documentElement.classList.remove("sirk-device-connection-sidebar-open");
-        try { localStorage.setItem("sirkPortal.focusMode", "0"); } catch (error) {}
         updateConnectionSidebarToggle();
         scheduleDesktopPresentation();
         if (changed) {
@@ -180,12 +197,31 @@
         }
     }
 
+    function exitExpandedModes() {
+        writeExpandedPreference("");
+        try { localStorage.setItem("sirkPortal.focusMode", "0"); } catch (error) {}
+        suspendExpandedModes();
+    }
+
+    function restorePreferredExpandedMode() {
+        if (restoringExpandedPreference || !isDevicesView() || expandedModeActive()) return;
+        var preferred = readExpandedPreference();
+        if (!preferred) return;
+        restoringExpandedPreference = true;
+        if (preferred === "connection") setConnectionMode(true, false);
+        else setFocusMode(true, false);
+        restoringExpandedPreference = false;
+    }
+
     function updateConnectionSidebarToggle() {
         var button = document.getElementById("sirkConnectionSidebarToggle");
         if (!button) return;
-        var expanded = expandedModeActive();
-        var open = expanded && document.documentElement.classList.contains("sirk-device-connection-sidebar-open");
-        if (!expanded) document.documentElement.classList.remove("sirk-device-connection-sidebar-open");
+        var active = expandedModeActive();
+        var open = active && document.documentElement.classList.contains("sirk-device-connection-sidebar-open");
+        var root = document.getElementById("sirkStandaloneRoot");
+        var collapsed = !!(root && root.classList.contains("is-collapsed"));
+        document.documentElement.style.setProperty("--sirk-expanded-sidebar-width", collapsed ? "76px" : "248px");
+        if (!active) document.documentElement.classList.remove("sirk-device-connection-sidebar-open");
         button.setAttribute("aria-expanded", open ? "true" : "false");
         button.setAttribute("aria-label", text(open ? "Ukryj lewe menu" : "Pokaż lewe menu", open ? "Hide left menu" : "Show left menu"));
         button.title = text(open ? "Ukryj lewe menu" : "Pokaż lewe menu", open ? "Hide left menu" : "Show left menu");
@@ -198,8 +234,9 @@
         window.dispatchEvent(new Event("resize"));
     }
 
-    function setFocusMode(enabled) {
+    function setFocusMode(enabled, remember) {
         enabled = enabled === true && isDevicesView();
+        if (remember !== false) writeExpandedPreference(enabled ? "focus" : "");
         document.documentElement.classList.toggle("sirk-device-focus-mode", enabled);
         if (enabled) {
             document.documentElement.classList.remove("sirk-device-connection-mode");
@@ -213,8 +250,9 @@
         window.dispatchEvent(new CustomEvent("sirkportal:deviceviewmodechange", { detail: { focus: enabled, connection: false } }));
     }
 
-    function setConnectionMode(enabled) {
+    function setConnectionMode(enabled, remember) {
         enabled = enabled === true && isDevicesView();
+        if (remember !== false) writeExpandedPreference(enabled ? "connection" : "");
         document.documentElement.classList.toggle("sirk-device-connection-mode", enabled);
         if (enabled) document.documentElement.classList.remove("sirk-device-focus-mode");
         else document.documentElement.classList.remove("sirk-device-connection-sidebar-open");
@@ -234,7 +272,8 @@
     }
 
     function restoreFocusMode() {
-        exitExpandedModes();
+        suspendExpandedModes();
+        window.setTimeout(restorePreferredExpandedMode, 0);
     }
 
     function mountConnectionSidebarToggle() {
@@ -462,14 +501,17 @@
         var navigation = event.target && event.target.closest &&
             event.target.closest(".sirk-standalone-nav [data-view]");
         if (!navigation) return;
-        if (navigation.getAttribute("data-view") !== "devices") exitExpandedModes();
+        if (navigation.getAttribute("data-view") !== "devices") suspendExpandedModes();
+        else window.setTimeout(restorePreferredExpandedMode, 0);
     }, true);
 
     var observerRoot = document.getElementById("sirkStandaloneRoot");
     if (observerRoot) new MutationObserver(function () {
         mountViewModeButton();
         mountConnectionSidebarToggle();
-        if (!isDevicesView() && expandedModeActive()) exitExpandedModes();
+        if (!isDevicesView() && expandedModeActive()) suspendExpandedModes();
+        else if (isDevicesView() && !expandedModeActive()) restorePreferredExpandedMode();
+        updateConnectionSidebarToggle();
         scheduleDesktopPresentation();
     }).observe(observerRoot, {
         childList: true,
