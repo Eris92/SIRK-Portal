@@ -18,114 +18,27 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
-
       - name: Prepare patch script
-        shell: bash
+        run: python3 -c "from pathlib import Path;p=Path('.github/scripts/workspace-layout-v2.py');s=p.read_text();a=s.index(\"new_layout = r'''\");b=s.index(\"\\n'''\\npattern = re.compile\",a);s=s[:a]+s[a:b].replace('\\\\\"','\"')+s[b:];s=s.replace('pattern.subn(new_layout, workspace, count=1)','pattern.subn(lambda _match: new_layout, workspace, count=1)');p.write_text(s)"
+      - name: Apply redesign
         run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          path = Path('.github/scripts/workspace-layout-v2.py')
-          source = path.read_text(encoding='utf-8')
-          start = source.index("new_layout = r'''")
-          end = source.index("\n'''\npattern = re.compile", start)
-          block = source[start:end].replace('\\"', '"')
-          source = source[:start] + block + source[end:]
-          source = source.replace(
-              'pattern.subn(new_layout, workspace, count=1)',
-              'pattern.subn(lambda _match: new_layout, workspace, count=1)')
-          path.write_text(source, encoding='utf-8')
-          PY
-
-      - name: Apply workspace redesign
-        run: python3 .github/scripts/workspace-layout-v2.py
-
-      - name: Align status contract and admin feedback
-        shell: bash
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-
-          contract_path = Path('tests/Sirk.Portal.ProtocolTests/DeviceHostTabSplitContract.cs')
-          contract = contract_path.read_text(encoding='utf-8')
-          old = '''                connectionScript.Contains(".sirk-device-host-tab.is-offline", StringComparison.Ordinal) &&
-                connectionScript.Contains("border-color:#16a34a", StringComparison.Ordinal) &&
-                connectionScript.Contains("border-color:#dc2626", StringComparison.Ordinal),
-            "Host tabs must hide per-tab connection actions and use green online or red offline status styling.");'''
-          new = '''                connectionScript.Contains(".sirk-device-host-tab.is-offline", StringComparison.Ordinal) &&
-                connectionScript.Contains("background:var(--sirk-sidebar-active,#2b3b55)", StringComparison.Ordinal) &&
-                connectionScript.Contains("inset 3px 0 0 #16a34a", StringComparison.Ordinal) &&
-                connectionScript.Contains("inset 3px 0 0 #dc2626", StringComparison.Ordinal),
-            "Host tabs must hide per-tab connection actions and reuse the sidebar active style with online/offline accents.");'''
-          if contract.count(old) != 1:
-              raise SystemExit('Legacy host-tab status contract was not found exactly once.')
-          contract_path.write_text(contract.replace(old, new, 1), encoding='utf-8')
-
-          workspace_path = Path('public/portal/standalone/scripts/device-workspace.js')
-          workspace = workspace_path.read_text(encoding='utf-8')
-          old_admin = '<button type="button" data-agent-admin-start disabled>Uruchom w sesji użytkownika</button></div><div class="sirk-agent-operation sirk-agent-terminal">'
-          new_admin = '<button type="button" data-agent-admin-start disabled>Uruchom w sesji użytkownika</button><small data-agent-admin-status>Gotowy.</small></div><div class="sirk-agent-operation sirk-agent-terminal">'
-          if workspace.count(old_admin) != 1:
-              raise SystemExit('Terminal admin block was not found exactly once.')
-          workspace = workspace.replace(old_admin, new_admin, 1)
-          old_query = '        var adminStart = workspaceRoot.querySelector("[data-agent-admin-start]");\n'
-          new_query = old_query + '        var adminStatus = workspaceRoot.querySelector("[data-agent-admin-status]") || status;\n'
-          if workspace.count(old_query) != 1:
-              raise SystemExit('Admin start query was not found exactly once.')
-          workspace = workspace.replace(old_query, new_query, 1)
-          old_handler = '''        adminStart.addEventListener("click", function () {
-            adminStart.disabled = true;
-            runAgentOperation(node, "desktop.admin.start", {
-                sessionId: Number(session.value),
-                tool: adminTool.value
-            }, status).then(function () {
-                status.textContent = "Narzędzie administracyjne działa jako SYSTEM na pulpicie użytkownika.";
-            }).catch(function (error) {
-                status.textContent = error.message || String(error);
-                status.classList.add("is-error");
-            }).then(function () { adminStart.disabled = !connected; });
-        });'''
-          new_handler = '''        adminStart.addEventListener("click", function () {
-            adminStart.disabled = true;
-            runAgentOperation(node, "desktop.admin.start", {
-                sessionId: Number(session.value),
-                tool: adminTool.value
-            }, adminStatus).then(function () {
-                adminStatus.textContent = "Narzędzie administracyjne działa jako SYSTEM na pulpicie użytkownika.";
-                adminStatus.classList.remove("is-error");
-            }).catch(function (error) {
-                adminStatus.textContent = error.message || String(error);
-                adminStatus.classList.add("is-error");
-            }).then(function () { adminStart.disabled = !connected; });
-        });'''
-          if workspace.count(old_handler) != 1:
-              raise SystemExit('Desktop admin handler was not found exactly once.')
-          workspace_path.write_text(workspace.replace(old_handler, new_handler, 1), encoding='utf-8')
-
-          css_path = Path('public/portal/standalone/styles/device-workspace.css')
-          css = css_path.read_text(encoding='utf-8')
-          css += '\n.sirk-agent-desktop-admin [data-agent-admin-status]{flex:1 1 100%;color:var(--sirk-muted,#94a3b8);font-size:12px}\n.sirk-agent-desktop-admin [data-agent-admin-status].is-error{color:#fca5a5}\n'
-          css_path.write_text(css, encoding='utf-8')
-          PY
-
-      - name: Validate JavaScript syntax
-        shell: bash
+          python3 .github/scripts/workspace-layout-v2.py
+          python3 .github/scripts/workspace-layout-v2-post.py
+      - name: Validate JavaScript
         run: |
           node --check public/portal/standalone/scripts/device-workspace.js
           node --check public/portal/standalone/scripts/device-tabs.js
           node --check public/portal/standalone/scripts/workspace-connection.js
-
-      - name: Validate Portal contracts
+      - name: Validate contracts
         run: dotnet run --project tests/Sirk.Portal.ProtocolTests/Sirk.Portal.ProtocolTests.csproj --configuration Release
-
-      - name: Commit validated redesign
-        shell: bash
+      - name: Commit
         run: |
           rm -f .github/workflows/one-shot-workspace-layout-v2.yml
           rm -f .github/scripts/workspace-layout-v2.py
+          rm -f .github/scripts/workspace-layout-v2-post.py
           git diff --check
           git config user.name 'SIRK Automation'
           git config user.email 'sirk-automation@users.noreply.github.com'
