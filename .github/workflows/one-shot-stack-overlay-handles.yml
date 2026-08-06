@@ -1,0 +1,114 @@
+name: One-shot stack overlay handles
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/one-shot-stack-overlay-handles.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.event.head_commit.message == 'chore: apply one-time stacked handle fix'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Stack the overlay handles vertically
+        shell: python
+        run: |
+          from pathlib import Path
+
+          view_path = Path('public/portal/standalone/scripts/view-mode.js')
+          test_path = Path('tests/Sirk.Portal.ProtocolTests/DeviceConnectionWorkspaceContract.cs')
+
+          view = view_path.read_text(encoding='utf-8')
+
+          replacements = [
+              (
+                  '".sirk-connection-sidebar-toggle{position:fixed!important;left:0;top:54px;',
+                  '".sirk-connection-sidebar-toggle{position:fixed!important;left:0;top:92px;'
+              ),
+              (
+                  '".sirk-connection-header-toggle{position:fixed!important;left:14px;top:54px;',
+                  '".sirk-connection-header-toggle{position:fixed!important;left:0;top:54px;'
+              ),
+              (
+                  'border:1px solid rgba(148,163,184,.72);border-radius:8px;background:rgba(13,23,40,.9);color:#edf4ff;box-shadow:0 7px 18px rgba(15,23,42,.24);cursor:pointer;transform:none;',
+                  'border:1px solid rgba(148,163,184,.72);border-left:0;border-radius:0 8px 8px 0;background:rgba(13,23,40,.9);color:#edf4ff;box-shadow:0 7px 18px rgba(15,23,42,.24);cursor:pointer;transform:none;'
+              ),
+              (
+                  'html.sirk-device-connection-mode.sirk-device-connection-header-open .sirk-connection-header-toggle{left:14px;',
+                  'html.sirk-device-connection-mode.sirk-device-connection-header-open .sirk-connection-header-toggle{left:0;'
+              ),
+              (
+                  'html.sirk-device-connection-mode.sirk-device-connection-sidebar-open .sirk-connection-header-toggle{left:calc(var(--sirk-expanded-sidebar-width,248px) + 36px)}',
+                  'html.sirk-device-connection-mode.sirk-device-connection-sidebar-open .sirk-connection-header-toggle{left:var(--sirk-expanded-sidebar-width,248px)}'
+              ),
+          ]
+
+          for old, new in replacements:
+              count = view.count(old)
+              if count != 1:
+                  raise SystemExit(f'Expected exactly one occurrence of {old!r}, found {count}.')
+              view = view.replace(old, new, 1)
+
+          hover_line = '            ".sirk-connection-sidebar-toggle:hover+.sirk-connection-header-toggle,.sirk-connection-sidebar-toggle:focus-visible+.sirk-connection-header-toggle{left:36px}",\n'
+          if view.count(hover_line) != 1:
+              raise SystemExit('Expected the horizontal handle-shift rule exactly once.')
+          view = view.replace(hover_line, '', 1)
+
+          view_path.write_text(view, encoding='utf-8', newline='')
+
+          test = test_path.read_text(encoding='utf-8')
+          test_replacements = [
+              (
+                  '        Require(viewMode.Contains("top:54px", StringComparison.Ordinal) &&\n',
+                  '        Require(viewMode.Contains(".sirk-connection-sidebar-toggle{position:fixed!important;left:0;top:92px", StringComparison.Ordinal) &&\n'
+                  '                viewMode.Contains(".sirk-connection-header-toggle{position:fixed!important;left:0;top:54px", StringComparison.Ordinal) &&\n'
+              ),
+              (
+                  '            "Expanded Devices must use a tiny top-edge hover handle and match collapsed or expanded sidebar width.");',
+                  '            "Expanded Devices must stack the top-header and side-menu handles on the left edge and match collapsed or expanded sidebar width.");'
+              ),
+              (
+                  '                viewMode.Contains("left:14px;top:54px", StringComparison.Ordinal) &&\n',
+                  '                viewMode.Contains("left:0;top:54px", StringComparison.Ordinal) &&\n'
+              ),
+              (
+                  '                viewMode.Contains("z-index:2147483560", StringComparison.Ordinal) &&\n',
+                  '                viewMode.Contains("z-index:2147483560", StringComparison.Ordinal) &&\n'
+                  '                !viewMode.Contains(".sirk-connection-sidebar-toggle:hover+.sirk-connection-header-toggle", StringComparison.Ordinal) &&\n'
+                  '                viewMode.Contains("sirk-device-connection-sidebar-open .sirk-connection-header-toggle{left:var(--sirk-expanded-sidebar-width,248px)}", StringComparison.Ordinal) &&\n'
+              ),
+              (
+                  '            "Connection full view must place the top-header handle beside the menu handle and keep it above the overlay.");',
+                  '            "Connection full view must place the top-header handle above the side-menu handle and keep both aligned with the overlay edge.");'
+              ),
+          ]
+
+          for old, new in test_replacements:
+              count = test.count(old)
+              if count != 1:
+                  raise SystemExit(f'Expected exactly one test occurrence of {old!r}, found {count}.')
+              test = test.replace(old, new, 1)
+
+          test_path.write_text(test, encoding='utf-8', newline='')
+      - name: Validate the device connection workspace contract
+        shell: bash
+        run: dotnet run --project tests/Sirk.Portal.ProtocolTests/Sirk.Portal.ProtocolTests.csproj --configuration Release
+      - name: Commit the validated fix
+        shell: bash
+        run: |
+          git config user.name 'SIRK Automation'
+          git config user.email 'sirk-automation@users.noreply.github.com'
+          git add public/portal/standalone/scripts/view-mode.js tests/Sirk.Portal.ProtocolTests/DeviceConnectionWorkspaceContract.cs
+          git commit -m 'fix(ui): stack connection overlay handles'
+          git push origin HEAD:main
