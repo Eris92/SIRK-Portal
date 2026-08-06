@@ -24,7 +24,7 @@ $env:DOTNET_NOLOGO = '1'
 
 $commonDataRoot = [Environment]::GetFolderPath([Environment+SpecialFolder]::CommonApplicationData)
 if ([string]::IsNullOrWhiteSpace($commonDataRoot)) {
-    throw 'Nie można ustalić systemowego katalogu ProgramData.'
+    throw 'Unable to resolve the system ProgramData directory.'
 }
 $installerWorkBase = Join-Path $commonDataRoot 'SIRK\Temp'
 New-Item -ItemType Directory -Path $installerWorkBase -Force | Out-Null
@@ -54,7 +54,7 @@ function Invoke-Utf8Script {
         [ref]$tokens,
         [ref]$errors) | Out-Null
     if ($errors.Count) {
-        throw ('Błąd składni skryptu {0}: {1}' -f $Path, (($errors | ForEach-Object Message) -join '; '))
+        throw ('Script syntax error in {0}: {1}' -f $Path, (($errors | ForEach-Object Message) -join '; '))
     }
     $script = [scriptblock]::Create($source)
     & $script @Parameters
@@ -72,7 +72,7 @@ if ([string]::IsNullOrWhiteSpace($effectiveFqdn)) {
         $effectiveFqdn = $defaultFqdn
     }
     else {
-        $answer = Read-Host "Nazwa DNS Portalu [$defaultFqdn]"
+        $answer = Read-Host "Portal DNS name [$defaultFqdn]"
         $effectiveFqdn = if ([string]::IsNullOrWhiteSpace($answer)) {
             $defaultFqdn
         } else {
@@ -82,15 +82,15 @@ if ([string]::IsNullOrWhiteSpace($effectiveFqdn)) {
 }
 
 if (-not $preserveExistingData -and -not $NonInteractive -and [string]::IsNullOrWhiteSpace($env:SIRK_INSTALL_BREAKGLASS_PASSWORD)) {
-    $password1 = Read-Host 'Hasło administratora Break-Glass (minimum 14 znaków)' -AsSecureString
-    $password2 = Read-Host 'Powtórz hasło' -AsSecureString
+    $password1 = Read-Host 'Break-Glass administrator password (minimum 14 characters)' -AsSecureString
+    $password2 = Read-Host 'Repeat the password' -AsSecureString
     $plain1 = ConvertFrom-SecureStringPlain $password1
     $plain2 = ConvertFrom-SecureStringPlain $password2
     try {
         if ([string]::IsNullOrWhiteSpace($plain1) -or $plain1.Length -lt 14) {
-            throw 'Hasło musi mieć minimum 14 znaków.'
+            throw 'The password must contain at least 14 characters.'
         }
-        if ($plain1 -cne $plain2) { throw 'Hasła nie są identyczne.' }
+        if ($plain1 -cne $plain2) { throw 'The passwords do not match.' }
         $env:SIRK_INSTALL_BREAKGLASS_PASSWORD = $plain1
     }
     finally {
@@ -103,8 +103,8 @@ if (-not $NonInteractive -and
     -not $TrustCertificate -and
     -not $DoNotTrustCertificate -and
     [string]::IsNullOrWhiteSpace($env:SIRK_INSTALL_TRUST_CERTIFICATE)) {
-    $trustAnswer = (Read-Host 'Dodać certyfikat Portalu do LocalMachine\Root? [T/n]').Trim().ToLowerInvariant()
-    if ($trustAnswer -in @('n','nie','no')) {
+    $trustAnswer = (Read-Host 'Add the Portal certificate to LocalMachine\Root? [Y/n]').Trim().ToLowerInvariant()
+    if ($trustAnswer -in @('n','no')) {
         $DoNotTrustCertificate = $true
     } else {
         $TrustCertificate = $true
@@ -113,10 +113,10 @@ if (-not $NonInteractive -and
 
 New-Item -ItemType Directory -Path $workRoot,$extractRoot -Force | Out-Null
 try {
-    Write-Host "=== SIRK Portal .NET 10 clean installation ===" -ForegroundColor Cyan
-    Write-Host "Źródło: Eris92/SIRK-Portal@$Branch" -ForegroundColor DarkCyan
+    Write-Host '=== SIRK Portal .NET 10 clean installation ===' -ForegroundColor Cyan
+    Write-Host "Source: Eris92/SIRK-Portal@$Branch" -ForegroundColor DarkCyan
     if ($preserveExistingData) {
-        Write-Host "Tryb: aktualizacja programu z zachowaniem $DataRoot" -ForegroundColor DarkGreen
+        Write-Host "Mode: program update preserving $DataRoot" -ForegroundColor DarkGreen
     }
 
     $encodedBranch = [Uri]::EscapeDataString($Branch)
@@ -126,11 +126,11 @@ try {
         -OutFile $sourceZip
     Expand-Archive -LiteralPath $sourceZip -DestinationPath $extractRoot -Force
     $sourceRoot = Get-ChildItem -LiteralPath $extractRoot -Directory | Select-Object -First 1
-    if (-not $sourceRoot) { throw 'Pobrane archiwum repozytorium jest nieprawidłowe.' }
+    if (-not $sourceRoot) { throw 'The downloaded repository archive is invalid.' }
 
     $installerPath = Join-Path $sourceRoot.FullName 'install-dotnet10.ps1'
     if (-not (Test-Path -LiteralPath $installerPath)) {
-        throw "Brak natywnego instalatora .NET 10: $installerPath"
+        throw "The native .NET 10 installer is missing: $installerPath"
     }
 
     $parameters = @{
@@ -151,11 +151,11 @@ try {
 
     $accessFile = Join-Path $DataRoot 'security\break-glass-access-code.txt'
     if (-not (Test-Path -LiteralPath $accessFile -PathType Leaf)) {
-        throw "Brak wygenerowanego Access Code: $accessFile"
+        throw "The generated Access Code file is missing: $accessFile"
     }
     $accessCode = (Get-Content -LiteralPath $accessFile -Raw -Encoding ASCII).Trim()
     if ($accessCode -notmatch '^[A-Za-z0-9_-]{32,256}$') {
-        throw 'Wygenerowany Access Code jest nieprawidłowy.'
+        throw 'The generated Access Code is invalid.'
     }
     $publicUrl = if ($HttpsPort -eq 443) {
         "https://$effectiveFqdn"
@@ -170,7 +170,7 @@ try {
     if (-not $SkipUpdater) {
         $updaterInstaller = Join-Path $sourceRoot.FullName 'tools\installer\Ensure-SirkUpdater.ps1'
         if (-not (Test-Path -LiteralPath $updaterInstaller)) {
-            throw "Brak integracji SIRK Updater: $updaterInstaller"
+            throw "SIRK Updater integration is missing: $updaterInstaller"
         }
         Invoke-Utf8Script -Path $updaterInstaller -Parameters @{
             PortalServiceName = 'SirkPortal'
@@ -180,15 +180,15 @@ try {
             Channel = 'dev'
         }
         $updater = Get-Service -Name SirkUpdater -ErrorAction Stop
-        if ($updater.Status -ne 'Running') { throw 'SIRK Updater nie działa po instalacji.' }
+        if ($updater.Status -ne 'Running') { throw 'SIRK Updater is not running after installation.' }
     }
 
     $portal = Get-Service -Name SirkPortal -ErrorAction Stop
     if ($portal.Status -ne 'Running' -or $portal.StartType -ne 'Automatic') {
-        throw "Nieprawidłowy stan SirkPortal: $($portal.Status) / $($portal.StartType)"
+        throw "Invalid SirkPortal service state: $($portal.Status) / $($portal.StartType)"
     }
 
-    Write-Host "Access URL zapisano również w: $accessFile" -ForegroundColor DarkYellow
+    Write-Host "The Access URL was also written to: $accessFile" -ForegroundColor DarkYellow
     Write-Host 'SIRK_PORTAL_DOTNET10_INSTALL_OK' -ForegroundColor Green
     if (-not $NonInteractive) { Start-Process $accessUrl }
 }
