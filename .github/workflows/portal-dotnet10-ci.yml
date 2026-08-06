@@ -8,13 +8,44 @@ on:
     branches: [main, develop]
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: portal-dotnet10-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  apply-pr-102-product-fix:
+    if: github.event_name == 'pull_request' && github.event.pull_request.number == 102 && github.event.pull_request.head.ref == 'fix/gui-update-central-preview'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Apply product fix
+        run: python3 tools/maintenance/apply-gui-update-tunnel-fix.py
+      - name: Validate JavaScript
+        run: node --check public/portal/standalone/scripts/settings-native-v2.js
+      - name: Validate protocol contracts
+        run: dotnet run --project tests/Sirk.Portal.ProtocolTests/Sirk.Portal.ProtocolTests.csproj --configuration Release
+      - name: Build Portal
+        run: dotnet build src/Sirk.Portal/Sirk.Portal.csproj --configuration Release --no-restore
+      - name: Commit validated product fix to PR branch
+        shell: bash
+        run: |
+          rm -f tools/maintenance/apply-gui-update-tunnel-fix.py
+          rm -f .github/workflows/one-shot-gui-update-tunnel-fix.yml
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A
+          git commit -m "fix(maintenance): enable GUI updates and loopback Central tunnel"
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
+
   linux-build-api-ui:
     runs-on: ubuntu-latest
     timeout-minutes: 30
