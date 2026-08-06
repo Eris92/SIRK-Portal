@@ -132,6 +132,10 @@
     var css = document.createElement("style");
     css.id = "sirk-workspace-connection-style";
     css.textContent = [
+        "#sirkPortalRoot .sirk-device-tabs-standalone{align-items:center!important;height:46px!important;min-height:46px!important;padding:4px 0!important}",
+        "#sirkPortalRoot .sirk-device-tabs-standalone .sirk-device-tab{height:38px!important;min-height:38px!important}",
+        "#sirkPortalRoot .sirk-device-tabs-standalone .sirk-device-tab-all{align-self:center!important;margin-top:0!important}",
+        "#sirkPortalRoot .sirk-device-workspace>.sirk-device-tabs{align-items:center!important;height:42px!important;min-height:42px!important;padding:4px 12px!important}",
         "#sirkPortalRoot .sirk-device-tabs-standalone .sirk-device-tab-connection-actions{display:none!important}",
         "#sirkPortalRoot .sirk-device-tabs-standalone .sirk-device-host-tab{display:grid!important;grid-template-columns:minmax(118px,1fr) 28px!important;grid-template-rows:19px 19px!important;min-width:154px!important;max-width:250px!important;height:38px!important;min-height:38px!important;padding:0!important;overflow:hidden!important;border-radius:9px!important}",
         "#sirkPortalRoot .sirk-device-tabs-standalone .sirk-device-tab-main{grid-column:1!important;grid-row:1/span 2!important;justify-content:flex-start!important;height:auto!important;min-height:0!important;padding:0 10px!important;border-radius:8px 0 0 8px!important}",
