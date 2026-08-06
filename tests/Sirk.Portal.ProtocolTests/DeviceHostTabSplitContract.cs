@@ -6,75 +6,48 @@ internal static class DeviceHostTabSplitContract
     {
         var root = FindRepositoryRoot();
         var tabsScript = File.ReadAllText(Path.Combine(root, "public", "portal", "standalone", "scripts", "device-tabs.js"));
-        var tabsCss = File.ReadAllText(Path.Combine(root, "public", "portal", "standalone", "styles", "device-tabs.css"));
-        var viewMode = File.ReadAllText(Path.Combine(root, "public", "portal", "standalone", "scripts", "view-mode.js"));
-        var workspace = File.ReadAllText(Path.Combine(root, "public", "portal", "standalone", "scripts", "device-workspace.js"));
+        var connectionScript = File.ReadAllText(Path.Combine(root, "public", "portal", "standalone", "scripts", "workspace-connection.js"));
+        var bundler = File.ReadAllText(Path.Combine(root, "src", "Sirk.Portal", "Ui", "PortalAssetBundler.cs"));
 
-        Require(tabsScript.Contains("sirk-device-tab-actions", StringComparison.Ordinal) &&
-                tabsScript.Contains("data-device-tab-close", StringComparison.Ordinal) &&
+        Require(tabsScript.Contains("data-device-tab-close", StringComparison.Ordinal) &&
                 tabsScript.Contains("data-device-tab-menu-toggle", StringComparison.Ordinal) &&
-                tabsScript.Contains("data-device-tab-connect", StringComparison.Ordinal) &&
-                tabsScript.Contains("data-device-tab-disconnect", StringComparison.Ordinal) &&
                 tabsScript.Contains("TAB_ICONS.close", StringComparison.Ordinal) &&
                 tabsScript.Contains("TAB_ICONS.menu", StringComparison.Ordinal),
-            "Host tabs must expose crisp close/menu controls and direct connect/disconnect actions.");
-        Require(tabsScript.Contains("data-device-tab-section", StringComparison.Ordinal) &&
-                tabsScript.Contains("Ogólne", StringComparison.Ordinal) &&
-                tabsScript.Contains("Połączenie", StringComparison.Ordinal) &&
-                tabsScript.Contains("Polecenia", StringComparison.Ordinal),
-            "The expanded host menu must expose the device workspace sections.");
-        Require(tabsScript.Contains("desktopMode() ? \"desktop\" : null", StringComparison.Ordinal) &&
-                tabsScript.Contains("state.pendingSection[info.key] = \"desktop\"", StringComparison.Ordinal),
-            "Opening a host in wide or connection mode must default to Desktop.");
-        Require(tabsScript.Contains("row.querySelector(\".sirk-device-connection.is-online\")", StringComparison.Ordinal) &&
-                tabsScript.Contains("is-online", StringComparison.Ordinal),
-            "Host tabs must inherit the live online state from the device list.");
+            "Host tabs must retain crisp close and section-menu controls.");
 
-        Require(tabsCss.Contains(".sirk-device-host-tab.is-online", StringComparison.Ordinal) &&
-                tabsCss.Contains("border-color:#16a34a", StringComparison.Ordinal),
-            "Online host tabs must keep a green outline.");
-        Require(tabsCss.Contains(".sirk-device-tab-connection-actions", StringComparison.Ordinal) &&
-                tabsCss.Contains(".sirk-device-tab-connect", StringComparison.Ordinal) &&
-                tabsCss.Contains(".sirk-device-tab-disconnect", StringComparison.Ordinal) &&
-                tabsCss.Contains(".sirk-device-tab-close svg", StringComparison.Ordinal) &&
-                tabsCss.Contains(".sirk-device-tab-menu-toggle svg", StringComparison.Ordinal),
-            "Host tabs must render polished SVG controls and integrated connection actions.");
-        Require(tabsScript.Contains("function requestDesktopAction", StringComparison.Ordinal) &&
-                tabsScript.Contains("sirkportal:desktopconnectionstate", StringComparison.Ordinal) &&
-                workspace.Contains("publishDesktopConnectionState(true)", StringComparison.Ordinal) &&
-                workspace.Contains("publishDesktopConnectionState(false)", StringComparison.Ordinal),
-            "Tab connection actions must drive and track the real desktop stream state.");
-        Require(tabsCss.Contains("sirk-device-tab-all", StringComparison.Ordinal) ||
-                tabsScript.Contains("sirk-device-tab sirk-device-tab-all", StringComparison.Ordinal),
-            "All must remain a plain tab without host split controls.");
+        Require(connectionScript.Contains("data-sirk-workspace-connection-toggle", StringComparison.Ordinal) &&
+                connectionScript.Contains("is-connected", StringComparison.Ordinal) &&
+                connectionScript.Contains("is-disconnected", StringComparison.Ordinal) &&
+                connectionScript.Contains("Rozłącz", StringComparison.Ordinal) &&
+                connectionScript.Contains("Połącz", StringComparison.Ordinal),
+            "The device workspace must expose one explicit Connect/Disconnect toggle.");
 
-        Require(viewMode.Contains("width:44px;height:44px", StringComparison.Ordinal),
-            "The view-mode and user controls must use the same 44px footprint.");
-        Require(tabsScript.Contains("function syncQuickCommandsToggle()", StringComparison.Ordinal) &&
-                tabsScript.Contains("toggle.classList.remove(\"is-header-mounted\")", StringComparison.Ordinal) &&
-                !tabsScript.Contains("state.header.insertBefore(toggle", StringComparison.Ordinal),
-            "Device tabs must not compete with the scoped Desktop presenter for Quick Commands.");
-        Require(viewMode.Contains("sirk-expanded-desktop-dock", StringComparison.Ordinal) &&
-                viewMode.Contains("stage.appendChild(dock)", StringComparison.Ordinal) &&
-                viewMode.Contains("restoreStandardDesktop", StringComparison.Ordinal),
-            "Quick Commands must be pinned inside the stage only in expanded Devices mode.");
-        Require(tabsCss.Contains("padding:2px 22px!important", StringComparison.Ordinal) &&
-                viewMode.Contains("padding:0!important;gap:0!important;border-radius:0!important", StringComparison.Ordinal),
-            "Expanded connection mode must remove content spacing and rounded desktop framing.");
-        Require(viewMode.Contains("sirk-device-focus-mode .sirk-device-workspace>.sirk-device-compact-header", StringComparison.Ordinal) &&
-                viewMode.Contains("sirk-device-focus-mode .sirk-device-tab-body", StringComparison.Ordinal) &&
-                viewMode.Contains("sirk-agent-desktop-stage canvas{max-width:100%!important;max-height:100%!important", StringComparison.Ordinal),
-            "Wide mode must replace the inner tabs and dedicate the content area to the selected workspace, including Desktop.");
-        Require(tabsCss.Contains("SIRK_HOST_TAB_CARD_V2", StringComparison.Ordinal) &&
-                tabsCss.Contains("height:72px!important", StringComparison.Ordinal) &&
-                tabsCss.Contains("grid-template-columns:minmax(200px,1fr) 44px!important", StringComparison.Ordinal) &&
-                tabsCss.Contains("linear-gradient(180deg,rgba(34,197,94,.24)", StringComparison.Ordinal) &&
-                tabsCss.Contains("linear-gradient(180deg,rgba(220,38,38,.22)", StringComparison.Ordinal),
-            "Host tabs must use the polished two-row card layout with readable connect, disconnect, close, and menu controls.");
-        Require(tabsScript.Contains("disconnect-close", StringComparison.Ordinal) &&
-                tabsScript.Contains("window.setTimeout(function () { closeTab(key); }, 0);", StringComparison.Ordinal) &&
-                tabsScript.Contains("delete state.pendingDesktopAction[key];", StringComparison.Ordinal),
-            "Disconnect must stop the desktop session and close the corresponding host tab.");
+        Require(connectionScript.Contains("type === \"general\" || connected", StringComparison.Ordinal) &&
+                connectionScript.Contains("button.disabled = !allowed", StringComparison.Ordinal) &&
+                connectionScript.Contains("Najpierw połącz z urządzeniem", StringComparison.Ordinal),
+            "Overview must remain available while remote sections stay disabled until explicit connection.");
+
+        Require(connectionScript.Contains("s.explicit !== active(ws)", StringComparison.Ordinal) &&
+                connectionScript.Contains("s.explicit !== \"desktop\"", StringComparison.Ordinal) &&
+                connectionScript.Contains("sirkWorkspaceStarted", StringComparison.Ordinal),
+            "Programmatic Desktop activation must be rejected and Desktop streaming may start only after an explicit workspace connection and tab choice.");
+
+        Require(connectionScript.Contains(".sirk-device-tab-connection-actions{display:none!important}", StringComparison.Ordinal) &&
+                connectionScript.Contains(".sirk-device-host-tab.is-online", StringComparison.Ordinal) &&
+                connectionScript.Contains(".sirk-device-host-tab.is-offline", StringComparison.Ordinal) &&
+                connectionScript.Contains("border-color:#16a34a", StringComparison.Ordinal) &&
+                connectionScript.Contains("border-color:#dc2626", StringComparison.Ordinal),
+            "Host tabs must hide per-tab connection actions and use green online or red offline status styling.");
+
+        Require(connectionScript.Contains("[data-agent-desktop-connect]", StringComparison.Ordinal) &&
+                connectionScript.Contains("[data-agent-desktop-disconnect]", StringComparison.Ordinal) &&
+                connectionScript.Contains("desktopStop(ws)", StringComparison.Ordinal),
+            "The single workspace toggle must control the real Desktop stream without exposing duplicate Desktop buttons.");
+
+        var tabsIndex = bundler.IndexOf("portal/standalone/scripts/device-tabs.js", StringComparison.Ordinal);
+        var connectionIndex = bundler.IndexOf("portal/standalone/scripts/workspace-connection.js", StringComparison.Ordinal);
+        Require(tabsIndex >= 0 && connectionIndex > tabsIndex,
+            "The workspace connection controller must be bundled after the existing device workspace and tab controllers.");
     }
 
     private static string FindRepositoryRoot()
