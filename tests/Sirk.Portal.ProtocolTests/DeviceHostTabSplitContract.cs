@@ -35,9 +35,10 @@ internal static class DeviceHostTabSplitContract
         Require(connectionScript.Contains(".sirk-device-tab-connection-actions{display:none!important}", StringComparison.Ordinal) &&
                 connectionScript.Contains(".sirk-device-host-tab.is-online", StringComparison.Ordinal) &&
                 connectionScript.Contains(".sirk-device-host-tab.is-offline", StringComparison.Ordinal) &&
-                connectionScript.Contains("border-color:#16a34a", StringComparison.Ordinal) &&
-                connectionScript.Contains("border-color:#dc2626", StringComparison.Ordinal),
-            "Host tabs must hide per-tab connection actions and use green online or red offline status styling.");
+                connectionScript.Contains("background:var(--sirk-sidebar-active,#2b3b55)", StringComparison.Ordinal) &&
+                connectionScript.Contains("inset 3px 0 0 #16a34a", StringComparison.Ordinal) &&
+                connectionScript.Contains("inset 3px 0 0 #dc2626", StringComparison.Ordinal),
+            "Host tabs must hide per-tab connection actions and reuse the sidebar active style with online/offline accents.");
 
         Require(connectionScript.Contains("[data-agent-desktop-connect]", StringComparison.Ordinal) &&
                 connectionScript.Contains("[data-agent-desktop-disconnect]", StringComparison.Ordinal) &&

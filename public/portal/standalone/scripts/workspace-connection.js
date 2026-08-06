@@ -12,7 +12,7 @@
     function keyOf(ws) {
         var root = ws.closest("#sirkStandaloneContent"), id = root && root.getAttribute("data-sirk-active-device-id");
         if (id) return String(id);
-        var name = ws.querySelector(".sirk-device-compact-main strong");
+        var name = document.querySelector(".sirk-device-host-tab.is-active .sirk-device-tab-label");
         return "name:" + String(name && name.textContent || "unknown").trim();
     }
     function state(ws) {
@@ -141,10 +141,10 @@
         "#sirkPortalRoot .sirk-device-tabs-standalone .sirk-device-tab-main{grid-column:1!important;grid-row:1/span 2!important;justify-content:flex-start!important;height:auto!important;min-height:0!important;padding:0 10px!important;border-radius:8px 0 0 8px!important}",
         "#sirkPortalRoot .sirk-device-tabs-standalone .sirk-device-tab-actions{grid-column:2!important;grid-row:1/span 2!important;display:grid!important;grid-template-rows:1fr 1fr!important;width:28px!important;min-width:28px!important}",
         "#sirkPortalRoot .sirk-device-tabs-standalone .sirk-device-tab-close,#sirkPortalRoot .sirk-device-tabs-standalone .sirk-device-tab-menu-toggle{display:grid!important;width:27px!important;min-width:27px!important;height:auto!important;min-height:0!important;padding:0!important}",
-        "#sirkPortalRoot .sirk-device-tabs-standalone .sirk-device-host-tab.is-online{border-color:#16a34a!important;background:rgba(22,163,74,.16)!important;color:var(--sirk-text,#172033)!important}",
-        "#sirkPortalRoot .sirk-device-tabs-standalone .sirk-device-host-tab.is-offline{border-color:#dc2626!important;background:rgba(220,38,38,.14)!important;color:var(--sirk-text,#172033)!important}",
-        "#sirkPortalRoot.sirk-theme-dark .sirk-device-tabs-standalone .sirk-device-host-tab.is-online{background:rgba(22,163,74,.25)!important;color:#dcfce7!important}",
-        "#sirkPortalRoot.sirk-theme-dark .sirk-device-tabs-standalone .sirk-device-host-tab.is-offline{background:rgba(220,38,38,.24)!important;color:#fee2e2!important}",
+        "#sirkPortalRoot .sirk-device-tabs-standalone .sirk-device-host-tab.is-online{border-color:transparent!important;background:var(--sirk-sidebar-active,#2b3b55)!important;color:#edf4ff!important;box-shadow:inset 3px 0 0 #16a34a,inset 0 0 0 1px rgba(255,255,255,.06)!important}",
+        "#sirkPortalRoot .sirk-device-tabs-standalone .sirk-device-host-tab.is-offline{border-color:transparent!important;background:var(--sirk-sidebar-active,#2b3b55)!important;color:#edf4ff!important;box-shadow:inset 3px 0 0 #dc2626,inset 0 0 0 1px rgba(255,255,255,.06)!important}",
+        "#sirkPortalRoot.sirk-theme-dark .sirk-device-tabs-standalone .sirk-device-host-tab.is-online{background:var(--sirk-sidebar-active,#2b3b55)!important;color:#edf4ff!important}",
+        "#sirkPortalRoot.sirk-theme-dark .sirk-device-tabs-standalone .sirk-device-host-tab.is-offline{background:var(--sirk-sidebar-active,#2b3b55)!important;color:#edf4ff!important}",
         "#sirkPortalRoot .sirk-device-workspace>.sirk-device-tabs .sirk-workspace-connection-toggle{order:-1;display:inline-flex!important;align-items:center!important;justify-content:center!important;gap:6px!important;min-width:92px!important;min-height:32px!important;padding:5px 12px!important;border-radius:7px!important;font-weight:700!important;color:#fff!important}",
         "#sirkPortalRoot .sirk-workspace-connection-toggle.is-disconnected{border-color:#15803d!important;background:#198754!important}",
         "#sirkPortalRoot .sirk-workspace-connection-toggle.is-connected{border-color:#b91c1c!important;background:#dc2626!important}",

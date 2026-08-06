@@ -478,3 +478,24 @@
         margin-left: 0;
     }
 }
+
+
+/* SIRK_DEVICE_WORKSPACE_LAYOUT_V2 */
+.sirk-device-workspace{grid-template-rows:auto minmax(0,1fr)}
+.sirk-device-workspace>.sirk-device-tabs{align-items:center;min-height:46px;padding:5px 8px;border:1px solid var(--sirk-border,#dce3ec);border-radius:11px 11px 0 0;background:var(--sirk-panel,#fff)}
+.sirk-device-workspace>.sirk-device-tabs .sirk-device-compact-meta{display:flex;align-items:center;justify-content:flex-end;gap:10px;min-width:max-content;margin-left:auto;padding:0 7px 0 12px;white-space:nowrap}
+.sirk-device-workspace>.sirk-device-tabs .sirk-device-compact-meta small{color:var(--sirk-muted,#657187);font-size:12px}
+.sirk-device-tab-body{position:relative;border-top:0}
+.sirk-device-tab-pane{width:100%;height:100%;min-width:0;min-height:0;overflow:auto}
+.sirk-device-tab-pane[hidden]{display:none!important}
+.sirk-device-tab-pane[data-device-pane="desktop"]{overflow:hidden}
+.sirk-device-tab-pane[data-device-pane="desktop"]>.sirk-agent-desktop{width:100%;height:100%;min-height:0}
+.sirk-device-tab-pane[data-device-pane="terminal"]{display:flex;flex-direction:column;gap:0}
+.sirk-device-tab-pane[data-device-pane="terminal"]>.sirk-agent-desktop-admin{margin:18px 18px 0}
+.sirk-device-tab-pane[data-device-pane="terminal"]>.sirk-agent-terminal{flex:1 1 auto;min-height:0}
+.sirk-agent-desktop-settings{min-height:0}
+.sirk-agent-desktop-settings .sirk-agent-desktop-controls,.sirk-agent-desktop-settings .sirk-agent-desktop-stats{width:100%}
+@media(max-width:800px){.sirk-device-workspace>.sirk-device-tabs{flex-wrap:wrap;height:auto!important}.sirk-device-workspace>.sirk-device-tabs .sirk-device-compact-meta{margin-left:0}}
+
+.sirk-agent-desktop-admin [data-agent-admin-status]{flex:1 1 100%;color:var(--sirk-muted,#94a3b8);font-size:12px}
+.sirk-agent-desktop-admin [data-agent-admin-status].is-error{color:#fca5a5}

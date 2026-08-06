@@ -49,14 +49,16 @@
                 { key: "desktop", label: "Connection" },
                 { key: "terminal", label: "Terminal" },
                 { key: "commands", label: "Commands" },
-                { key: "files", label: "Files" }
+                { key: "files", label: "Files" },
+                { key: "settings", label: "Settings" }
             ]
             : [
                 { key: "general", label: "Ogólne" },
                 { key: "desktop", label: "Połączenie" },
                 { key: "terminal", label: "Terminal" },
                 { key: "commands", label: "Polecenia" },
-                { key: "files", label: "Pliki" }
+                { key: "files", label: "Pliki" },
+                { key: "settings", label: "Ustawienia" }
             ];
     }
 

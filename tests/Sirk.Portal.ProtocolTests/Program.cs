@@ -20,6 +20,7 @@ DesktopImageCodecUiContract.Run();
 CommandWorkspaceStyleContract.Run();
 DeviceHeaderLayoutContract.Run();
 DeviceConnectionWorkspaceContract.Run();
+DeviceWorkspaceLayoutV2Contract.Run();
 DeviceHostTabSplitContract.Run();
 InstallerBuildSdkCacheContract.Run();
 InstallerEventLogSourceContract.Run();
