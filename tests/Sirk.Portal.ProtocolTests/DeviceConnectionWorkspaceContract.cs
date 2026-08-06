@@ -64,6 +64,20 @@ internal static class DeviceConnectionWorkspaceContract
         Require(viewMode.Contains("if (button.contains(event.target) || sidebar.contains(event.target)) return;", StringComparison.Ordinal) &&
                 viewMode.Contains("setConnectionSidebarOpen(false);", StringComparison.Ordinal),
             "Clicking the expanded workspace outside the menu must hide the overlay.");
+        Require(viewMode.Contains(".sirk-connection-header-toggle", StringComparison.Ordinal) &&
+                viewMode.Contains("sirk-device-connection-header-open .sirk-standalone-header", StringComparison.Ordinal) &&
+                viewMode.Contains("grid-template-rows:minmax(0,1fr)", StringComparison.Ordinal) &&
+                viewMode.Contains("function mountConnectionHeaderToggle()", StringComparison.Ordinal),
+            "Connection full view must hide the top header and expose it through a compact overlay handle.");
+        Require(viewMode.Contains("if (button.contains(event.target) || header.contains(event.target)) return;", StringComparison.Ordinal) &&
+                viewMode.Contains("setConnectionHeaderOpen(false);", StringComparison.Ordinal),
+            "Clicking outside the connection header overlay must hide it.");
+        Require(viewMode.Contains("function exitPortalFullscreen()", StringComparison.Ordinal) &&
+                viewMode.Contains("document.exitFullscreen()", StringComparison.Ordinal) &&
+                viewMode.Contains("if (expandedModeActive()) exitExpandedModes();", StringComparison.Ordinal) &&
+                viewMode.Contains("var alreadyActive = document.documentElement.classList.contains", StringComparison.Ordinal) &&
+                viewMode.Contains("&& !!document.fullscreenElement", StringComparison.Ordinal),
+            "Expanded options must toggle off and always leave the browser fullscreen state.");
         Require(commandsCss.Contains(".sirk-quick-commands-panel", StringComparison.Ordinal),
             "The shared Quick Commands presentation must remain available in normal Desktop mode.");
     }
