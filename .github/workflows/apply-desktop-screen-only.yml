@@ -6,6 +6,7 @@ on:
       - fix/desktop-screen-only
     paths:
       - .github/scripts/apply-desktop-screen-only.py
+      - .github/scripts/run-desktop-screen-only-migration.py
       - .github/workflows/apply-desktop-screen-only.yml
 
 permissions:
@@ -25,7 +26,7 @@ jobs:
           dotnet-version: 10.0.x
 
       - name: Apply desktop layout
-        run: python .github/scripts/apply-desktop-screen-only.py
+        run: python .github/scripts/run-desktop-screen-only-migration.py
 
       - name: Validate browser scripts
         run: |
@@ -49,6 +50,7 @@ jobs:
       - name: Remove migration helpers
         run: |
           rm .github/scripts/apply-desktop-screen-only.py
+          rm .github/scripts/run-desktop-screen-only-migration.py
           rm .github/workflows/apply-desktop-screen-only.yml
 
       - name: Commit product changes
