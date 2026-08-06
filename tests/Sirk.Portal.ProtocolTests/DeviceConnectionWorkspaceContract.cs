@@ -53,9 +53,13 @@ internal static class DeviceConnectionWorkspaceContract
 
         Require(tabsCss.Contains("padding:0 12px!important", StringComparison.Ordinal),
             "The Devices header must keep its 12px inset.");
-        Require(viewMode.Contains(".sirk-connection-sidebar-toggle", StringComparison.Ordinal) &&
-                viewMode.Contains("sirk-device-connection-sidebar-open .sirk-standalone-sidebar", StringComparison.Ordinal),
-            "Connection mode must retain its left-menu overlay control.");
+        Require(viewMode.Contains("html.sirk-device-focus-mode .sirk-connection-sidebar-toggle", StringComparison.Ordinal) &&
+                viewMode.Contains("html.sirk-device-connection-mode .sirk-connection-sidebar-toggle", StringComparison.Ordinal) &&
+                viewMode.Contains("var active = expandedModeActive();", StringComparison.Ordinal),
+            "Both expanded Devices modes must expose the left-menu overlay control.");
+        Require(viewMode.Contains("if (button.contains(event.target) || sidebar.contains(event.target)) return;", StringComparison.Ordinal) &&
+                viewMode.Contains("setConnectionSidebarOpen(false);", StringComparison.Ordinal),
+            "Clicking the expanded workspace outside the menu must hide the overlay.");
         Require(commandsCss.Contains(".sirk-quick-commands-panel", StringComparison.Ordinal),
             "The shared Quick Commands presentation must remain available in normal Desktop mode.");
     }

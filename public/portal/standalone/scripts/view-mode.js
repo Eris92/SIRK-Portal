@@ -44,11 +44,11 @@
             ".sirk-connection-sidebar-toggle{position:fixed!important;left:0;top:50%;z-index:2147483500;display:none!important;align-items:center;justify-content:center;width:34px;height:48px;padding:0;border:1px solid rgba(148,163,184,.72);border-left:0;border-radius:0 10px 10px 0;background:rgba(13,23,40,.9);color:#edf4ff;box-shadow:0 8px 22px rgba(15,23,42,.28);cursor:pointer;transform:translateY(-50%);transition:left .18s ease,background .18s ease,border-color .18s ease}",
             ".sirk-connection-sidebar-toggle:hover,.sirk-connection-sidebar-toggle:focus-visible{border-color:#60a5fa;background:#17263d;color:#fff;outline:none}",
             ".sirk-connection-sidebar-toggle svg{display:block;width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;transition:transform .18s ease}",
-            "html.sirk-device-connection-mode .sirk-connection-sidebar-toggle{display:flex!important}",
-            "html.sirk-device-connection-mode.sirk-device-connection-sidebar-open .sirk-connection-sidebar-toggle{left:248px}",
-            "html.sirk-device-connection-mode.sirk-device-connection-sidebar-open .sirk-connection-sidebar-toggle svg{transform:rotate(180deg)}",
-            "html.sirk-device-connection-mode.sirk-device-connection-sidebar-open .sirk-standalone-sidebar{position:fixed!important;inset:0 auto 0 0!important;z-index:2147483400!important;display:flex!important;width:248px!important;height:100dvh!important;box-shadow:12px 0 30px rgba(15,23,42,.34)}",
-            "html.sirk-device-focus-mode .sirk-standalone-sidebar{display:none!important}",
+            "html.sirk-device-focus-mode .sirk-connection-sidebar-toggle,html.sirk-device-connection-mode .sirk-connection-sidebar-toggle{display:flex!important}",
+            "html.sirk-device-focus-mode.sirk-device-connection-sidebar-open .sirk-connection-sidebar-toggle,html.sirk-device-connection-mode.sirk-device-connection-sidebar-open .sirk-connection-sidebar-toggle{left:248px}",
+            "html.sirk-device-focus-mode.sirk-device-connection-sidebar-open .sirk-connection-sidebar-toggle svg,html.sirk-device-connection-mode.sirk-device-connection-sidebar-open .sirk-connection-sidebar-toggle svg{transform:rotate(180deg)}",
+            "html.sirk-device-focus-mode.sirk-device-connection-sidebar-open .sirk-standalone-sidebar,html.sirk-device-connection-mode.sirk-device-connection-sidebar-open .sirk-standalone-sidebar{position:fixed!important;inset:0 auto 0 0!important;z-index:2147483400!important;display:flex!important;width:248px!important;height:100dvh!important;box-shadow:12px 0 30px rgba(15,23,42,.34)}",
+            "html.sirk-device-focus-mode:not(.sirk-device-connection-sidebar-open) .sirk-standalone-sidebar{display:none!important}",
             "html.sirk-device-focus-mode .sirk-standalone-root{grid-template-columns:minmax(0,1fr)!important}",
             "html.sirk-device-focus-mode .sirk-standalone-topbar{display:none!important}",
             "html.sirk-device-focus-mode #sirkPortalRoot,html.sirk-device-focus-mode #sirkStandaloneRoot,html.sirk-device-focus-mode .sirk-standalone-main{width:100%!important;height:100%!important;min-height:100%!important}",
@@ -183,16 +183,16 @@
     function updateConnectionSidebarToggle() {
         var button = document.getElementById("sirkConnectionSidebarToggle");
         if (!button) return;
-        var connection = document.documentElement.classList.contains("sirk-device-connection-mode");
-        var open = connection && document.documentElement.classList.contains("sirk-device-connection-sidebar-open");
-        if (!connection) document.documentElement.classList.remove("sirk-device-connection-sidebar-open");
+        var expanded = expandedModeActive();
+        var open = expanded && document.documentElement.classList.contains("sirk-device-connection-sidebar-open");
+        if (!expanded) document.documentElement.classList.remove("sirk-device-connection-sidebar-open");
         button.setAttribute("aria-expanded", open ? "true" : "false");
         button.setAttribute("aria-label", text(open ? "Ukryj lewe menu" : "Pokaż lewe menu", open ? "Hide left menu" : "Show left menu"));
         button.title = text(open ? "Ukryj lewe menu" : "Pokaż lewe menu", open ? "Hide left menu" : "Show left menu");
     }
 
     function setConnectionSidebarOpen(enabled) {
-        var active = document.documentElement.classList.contains("sirk-device-connection-mode");
+        var active = expandedModeActive();
         document.documentElement.classList.toggle("sirk-device-connection-sidebar-open", active && enabled);
         updateConnectionSidebarToggle();
         window.dispatchEvent(new Event("resize"));
