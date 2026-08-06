@@ -5,11 +5,18 @@ internal static class DeviceHostTabSplitContract
     public static void Run()
     {
         var root = FindRepositoryRoot();
+        var transportScript = File.ReadAllText(Path.Combine(root, "public", "portal", "standalone", "scripts", "central-tunnel-transport.js"));
+        var workspaceScript = File.ReadAllText(Path.Combine(root, "public", "portal", "standalone", "scripts", "device-workspace.js"));
         var tabsScript = File.ReadAllText(Path.Combine(root, "public", "portal", "standalone", "scripts", "device-tabs.js"));
         var connectionScript = File.ReadAllText(Path.Combine(root, "public", "portal", "standalone", "scripts", "workspace-connection.js"));
         var lifecycleScript = File.ReadAllText(Path.Combine(root, "public", "portal", "standalone", "scripts", "device-tabs-lifecycle-v4.js"));
         var headerContextScript = File.ReadAllText(Path.Combine(root, "public", "portal", "standalone", "scripts", "header-toggle-context-menu.js"));
         var bundler = File.ReadAllText(Path.Combine(root, "src", "Sirk.Portal", "Ui", "PortalAssetBundler.cs"));
+
+        Require(transportScript.Contains("window.detailItem = function", StringComparison.Ordinal) &&
+                transportScript.Contains("sirk-device-detail-item", StringComparison.Ordinal) &&
+                workspaceScript.Contains("detailItem(t(\"name\")", StringComparison.Ordinal),
+            "The device detail helper must exist before workspace initialization so one missing function cannot leave every section empty.");
 
         Require(tabsScript.Contains("data-device-tab-close", StringComparison.Ordinal) &&
                 tabsScript.Contains("data-device-tab-menu-toggle", StringComparison.Ordinal) &&
@@ -83,15 +90,18 @@ internal static class DeviceHostTabSplitContract
                 headerContextScript.Contains("!connectionMode() || !ws", StringComparison.Ordinal),
             "The top-bar handle context menu must be restricted to connection view.");
 
+        var transportIndex = bundler.IndexOf("portal/standalone/scripts/central-tunnel-transport.js", StringComparison.Ordinal);
+        var workspaceIndex = bundler.IndexOf("portal/standalone/scripts/device-workspace.js", StringComparison.Ordinal);
         var tabsIndex = bundler.IndexOf("portal/standalone/scripts/device-tabs.js", StringComparison.Ordinal);
         var connectionIndex = bundler.IndexOf("portal/standalone/scripts/workspace-connection.js", StringComparison.Ordinal);
         var lifecycleIndex = bundler.IndexOf("portal/standalone/scripts/device-tabs-lifecycle-v4.js", StringComparison.Ordinal);
         var legacyLifecycleIndex = bundler.IndexOf("portal/standalone/scripts/device-tabs-lifecycle-v3.js", StringComparison.Ordinal);
         var headerContextIndex = bundler.IndexOf("portal/standalone/scripts/header-toggle-context-menu.js", StringComparison.Ordinal);
         var terminalIndex = bundler.IndexOf("portal/standalone/scripts/terminal-connect.js", StringComparison.Ordinal);
-        Require(tabsIndex >= 0 && connectionIndex > tabsIndex && lifecycleIndex > connectionIndex &&
-                legacyLifecycleIndex < 0 && headerContextIndex > lifecycleIndex && terminalIndex > headerContextIndex,
-            "The stable lifecycle v4 controller must replace v3 and load before header-context and Terminal integration.");
+        Require(transportIndex >= 0 && workspaceIndex > transportIndex && tabsIndex > workspaceIndex &&
+                connectionIndex > tabsIndex && lifecycleIndex > connectionIndex && legacyLifecycleIndex < 0 &&
+                headerContextIndex > lifecycleIndex && terminalIndex > headerContextIndex,
+            "Workspace prerequisites and lifecycle controllers must load in a deterministic order.");
     }
 
     private static string FindRepositoryRoot()
