@@ -10,6 +10,7 @@ internal static class DeviceHostTabSplitContract
         var tabsScript = File.ReadAllText(Path.Combine(root, "public", "portal", "standalone", "scripts", "device-tabs.js"));
         var connectionScript = File.ReadAllText(Path.Combine(root, "public", "portal", "standalone", "scripts", "workspace-connection.js"));
         var lifecycleScript = File.ReadAllText(Path.Combine(root, "public", "portal", "standalone", "scripts", "device-tabs-lifecycle-v4.js"));
+        var selectionScript = File.ReadAllText(Path.Combine(root, "public", "portal", "standalone", "scripts", "device-tab-selection-state.js"));
         var headerContextScript = File.ReadAllText(Path.Combine(root, "public", "portal", "standalone", "scripts", "header-toggle-context-menu.js"));
         var bundler = File.ReadAllText(Path.Combine(root, "src", "Sirk.Portal", "Ui", "PortalAssetBundler.cs"));
 
@@ -77,6 +78,16 @@ internal static class DeviceHostTabSplitContract
                 lifecycleScript.Contains("#sirkPortalRoot.sirk-theme-dark", StringComparison.Ordinal),
             "Host tabs and their dropdown must follow the active light or dark Portal theme.");
 
+        Require(selectionScript.Contains(".sirk-device-tab-all.is-active", StringComparison.Ordinal) &&
+                selectionScript.Contains(".sirk-device-host-tab.is-active", StringComparison.Ordinal) &&
+                selectionScript.Contains("inset 0 -3px 0 #2563eb", StringComparison.Ordinal),
+            "The selected All or host tab must have a distinct blue fill and underline independent of online status.");
+        Require(selectionScript.Contains(".is-online.is-active", StringComparison.Ordinal) &&
+                selectionScript.Contains(".is-offline.is-active", StringComparison.Ordinal) &&
+                selectionScript.Contains("inset 3px 0 0 #16a34a", StringComparison.Ordinal) &&
+                selectionScript.Contains("inset 3px 0 0 #dc2626", StringComparison.Ordinal),
+            "Online and offline accents must remain visible while the selected state uses a separate blue marker.");
+
         Require(headerContextScript.Contains("#sirkConnectionHeaderToggle", StringComparison.Ordinal) &&
                 headerContextScript.Contains("contextmenu", StringComparison.Ordinal) &&
                 headerContextScript.Contains("data-header-context-connection", StringComparison.Ordinal),
@@ -95,13 +106,14 @@ internal static class DeviceHostTabSplitContract
         var tabsIndex = bundler.IndexOf("portal/standalone/scripts/device-tabs.js", StringComparison.Ordinal);
         var connectionIndex = bundler.IndexOf("portal/standalone/scripts/workspace-connection.js", StringComparison.Ordinal);
         var lifecycleIndex = bundler.IndexOf("portal/standalone/scripts/device-tabs-lifecycle-v4.js", StringComparison.Ordinal);
+        var selectionIndex = bundler.IndexOf("portal/standalone/scripts/device-tab-selection-state.js", StringComparison.Ordinal);
         var legacyLifecycleIndex = bundler.IndexOf("portal/standalone/scripts/device-tabs-lifecycle-v3.js", StringComparison.Ordinal);
         var headerContextIndex = bundler.IndexOf("portal/standalone/scripts/header-toggle-context-menu.js", StringComparison.Ordinal);
         var terminalIndex = bundler.IndexOf("portal/standalone/scripts/terminal-connect.js", StringComparison.Ordinal);
         Require(transportIndex >= 0 && workspaceIndex > transportIndex && tabsIndex > workspaceIndex &&
-                connectionIndex > tabsIndex && lifecycleIndex > connectionIndex && legacyLifecycleIndex < 0 &&
-                headerContextIndex > lifecycleIndex && terminalIndex > headerContextIndex,
-            "Workspace prerequisites and lifecycle controllers must load in a deterministic order.");
+                connectionIndex > tabsIndex && lifecycleIndex > connectionIndex && selectionIndex > lifecycleIndex &&
+                legacyLifecycleIndex < 0 && headerContextIndex > selectionIndex && terminalIndex > headerContextIndex,
+            "Workspace prerequisites, lifecycle, and selected-tab styling must load in a deterministic order.");
     }
 
     private static string FindRepositoryRoot()
