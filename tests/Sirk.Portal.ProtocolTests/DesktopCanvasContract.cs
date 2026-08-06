@@ -7,8 +7,8 @@ internal static class DesktopCanvasContract
         var root = FindRepositoryRoot();
         var workspace = File.ReadAllText(Path.Combine(root, "public", "portal", "standalone",
             "scripts", "device-workspace.js"));
-        var workspaceCss = File.ReadAllText(Path.Combine(root, "public", "portal", "standalone",
-            "styles", "device-workspace.css"));
+        var viewMode = File.ReadAllText(Path.Combine(root, "public", "portal", "standalone",
+            "scripts", "view-mode.js"));
 
         Require(workspace.Contains("var imageFrame = /^image\\/(?:jpeg|png|webp)/i.test(value.contentType);",
                 StringComparison.Ordinal),
@@ -17,9 +17,13 @@ internal static class DesktopCanvasContract
             "Image tile atlases must render into a source-sized desktop canvas.");
         Require(workspace.Contains("positionLocalCursor", StringComparison.Ordinal),
             "Remote cursor positioning must account for the fitted canvas rectangle.");
-        Require(workspaceCss.Contains(".sirk-agent-desktop-stage canvas", StringComparison.Ordinal) &&
-                workspaceCss.Contains("max-height:100%", StringComparison.Ordinal),
-            "The screen-only desktop canvas must fill the available stage without extra controls.");
+        Require(viewMode.Contains("html.sirk-device-focus-mode .sirk-agent-desktop-stage canvas", StringComparison.Ordinal) &&
+                viewMode.Contains("html.sirk-device-connection-mode .sirk-agent-desktop-stage canvas", StringComparison.Ordinal) &&
+                viewMode.Contains("max-height:100%!important", StringComparison.Ordinal),
+            "Only expanded Devices modes must fit the desktop canvas to the complete available stage.");
+        Require(viewMode.Contains(".sirk-agent-desktop-controls", StringComparison.Ordinal) &&
+                viewMode.Contains("display:none!important", StringComparison.Ordinal),
+            "Expanded-mode CSS must hide standard controls without deleting them from normal Desktop.");
         Require(!workspace.Contains(
                 "nativeWidth = Number(data.width || 0);\n                nativeHeight = Number(data.height || 0);",
                 StringComparison.Ordinal),
