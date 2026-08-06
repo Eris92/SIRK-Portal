@@ -2,16 +2,17 @@ name: One-shot stack overlay handles
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
     paths:
-      - '.github/workflows/one-shot-stack-overlay-handles.yml'
+      - .github/workflows/one-shot-stack-overlay-handles.yml
 
 permissions:
   contents: write
 
 jobs:
   patch:
-    if: github.event.head_commit.message == 'chore: apply one-time stacked handle fix'
+    if: ${{ contains(github.event.head_commit.message, '[run-stack-fix]') }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -22,8 +23,9 @@ jobs:
         with:
           dotnet-version: 10.0.x
       - name: Stack the overlay handles vertically
-        shell: python
+        shell: bash
         run: |
+          python3 - <<'PY'
           from pathlib import Path
 
           view_path = Path('public/portal/standalone/scripts/view-mode.js')
@@ -101,6 +103,7 @@ jobs:
               test = test.replace(old, new, 1)
 
           test_path.write_text(test, encoding='utf-8', newline='')
+          PY
       - name: Validate the device connection workspace contract
         shell: bash
         run: dotnet run --project tests/Sirk.Portal.ProtocolTests/Sirk.Portal.ProtocolTests.csproj --configuration Release
