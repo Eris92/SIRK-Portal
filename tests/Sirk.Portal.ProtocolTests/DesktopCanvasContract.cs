@@ -7,6 +7,8 @@ internal static class DesktopCanvasContract
         var root = FindRepositoryRoot();
         var workspace = File.ReadAllText(Path.Combine(root, "public", "portal", "standalone",
             "scripts", "device-workspace.js"));
+        var workspaceCss = File.ReadAllText(Path.Combine(root, "public", "portal", "standalone",
+            "styles", "device-workspace.css"));
 
         Require(workspace.Contains("var imageFrame = /^image\\/(?:jpeg|png|webp)/i.test(value.contentType);",
                 StringComparison.Ordinal),
@@ -15,8 +17,9 @@ internal static class DesktopCanvasContract
             "Image tile atlases must render into a source-sized desktop canvas.");
         Require(workspace.Contains("positionLocalCursor", StringComparison.Ordinal),
             "Remote cursor positioning must account for the fitted canvas rectangle.");
-        Require(workspace.Contains("max-height:calc(100vh - 360px)", StringComparison.Ordinal),
-            "The desktop canvas must be fitted to the available viewport.");
+        Require(workspaceCss.Contains(".sirk-agent-desktop-stage canvas", StringComparison.Ordinal) &&
+                workspaceCss.Contains("max-height:100%", StringComparison.Ordinal),
+            "The screen-only desktop canvas must fill the available stage without extra controls.");
         Require(!workspace.Contains(
                 "nativeWidth = Number(data.width || 0);\n                nativeHeight = Number(data.height || 0);",
                 StringComparison.Ordinal),

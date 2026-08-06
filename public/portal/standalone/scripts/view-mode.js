@@ -50,7 +50,7 @@
             "html.sirk-device-focus-mode .sirk-device-workspace{grid-template-rows:minmax(0,1fr)!important;width:100%!important;height:100%!important;min-height:0!important}",
             "html.sirk-device-focus-mode .sirk-device-workspace>.sirk-device-compact-header,html.sirk-device-focus-mode .sirk-device-workspace>.sirk-device-tabs{display:none!important}",
             "html.sirk-device-focus-mode .sirk-device-tab-body{width:100%!important;height:100%!important;min-height:0!important;border:0!important;border-radius:0!important}",
-            "html.sirk-device-focus-mode .sirk-agent-operation.sirk-agent-desktop{width:100%!important;height:100%!important;min-height:0!important;margin:0!important;padding:0!important;gap:0!important;border-radius:0!important;box-sizing:border-box!important;overflow:hidden!important}",
+            "html.sirk-device-focus-mode .sirk-agent-desktop{width:100%!important;height:100%!important;min-height:0!important;margin:0!important;padding:0!important;gap:0!important;border-radius:0!important;box-sizing:border-box!important;overflow:hidden!important}",
             "html.sirk-device-focus-mode .sirk-agent-desktop-stage{display:flex!important;flex:1 1 auto!important;width:100%!important;min-height:0!important;overflow:hidden!important}",
             "html.sirk-device-focus-mode .sirk-agent-desktop-stage canvas{max-width:100%!important;max-height:100%!important;width:auto!important;height:auto!important;margin:auto!important}",
             "html.sirk-device-connection-mode .sirk-standalone-sidebar,html.sirk-device-connection-mode .sirk-standalone-topbar{display:none!important}",
@@ -60,12 +60,10 @@
             "html.sirk-device-connection-mode .sirk-device-workspace{grid-template-rows:minmax(0,1fr)!important;width:100%!important;height:100%!important;min-height:0!important}",
             "html.sirk-device-connection-mode .sirk-device-workspace>.sirk-device-compact-header,html.sirk-device-connection-mode .sirk-device-workspace>.sirk-device-tabs{display:none!important}",
             "html.sirk-device-connection-mode .sirk-device-tab-body{width:100%!important;height:100%!important;min-height:0!important;border:0!important;border-radius:0!important}",
-            "html.sirk-device-connection-mode .sirk-agent-operation.sirk-agent-desktop{width:100%!important;height:100%!important;min-height:0!important;margin:0!important;padding:0!important;gap:0!important;border-radius:0!important;box-sizing:border-box!important;overflow:hidden!important}",
-            "html.sirk-device-connection-mode .sirk-agent-desktop>header,html.sirk-device-connection-mode .sirk-agent-desktop-controls,html.sirk-device-connection-mode .sirk-agent-desktop-stats,html.sirk-device-connection-mode .sirk-agent-desktop-admin,html.sirk-device-connection-mode .sirk-agent-desktop-input,html.sirk-device-connection-mode .sirk-agent-desktop-clipboard,html.sirk-device-connection-mode .sirk-agent-policy-action,html.sirk-device-connection-mode .sirk-agent-desktop>pre{display:none!important}",
+            "html.sirk-device-connection-mode .sirk-agent-desktop{width:100%!important;height:100%!important;min-height:0!important;margin:0!important;padding:0!important;gap:0!important;border-radius:0!important;box-sizing:border-box!important;overflow:hidden!important}",
             "html.sirk-device-connection-mode .sirk-agent-desktop-stage{position:relative!important;display:flex!important;flex:1 1 auto!important;width:100%!important;height:100%!important;min-height:0!important;border-radius:0!important;overflow:hidden!important}",
             "html.sirk-device-connection-mode .sirk-agent-desktop-stage canvas{display:block!important;max-width:100%!important;max-height:100%!important;width:auto!important;height:auto!important;margin:auto!important}",
-            "html.sirk-device-connection-mode .sirk-quick-commands-toggle.is-header-mounted,html.sirk-device-focus-mode .sirk-quick-commands-toggle.is-header-mounted{z-index:60!important}",
-            "html.sirk-device-connection-mode .sirk-quick-commands-panel{z-index:59!important;top:8px!important;right:8px!important;bottom:8px!important}",
+            "html.sirk-device-connection-mode .sirk-quick-commands-dock,html.sirk-device-focus-mode .sirk-quick-commands-dock{z-index:60!important}",
             "html.sirk-device-workspace-child .sirk-device-view-mode{display:none!important}"
         ].join("");
         (document.head || document.documentElement).appendChild(style);
