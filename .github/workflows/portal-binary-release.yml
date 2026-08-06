@@ -4,6 +4,8 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
 
 permissions:
   contents: write
@@ -14,11 +16,20 @@ concurrency:
 
 jobs:
   publish-main-package:
-    if: github.ref == 'refs/heads/main'
+    if: github.event_name != 'pull_request' || github.head_ref == 'trigger/portal-binary-release'
     runs-on: windows-latest
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'pull_request' && 'main' || github.ref }}
+
+      - name: Resolve package commit
+        shell: pwsh
+        run: |
+          $commit = (git rev-parse HEAD).Trim()
+          if ($commit -notmatch '^[a-f0-9]{40}$') { throw "Invalid package commit: $commit" }
+          "PORTAL_COMMIT=$commit" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
       - uses: actions/setup-dotnet@v4
         with:
@@ -76,7 +87,7 @@ jobs:
             schemaVersion = 1
             applicationId = 'sirk-portal'
             channel = 'main'
-            commit = '${{ github.sha }}'
+            commit = '${{ env.PORTAL_COMMIT }}'
             architecture = 'win-x64'
             deploymentMode = 'framework-dependent'
             targetFramework = 'net10.0'
@@ -96,7 +107,7 @@ jobs:
             schemaVersion = 1
             applicationId = 'sirk-portal'
             channel = 'main'
-            commit = '${{ github.sha }}'
+            commit = '${{ env.PORTAL_COMMIT }}'
             package = 'sirk-portal-win-x64.zip'
             sha256 = $sha256
             sizeBytes = $file.Length
@@ -120,7 +131,7 @@ jobs:
           gh release create portal-main-latest `
             artifacts/sirk-portal-win-x64.zip `
             artifacts/portal-update.json `
-            --target '${{ github.sha }}' `
+            --target '${{ env.PORTAL_COMMIT }}' `
             --title 'SIRK Portal main binary update' `
             --notes 'Automatically built, SHA-256 verified framework-dependent win-x64 update package.' `
             --prerelease
@@ -128,7 +139,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: sirk-portal-win-x64-${{ github.sha }}
+          name: sirk-portal-win-x64-${{ env.PORTAL_COMMIT }}
           path: |
             artifacts/sirk-portal-win-x64.zip
             artifacts/portal-update.json
