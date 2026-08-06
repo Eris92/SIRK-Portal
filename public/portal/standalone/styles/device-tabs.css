@@ -66,3 +66,149 @@ html.sirk-device-workspace-child #sirkStandaloneContent .sirk-device-workspace{h
 html.sirk-device-workspace-child #sirkStandaloneContent .sirk-device-compact-header{margin:0!important;border-radius:11px 11px 0 0!important}
 html.sirk-device-workspace-child #sirkStandaloneContent .sirk-device-tabs{margin:0!important;padding-left:12px!important;padding-right:12px!important}
 html.sirk-device-workspace-child #sirkStandaloneContent canvas{max-height:calc(100vh - 136px)!important}
+
+
+/* SIRK_HOST_TAB_CARD_V2 */
+#sirkPortalRoot .sirk-device-tabs{
+    align-items:flex-start!important;
+    height:84px!important;
+    min-height:84px!important;
+    padding:6px 12px!important;
+}
+#sirkPortalRoot .sirk-device-tabs-standalone{
+    height:72px!important;
+    min-height:72px!important;
+    padding:0!important;
+}
+#sirkPortalRoot .sirk-device-tab{
+    height:72px!important;
+    min-height:72px!important;
+}
+#sirkPortalRoot .sirk-device-tab-all{
+    align-self:flex-start!important;
+    height:38px!important;
+    min-height:38px!important;
+    margin-top:3px!important;
+}
+#sirkPortalRoot .sirk-device-host-tab{
+    display:grid!important;
+    grid-template-columns:minmax(200px,1fr) 44px!important;
+    grid-template-rows:38px 34px!important;
+    min-width:286px!important;
+    max-width:360px!important;
+    height:72px!important;
+    min-height:72px!important;
+    padding:0!important;
+    border-radius:12px!important;
+    overflow:hidden!important;
+}
+#sirkPortalRoot .sirk-device-tab-main{
+    grid-column:1!important;
+    grid-row:1!important;
+    justify-content:flex-start!important;
+    min-height:38px!important;
+    padding:0 12px!important;
+    border-radius:11px 0 0 0!important;
+}
+#sirkPortalRoot .sirk-device-tab-label{
+    font-size:13px!important;
+    font-weight:700!important;
+    line-height:1!important;
+}
+#sirkPortalRoot .sirk-device-tab-connection-actions{
+    grid-column:1!important;
+    grid-row:2!important;
+    display:grid!important;
+    grid-template-columns:1fr 1fr!important;
+    height:34px!important;
+    border-top:1px solid rgba(101,113,135,.30)!important;
+}
+#sirkPortalRoot .sirk-device-tab-connect,
+#sirkPortalRoot .sirk-device-tab-disconnect{
+    display:inline-flex!important;
+    align-items:center!important;
+    justify-content:center!important;
+    gap:6px!important;
+    height:34px!important;
+    min-height:34px!important;
+    padding:0 10px!important;
+    border:0!important;
+    font:700 12px/1 Segoe UI,Arial,sans-serif!important;
+}
+#sirkPortalRoot .sirk-device-tab-connect{
+    border-radius:0 0 0 11px!important;
+    color:#15803d!important;
+    background:linear-gradient(180deg,rgba(34,197,94,.24),rgba(34,197,94,.14))!important;
+}
+#sirkPortalRoot .sirk-device-tab-disconnect{
+    border-left:1px solid rgba(101,113,135,.30)!important;
+    color:#dc2626!important;
+    background:linear-gradient(180deg,rgba(220,38,38,.22),rgba(220,38,38,.12))!important;
+}
+#sirkPortalRoot .sirk-device-tab-connect svg,
+#sirkPortalRoot .sirk-device-tab-disconnect svg{
+    flex:0 0 15px!important;
+    width:15px!important;
+    height:15px!important;
+    stroke-width:2.2!important;
+}
+#sirkPortalRoot .sirk-device-tab-connect:hover:not(:disabled),
+#sirkPortalRoot .sirk-device-tab-connect:focus-visible{
+    background:linear-gradient(180deg,rgba(34,197,94,.34),rgba(34,197,94,.22))!important;
+}
+#sirkPortalRoot .sirk-device-tab-disconnect:hover:not(:disabled),
+#sirkPortalRoot .sirk-device-tab-disconnect:focus-visible{
+    background:linear-gradient(180deg,rgba(220,38,38,.32),rgba(220,38,38,.20))!important;
+}
+#sirkPortalRoot .sirk-device-tab-connect:disabled,
+#sirkPortalRoot .sirk-device-tab-disconnect:disabled{
+    opacity:.34!important;
+    cursor:default!important;
+}
+#sirkPortalRoot .sirk-device-tab-actions{
+    grid-column:2!important;
+    grid-row:1 / span 2!important;
+    display:grid!important;
+    grid-template-rows:1fr 1fr!important;
+    width:44px!important;
+    min-width:44px!important;
+    border-left:1px solid rgba(101,113,135,.30)!important;
+}
+#sirkPortalRoot .sirk-device-tab-close,
+#sirkPortalRoot .sirk-device-tab-menu-toggle{
+    display:grid!important;
+    place-items:center!important;
+    width:44px!important;
+    min-width:44px!important;
+    padding:0!important;
+    opacity:1!important;
+}
+#sirkPortalRoot .sirk-device-tab-close{
+    border-bottom:1px solid rgba(101,113,135,.30)!important;
+}
+#sirkPortalRoot .sirk-device-tab-close svg,
+#sirkPortalRoot .sirk-device-tab-menu-toggle svg{
+    width:18px!important;
+    height:18px!important;
+    stroke-width:2.4!important;
+}
+#sirkPortalRoot.sirk-theme-dark .sirk-device-tab-connect{
+    color:#86efac!important;
+    background:linear-gradient(180deg,rgba(22,163,74,.28),rgba(22,163,74,.16))!important;
+}
+#sirkPortalRoot.sirk-theme-dark .sirk-device-tab-disconnect{
+    color:#fca5a5!important;
+    background:linear-gradient(180deg,rgba(220,38,38,.26),rgba(220,38,38,.15))!important;
+}
+@media (max-width:900px){
+    #sirkPortalRoot .sirk-device-host-tab{
+        grid-template-columns:minmax(174px,1fr) 42px!important;
+        min-width:250px!important;
+    }
+    #sirkPortalRoot .sirk-device-tab-actions,
+    #sirkPortalRoot .sirk-device-tab-close,
+    #sirkPortalRoot .sirk-device-tab-menu-toggle{
+        width:42px!important;
+        min-width:42px!important;
+    }
+}

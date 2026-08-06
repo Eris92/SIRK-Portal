@@ -1,8 +1,8 @@
 (function () {
     "use strict";
 
-    if (window.__sirkPlatformDeviceTabsV15Loaded) return;
-    window.__sirkPlatformDeviceTabsV15Loaded = true;
+    if (window.__sirkPlatformDeviceTabsV16Loaded) return;
+    window.__sirkPlatformDeviceTabsV16Loaded = true;
 
     var STORAGE_KEY = "sirkPortal.deviceTabs";
     var state = {
@@ -386,7 +386,7 @@
         var pane = state.panes[key];
         if (!pane || (shouldConnect && !pane.online)) return;
         hideMenu();
-        state.pendingDesktopAction[key] = shouldConnect ? "connect" : "disconnect";
+        state.pendingDesktopAction[key] = shouldConnect ? "connect" : "disconnect-close";
         activatePane(key, "desktop");
 
         var attempts = 0;
@@ -397,10 +397,32 @@
             var selector = shouldConnect ? "[data-agent-desktop-connect]" : "[data-agent-desktop-disconnect]";
             var button = state.content && state.content.querySelector(selector);
             if (contentIsWorkspace() && currentId === pane.nodeId && button) {
-                delete state.pendingDesktopAction[key];
-                if (!button.disabled) {
-                    try { button.click(); } catch (error) {}
+                if (shouldConnect) {
+                    delete state.pendingDesktopAction[key];
+                    if (!button.disabled) {
+                        try { button.click(); } catch (error) {}
+                    }
+                    return;
                 }
+
+                if (button.disabled) {
+                    delete state.pendingDesktopAction[key];
+                    closeTab(key);
+                    return;
+                }
+
+                try { button.click(); } catch (error) {
+                    delete state.pendingDesktopAction[key];
+                    return;
+                }
+
+                window.setTimeout(function () {
+                    if (state.pendingDesktopAction[key] !== "disconnect-close") return;
+                    var currentPane = state.panes[key];
+                    if (!currentPane || currentPane.connected === true) return;
+                    delete state.pendingDesktopAction[key];
+                    closeTab(key);
+                }, 500);
                 return;
             }
             if (attempts < 180) window.setTimeout(invoke, 50);
@@ -415,6 +437,7 @@
         var wasActive = state.active === key;
         delete state.panes[key];
         delete state.pendingSection[key];
+        delete state.pendingDesktopAction[key];
         if (wasActive) activateAll();
         else {
             renderTabs();
@@ -602,6 +625,11 @@
                 var pane = state.panes[key];
                 if (clean(pane.nodeId) !== nodeId) return false;
                 pane.connected = detail.connected === true;
+                if (detail.connected !== true && state.pendingDesktopAction[key] === "disconnect-close") {
+                    delete state.pendingDesktopAction[key];
+                    window.setTimeout(function () { closeTab(key); }, 0);
+                    return true;
+                }
                 renderTabs();
                 return true;
             });

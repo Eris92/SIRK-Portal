@@ -65,6 +65,16 @@ internal static class DeviceHostTabSplitContract
                 viewMode.Contains("sirk-device-focus-mode .sirk-device-tab-body", StringComparison.Ordinal) &&
                 viewMode.Contains("sirk-agent-desktop-stage canvas{max-width:100%!important;max-height:100%!important", StringComparison.Ordinal),
             "Wide mode must replace the inner tabs and dedicate the content area to the selected workspace, including Desktop.");
+        Require(tabsCss.Contains("SIRK_HOST_TAB_CARD_V2", StringComparison.Ordinal) &&
+                tabsCss.Contains("height:72px!important", StringComparison.Ordinal) &&
+                tabsCss.Contains("grid-template-columns:minmax(200px,1fr) 44px!important", StringComparison.Ordinal) &&
+                tabsCss.Contains("linear-gradient(180deg,rgba(34,197,94,.24)", StringComparison.Ordinal) &&
+                tabsCss.Contains("linear-gradient(180deg,rgba(220,38,38,.22)", StringComparison.Ordinal),
+            "Host tabs must use the polished two-row card layout with readable connect, disconnect, close, and menu controls.");
+        Require(tabsScript.Contains("disconnect-close", StringComparison.Ordinal) &&
+                tabsScript.Contains("window.setTimeout(function () { closeTab(key); }, 0);", StringComparison.Ordinal) &&
+                tabsScript.Contains("delete state.pendingDesktopAction[key];", StringComparison.Ordinal),
+            "Disconnect must stop the desktop session and close the corresponding host tab.");
     }
 
     private static string FindRepositoryRoot()
