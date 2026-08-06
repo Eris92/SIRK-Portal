@@ -41,6 +41,13 @@
             ".sirk-device-view-mode-menu button{display:flex;align-items:center;gap:9px;min-height:36px;padding:8px 10px;border:0;border-radius:7px;background:transparent;color:inherit;text-align:left;font:600 13px Segoe UI,Arial,sans-serif;cursor:pointer}",
             ".sirk-device-view-mode-menu button:hover,.sirk-device-view-mode-menu button:focus-visible{background:var(--sirk-hover,#eef3f9);outline:none}",
             ".sirk-device-view-mode-menu button.is-active{background:rgba(59,130,246,.12);color:#2563eb}",
+            ".sirk-connection-sidebar-toggle{position:fixed!important;left:0;top:50%;z-index:2147483500;display:none!important;align-items:center;justify-content:center;width:34px;height:48px;padding:0;border:1px solid rgba(148,163,184,.72);border-left:0;border-radius:0 10px 10px 0;background:rgba(13,23,40,.9);color:#edf4ff;box-shadow:0 8px 22px rgba(15,23,42,.28);cursor:pointer;transform:translateY(-50%);transition:left .18s ease,background .18s ease,border-color .18s ease}",
+            ".sirk-connection-sidebar-toggle:hover,.sirk-connection-sidebar-toggle:focus-visible{border-color:#60a5fa;background:#17263d;color:#fff;outline:none}",
+            ".sirk-connection-sidebar-toggle svg{display:block;width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;transition:transform .18s ease}",
+            "html.sirk-device-connection-mode .sirk-connection-sidebar-toggle{display:flex!important}",
+            "html.sirk-device-connection-mode.sirk-device-connection-sidebar-open .sirk-connection-sidebar-toggle{left:248px}",
+            "html.sirk-device-connection-mode.sirk-device-connection-sidebar-open .sirk-connection-sidebar-toggle svg{transform:rotate(180deg)}",
+            "html.sirk-device-connection-mode.sirk-device-connection-sidebar-open .sirk-standalone-sidebar{position:fixed!important;inset:0 auto 0 0!important;z-index:2147483400!important;display:flex!important;width:248px!important;height:100dvh!important;box-shadow:12px 0 30px rgba(15,23,42,.34)}",
             "html.sirk-device-focus-mode .sirk-standalone-sidebar{display:none!important}",
             "html.sirk-device-focus-mode .sirk-standalone-root{grid-template-columns:minmax(0,1fr)!important}",
             "html.sirk-device-focus-mode .sirk-standalone-topbar{display:none!important}",
@@ -69,11 +76,33 @@
         (document.head || document.documentElement).appendChild(style);
     }
 
+    function updateConnectionSidebarToggle() {
+        var button = document.getElementById("sirkConnectionSidebarToggle");
+        if (!button) return;
+        var connection = document.documentElement.classList.contains("sirk-device-connection-mode");
+        var open = connection && document.documentElement.classList.contains("sirk-device-connection-sidebar-open");
+        if (!connection) document.documentElement.classList.remove("sirk-device-connection-sidebar-open");
+        button.setAttribute("aria-expanded", open ? "true" : "false");
+        button.setAttribute("aria-label", text(open ? "Ukryj lewe menu" : "Pokaż lewe menu", open ? "Hide left menu" : "Show left menu"));
+        button.title = text(open ? "Ukryj lewe menu" : "Pokaż lewe menu", open ? "Hide left menu" : "Show left menu");
+    }
+
+    function setConnectionSidebarOpen(enabled) {
+        var active = document.documentElement.classList.contains("sirk-device-connection-mode");
+        document.documentElement.classList.toggle("sirk-device-connection-sidebar-open", active && enabled);
+        updateConnectionSidebarToggle();
+        window.dispatchEvent(new Event("resize"));
+    }
+
     function setFocusMode(enabled) {
         document.documentElement.classList.toggle("sirk-device-focus-mode", enabled);
-        if (enabled) document.documentElement.classList.remove("sirk-device-connection-mode");
+        if (enabled) {
+            document.documentElement.classList.remove("sirk-device-connection-mode");
+            document.documentElement.classList.remove("sirk-device-connection-sidebar-open");
+        }
         try { localStorage.setItem("sirkPortal.focusMode", enabled ? "1" : "0"); }
         catch (error) {}
+        updateConnectionSidebarToggle();
         window.dispatchEvent(new Event("resize"));
         window.dispatchEvent(new CustomEvent("sirkportal:deviceviewmodechange", { detail: { focus: enabled, connection: false } }));
     }
@@ -81,6 +110,8 @@
     function setConnectionMode(enabled) {
         document.documentElement.classList.toggle("sirk-device-connection-mode", enabled);
         if (enabled) document.documentElement.classList.remove("sirk-device-focus-mode");
+        else document.documentElement.classList.remove("sirk-device-connection-sidebar-open");
+        updateConnectionSidebarToggle();
         window.dispatchEvent(new Event("resize"));
         window.dispatchEvent(new CustomEvent("sirkportal:deviceviewmodechange", { detail: { focus: false, connection: enabled } }));
     }
@@ -97,6 +128,51 @@
     function restoreFocusMode() {
         try { setFocusMode(localStorage.getItem("sirkPortal.focusMode") === "1"); }
         catch (error) { setFocusMode(false); }
+    }
+
+    function mountConnectionSidebarToggle() {
+        var sidebar = document.querySelector(".sirk-standalone-sidebar");
+        if (!sidebar) return false;
+
+        if (!sidebar.id) sidebar.id = "sirkStandaloneSidebar";
+
+        var button = document.getElementById("sirkConnectionSidebarToggle");
+        if (!button) {
+            button = document.createElement("button");
+            button.type = "button";
+            button.id = "sirkConnectionSidebarToggle";
+            button.className = "sirk-connection-sidebar-toggle";
+            button.setAttribute("aria-controls", sidebar.id);
+            button.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg>';
+
+            button.addEventListener("click", function (event) {
+                event.preventDefault();
+                event.stopPropagation();
+                setConnectionSidebarOpen(!document.documentElement.classList.contains("sirk-device-connection-sidebar-open"));
+            });
+
+            document.addEventListener("pointerdown", function (event) {
+                if (!document.documentElement.classList.contains("sirk-device-connection-sidebar-open")) return;
+                if (button.contains(event.target) || sidebar.contains(event.target)) return;
+                setConnectionSidebarOpen(false);
+            }, true);
+
+            document.addEventListener("keydown", function (event) {
+                if (event.key === "Escape") setConnectionSidebarOpen(false);
+            });
+
+            sidebar.addEventListener("click", function (event) {
+                var navigation = event.target.closest && event.target.closest(".sirk-standalone-nav [data-view],.sirk-standalone-nav a");
+                if (navigation) window.setTimeout(function () { setConnectionSidebarOpen(false); }, 0);
+            });
+
+            document.body.appendChild(button);
+        } else {
+            button.setAttribute("aria-controls", sidebar.id);
+        }
+
+        updateConnectionSidebarToggle();
+        return true;
     }
 
     function mountViewModeButton() {
@@ -142,6 +218,7 @@
             connection.classList.toggle("is-active", connectionActive && !document.fullscreenElement);
             connectionFullscreen.classList.toggle("is-active", connectionActive && !!document.fullscreenElement);
             toggle.classList.toggle("is-active", focusActive || connectionActive);
+            updateConnectionSidebarToggle();
         }
 
         function hideMenu() {
@@ -261,14 +338,21 @@
         }, 100);
     }
 
-    if (!mountViewModeButton()) {
+    var viewModeMounted = mountViewModeButton();
+    var sidebarToggleMounted = mountConnectionSidebarToggle();
+    if (!viewModeMounted || !sidebarToggleMounted) {
         var mountAttempts = 0;
         var mountTimer = window.setInterval(function () {
             mountAttempts += 1;
-            if (mountViewModeButton() || mountAttempts >= 200) window.clearInterval(mountTimer);
+            viewModeMounted = mountViewModeButton() || viewModeMounted;
+            sidebarToggleMounted = mountConnectionSidebarToggle() || sidebarToggleMounted;
+            if ((viewModeMounted && sidebarToggleMounted) || mountAttempts >= 200) window.clearInterval(mountTimer);
         }, 100);
     }
 
     var observerRoot = document.getElementById("sirkStandaloneRoot");
-    if (observerRoot) new MutationObserver(function () { mountViewModeButton(); }).observe(observerRoot, { childList: true, subtree: true });
+    if (observerRoot) new MutationObserver(function () {
+        mountViewModeButton();
+        mountConnectionSidebarToggle();
+    }).observe(observerRoot, { childList: true, subtree: true });
 }());
