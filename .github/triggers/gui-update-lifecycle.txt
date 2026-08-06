@@ -1,2 +1,0 @@
-Repair the Portal GUI updater lifecycle, stale lock handling, progress polling and log visibility.
-Run: 2
