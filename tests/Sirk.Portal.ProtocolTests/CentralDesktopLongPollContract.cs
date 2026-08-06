@@ -27,7 +27,7 @@ internal static class CentralDesktopLongPollContract
 
         Require(
             guard.Contains("maximumWaitMilliseconds = 15000", StringComparison.Ordinal) &&
-            guard.Contains("/api\\/v1\\/desktop\\/frame", StringComparison.Ordinal) &&
+            guard.Contains("/api\/v1\/desktop\/frame", StringComparison.Ordinal) &&
             guard.Contains("response.status === 504", StringComparison.Ordinal) &&
             guard.Contains("status: 204", StringComparison.Ordinal) &&
             guard.Contains("gatewayRetryMilliseconds", StringComparison.Ordinal),
