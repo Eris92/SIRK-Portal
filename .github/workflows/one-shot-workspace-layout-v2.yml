@@ -21,17 +21,10 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
-      - name: Prepare patch script
-        run: python3 -c "from pathlib import Path;p=Path('.github/scripts/workspace-layout-v2.py');s=p.read_text();a=s.index(\"new_layout = r'''\");b=s.index(\"\\n'''\\npattern = re.compile\",a);s=s[:a]+s[a:b].replace('\\\\\"','\"')+s[b:];s=s.replace('pattern.subn(new_layout, workspace, count=1)','pattern.subn(lambda _match: new_layout, workspace, count=1)');p.write_text(s)"
       - name: Apply redesign
-        run: |
-          python3 .github/scripts/workspace-layout-v2.py
-          python3 .github/scripts/workspace-layout-v2-post.py
+        run: python3 .github/scripts/workspace-layout-v2-run.py
       - name: Validate JavaScript
-        run: |
-          node --check public/portal/standalone/scripts/device-workspace.js
-          node --check public/portal/standalone/scripts/device-tabs.js
-          node --check public/portal/standalone/scripts/workspace-connection.js
+        run: node --check public/portal/standalone/scripts/device-workspace.js && node --check public/portal/standalone/scripts/device-tabs.js && node --check public/portal/standalone/scripts/workspace-connection.js
       - name: Validate contracts
         run: dotnet run --project tests/Sirk.Portal.ProtocolTests/Sirk.Portal.ProtocolTests.csproj --configuration Release
       - name: Commit
@@ -39,6 +32,7 @@ jobs:
           rm -f .github/workflows/one-shot-workspace-layout-v2.yml
           rm -f .github/scripts/workspace-layout-v2.py
           rm -f .github/scripts/workspace-layout-v2-post.py
+          rm -f .github/scripts/workspace-layout-v2-run.py
           git diff --check
           git config user.name 'SIRK Automation'
           git config user.email 'sirk-automation@users.noreply.github.com'
