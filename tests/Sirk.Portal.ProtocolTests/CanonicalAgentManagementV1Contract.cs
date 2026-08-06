@@ -40,8 +40,9 @@ internal static class CanonicalAgentManagementV1Contract
             "Authenticated Agent check-in does not deliver the signed policy and trust anchor.");
         Require(workspace.Contains("Agent odrzucił pobranie sesji", StringComparison.Ordinal) &&
                 workspace.Contains("scheduleReconnect", StringComparison.Ordinal) &&
-                !workspace.Contains("/api/v1/admin/agent-policies", StringComparison.Ordinal),
-            "The screen-only desktop must fail closed and retry without exposing a policy administration control.");
+                workspace.Contains("/api/v1/admin/agent-policies", StringComparison.Ordinal) &&
+                workspace.Contains("sirk-agent-policy-action", StringComparison.Ordinal),
+            "The standard Desktop must fail closed, retry safely and expose the canonical administrator policy action.");
     }
 
     private static string Read(string root, params string[] values) =>
