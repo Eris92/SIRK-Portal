@@ -7,7 +7,7 @@ internal static class DeviceHostTabSplitContract
         var root = FindRepositoryRoot();
         var tabsScript = File.ReadAllText(Path.Combine(root, "public", "portal", "standalone", "scripts", "device-tabs.js"));
         var connectionScript = File.ReadAllText(Path.Combine(root, "public", "portal", "standalone", "scripts", "workspace-connection.js"));
-        var lifecycleScript = File.ReadAllText(Path.Combine(root, "public", "portal", "standalone", "scripts", "device-tabs-lifecycle-v3.js"));
+        var lifecycleScript = File.ReadAllText(Path.Combine(root, "public", "portal", "standalone", "scripts", "device-tabs-lifecycle-v4.js"));
         var headerContextScript = File.ReadAllText(Path.Combine(root, "public", "portal", "standalone", "scripts", "header-toggle-context-menu.js"));
         var bundler = File.ReadAllText(Path.Combine(root, "src", "Sirk.Portal", "Ui", "PortalAssetBundler.cs"));
 
@@ -48,16 +48,21 @@ internal static class DeviceHostTabSplitContract
             "The single workspace toggle must control the real Desktop stream without exposing duplicate Desktop buttons.");
 
         Require(lifecycleScript.Contains("sessionStorage", StringComparison.Ordinal) &&
-                lifecycleScript.Contains("function restore(ws)", StringComparison.Ordinal) &&
+                lifecycleScript.Contains("function restoreWorkspace(ws)", StringComparison.Ordinal) &&
                 lifecycleScript.Contains("data-sirk-lifecycle-connection", StringComparison.Ordinal),
-            "Refresh must restore the logical connection and the wide dropdown must start with Connect/Disconnect.");
+            "Refresh must restore the logical connection once per mounted workspace and the wide dropdown must start with Connect/Disconnect.");
         Require(lifecycleScript.Contains("function wideMode()", StringComparison.Ordinal) &&
                 lifecycleScript.Contains("menu.hidden = true", StringComparison.Ordinal) &&
                 lifecycleScript.Contains("has-section-menu", StringComparison.Ordinal),
             "The host dropdown must be available only in wide or connection mode.");
         Require(lifecycleScript.Contains(".sirk-device-tab-pane.is-active", StringComparison.Ordinal) &&
-                lifecycleScript.Contains("syncPanes(ws)", StringComparison.Ordinal),
-            "Workspace sections must have an explicit active-pane lifecycle instead of rendering blank content.");
+                lifecycleScript.Contains("function showSection(ws, section, persist)", StringComparison.Ordinal) &&
+                lifecycleScript.Contains("Array.prototype.forEach.call(body.children", StringComparison.Ordinal),
+            "Workspace sections must explicitly activate their populated panes instead of rendering blank content.");
+        Require(lifecycleScript.Contains("border-bottom:1px solid", StringComparison.Ordinal) &&
+                lifecycleScript.Contains("border-radius:0!important", StringComparison.Ordinal) &&
+                lifecycleScript.Contains("border-bottom-color:var(--sirk-active-accent", StringComparison.Ordinal),
+            "The workspace navigation must use a flat divider and underline instead of a rounded container.");
         Require(lifecycleScript.Contains("rgba(239,68,68,.72)", StringComparison.Ordinal) &&
                 lifecycleScript.Contains("width:12px", StringComparison.Ordinal),
             "The close glyph must stay small and subtly red without a filled hover background.");
@@ -80,12 +85,13 @@ internal static class DeviceHostTabSplitContract
 
         var tabsIndex = bundler.IndexOf("portal/standalone/scripts/device-tabs.js", StringComparison.Ordinal);
         var connectionIndex = bundler.IndexOf("portal/standalone/scripts/workspace-connection.js", StringComparison.Ordinal);
-        var lifecycleIndex = bundler.IndexOf("portal/standalone/scripts/device-tabs-lifecycle-v3.js", StringComparison.Ordinal);
+        var lifecycleIndex = bundler.IndexOf("portal/standalone/scripts/device-tabs-lifecycle-v4.js", StringComparison.Ordinal);
+        var legacyLifecycleIndex = bundler.IndexOf("portal/standalone/scripts/device-tabs-lifecycle-v3.js", StringComparison.Ordinal);
         var headerContextIndex = bundler.IndexOf("portal/standalone/scripts/header-toggle-context-menu.js", StringComparison.Ordinal);
         var terminalIndex = bundler.IndexOf("portal/standalone/scripts/terminal-connect.js", StringComparison.Ordinal);
         Require(tabsIndex >= 0 && connectionIndex > tabsIndex && lifecycleIndex > connectionIndex &&
-                headerContextIndex > lifecycleIndex && terminalIndex > headerContextIndex,
-            "The header context menu must be bundled after workspace lifecycle and before Terminal integration.");
+                legacyLifecycleIndex < 0 && headerContextIndex > lifecycleIndex && terminalIndex > headerContextIndex,
+            "The stable lifecycle v4 controller must replace v3 and load before header-context and Terminal integration.");
     }
 
     private static string FindRepositoryRoot()
