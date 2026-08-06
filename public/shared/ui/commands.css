@@ -340,8 +340,8 @@
 #sirkPortalRoot .sirk-quick-command-status:empty{display:none}
 #sirkPortalRoot .sirk-quick-command-status.is-error{color:#b42318;border-color:#efb4b4;background:#fff4f4}
 #sirkPortalRoot .sirk-command-loading,
-#sirkPortalRoot .sirk-command-error{padding:20px;text-align:center;color:var(--sirk-command-muted)}
-#sirkPortalRoot .sirk-command-error{color:#b42318}
+#sirkPortalRoot .sirk-command-message{padding:20px;text-align:center;color:var(--sirk-command-muted)}
+#sirkPortalRoot .sirk-command-message.is-error{color:#b42318}
 
 @media(max-width:1100px){
     #sirkPortalRoot .sirk-device-commands-host .sirk-layout-host,
