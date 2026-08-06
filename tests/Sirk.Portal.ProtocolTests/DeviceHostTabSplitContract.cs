@@ -83,14 +83,18 @@ internal static class DeviceHostTabSplitContract
                 selectionScript.Contains("function findDeviceRow", StringComparison.Ordinal) &&
                 selectionScript.Contains("row.click()", StringComparison.Ordinal),
             "Device host and All tabs must complete navigation on the first pointer interaction instead of requiring a second click.");
+        Require(selectionScript.Contains("new MutationObserver(scheduleSelectionSync)", StringComparison.Ordinal) &&
+                selectionScript.Contains("markSelected(activeKey())", StringComparison.Ordinal) &&
+                selectionScript.Contains("function scheduleSelectionSync()", StringComparison.Ordinal),
+            "The active device tab style must be restored after every device-tabs re-render.");
         Require(selectionScript.Contains("background:var(--sirk-sidebar-active,#2b3b55)", StringComparison.Ordinal) &&
                 selectionScript.Contains("inset 3px 0 0 var(--sirk-view-accent", StringComparison.Ordinal),
             "The selected All or host tab must reuse the active left-menu surface and selection accent.");
-        Require(selectionScript.Contains("inset -3px 0 0 #16a34a", StringComparison.Ordinal) &&
-                selectionScript.Contains("inset -3px 0 0 #dc2626", StringComparison.Ordinal) &&
-                selectionScript.Contains(".is-online.is-active", StringComparison.Ordinal) &&
-                selectionScript.Contains(".is-offline.is-active", StringComparison.Ordinal),
-            "Online and offline status accents must remain on the right edge independently of the selected state.");
+        Require(selectionScript.Contains(".sirk-device-host-tab::after", StringComparison.Ordinal) &&
+                selectionScript.Contains("right:0", StringComparison.Ordinal) &&
+                selectionScript.Contains(".is-online::after{background:#16a34a}", StringComparison.Ordinal) &&
+                selectionScript.Contains(".is-offline::after{background:#dc2626}", StringComparison.Ordinal),
+            "Online and offline status must use a dedicated right-edge marker independent of selected state.");
 
         Require(headerContextScript.Contains("#sirkConnectionHeaderToggle", StringComparison.Ordinal) &&
                 headerContextScript.Contains("contextmenu", StringComparison.Ordinal) &&
