@@ -8,11 +8,16 @@ internal static class DeviceHostTabSplitContract
         var tabsScript = File.ReadAllText(Path.Combine(root, "public", "portal", "standalone", "scripts", "device-tabs.js"));
         var tabsCss = File.ReadAllText(Path.Combine(root, "public", "portal", "standalone", "styles", "device-tabs.css"));
         var viewMode = File.ReadAllText(Path.Combine(root, "public", "portal", "standalone", "scripts", "view-mode.js"));
+        var workspace = File.ReadAllText(Path.Combine(root, "public", "portal", "standalone", "scripts", "device-workspace.js"));
 
         Require(tabsScript.Contains("sirk-device-tab-actions", StringComparison.Ordinal) &&
                 tabsScript.Contains("data-device-tab-close", StringComparison.Ordinal) &&
-                tabsScript.Contains("data-device-tab-menu-toggle", StringComparison.Ordinal),
-            "Host tabs must expose a split close/menu control column.");
+                tabsScript.Contains("data-device-tab-menu-toggle", StringComparison.Ordinal) &&
+                tabsScript.Contains("data-device-tab-connect", StringComparison.Ordinal) &&
+                tabsScript.Contains("data-device-tab-disconnect", StringComparison.Ordinal) &&
+                tabsScript.Contains("TAB_ICONS.close", StringComparison.Ordinal) &&
+                tabsScript.Contains("TAB_ICONS.menu", StringComparison.Ordinal),
+            "Host tabs must expose crisp close/menu controls and direct connect/disconnect actions.");
         Require(tabsScript.Contains("data-device-tab-section", StringComparison.Ordinal) &&
                 tabsScript.Contains("Ogólne", StringComparison.Ordinal) &&
                 tabsScript.Contains("Połączenie", StringComparison.Ordinal) &&
@@ -28,10 +33,17 @@ internal static class DeviceHostTabSplitContract
         Require(tabsCss.Contains(".sirk-device-host-tab.is-online", StringComparison.Ordinal) &&
                 tabsCss.Contains("border-color:#16a34a", StringComparison.Ordinal),
             "Online host tabs must keep a green outline.");
-        Require(tabsCss.Contains("html.sirk-device-focus-mode #sirkPortalRoot .sirk-device-tab-actions", StringComparison.Ordinal) &&
-                tabsCss.Contains("html.sirk-device-connection-mode #sirkPortalRoot .sirk-device-tab-actions", StringComparison.Ordinal) &&
-                tabsCss.Contains("html.sirk-device-connection-mode #sirkPortalRoot .sirk-device-tab-menu-toggle{display:grid}", StringComparison.Ordinal),
-            "The lower split-menu control must appear in both expanded device modes.");
+        Require(tabsCss.Contains(".sirk-device-tab-connection-actions", StringComparison.Ordinal) &&
+                tabsCss.Contains(".sirk-device-tab-connect", StringComparison.Ordinal) &&
+                tabsCss.Contains(".sirk-device-tab-disconnect", StringComparison.Ordinal) &&
+                tabsCss.Contains(".sirk-device-tab-close svg", StringComparison.Ordinal) &&
+                tabsCss.Contains(".sirk-device-tab-menu-toggle svg", StringComparison.Ordinal),
+            "Host tabs must render polished SVG controls and integrated connection actions.");
+        Require(tabsScript.Contains("function requestDesktopAction", StringComparison.Ordinal) &&
+                tabsScript.Contains("sirkportal:desktopconnectionstate", StringComparison.Ordinal) &&
+                workspace.Contains("publishDesktopConnectionState(true)", StringComparison.Ordinal) &&
+                workspace.Contains("publishDesktopConnectionState(false)", StringComparison.Ordinal),
+            "Tab connection actions must drive and track the real desktop stream state.");
         Require(tabsCss.Contains("sirk-device-tab-all", StringComparison.Ordinal) ||
                 tabsScript.Contains("sirk-device-tab sirk-device-tab-all", StringComparison.Ordinal),
             "All must remain a plain tab without host split controls.");

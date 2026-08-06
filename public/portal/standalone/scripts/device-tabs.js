@@ -1,8 +1,8 @@
 (function () {
     "use strict";
 
-    if (window.__sirkPlatformDeviceTabsV14Loaded) return;
-    window.__sirkPlatformDeviceTabsV14Loaded = true;
+    if (window.__sirkPlatformDeviceTabsV15Loaded) return;
+    window.__sirkPlatformDeviceTabsV15Loaded = true;
 
     var STORAGE_KEY = "sirkPortal.deviceTabs";
     var state = {
@@ -14,6 +14,7 @@
         menuKey: "",
         panes: Object.create(null),
         pendingSection: Object.create(null),
+        pendingDesktopAction: Object.create(null),
         active: "all",
         restoreActive: "all",
         restored: false,
@@ -25,6 +26,13 @@
         syncScheduled: false,
         switching: false,
         desktopModeWasActive: false
+    };
+
+    var TAB_ICONS = {
+        close: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+        menu: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>',
+        connect: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9.5 14.5l5-5"/><path d="M7.2 16.8l-1.4 1.4a3 3 0 104.2 4.2l3.2-3.2a3 3 0 000-4.2"/><path d="M16.8 7.2l1.4-1.4A3 3 0 102 1.6L.8 4.8a3 3 0 000 4.2" transform="translate(4 0)"/></svg>',
+        disconnect: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 16l-2 2a3 3 0 104 4l3-3"/><path d="M16 8l2-2a3 3 0 10-4-4l-3 3"/><path d="M5 5l14 14"/></svg>'
     };
 
     function clean(value) { return String(value || "").replace(/\s+/g, " ").trim(); }
@@ -91,7 +99,7 @@
     function ensurePane(key, nodeId, name, online) {
         var pane = state.panes[key];
         if (!pane) {
-            pane = { key: key, nodeId: nodeId || "", name: name || nodeId || key, online: online === true };
+            pane = { key: key, nodeId: nodeId || "", name: name || nodeId || key, online: online === true, connected: false };
             state.panes[key] = pane;
         }
         if (nodeId) pane.nodeId = nodeId;
@@ -151,7 +159,7 @@
     }
 
     function showMenu(key, toggle) {
-        if (!wideMode() || !state.panes[key]) return;
+        if (!state.panes[key]) return;
         var menu = ensureMenu();
         state.menuKey = key;
         var activeSection = "";
@@ -172,7 +180,7 @@
         if (!state.bar) return;
         var keys = ["all"].concat(Object.keys(state.panes));
         var signature = keys.map(function (key) {
-            return key === "all" ? "all:" + allLabel() : key + ":" + state.panes[key].name + ":" + (state.panes[key].online ? "1" : "0");
+            return key === "all" ? "all:" + allLabel() : key + ":" + state.panes[key].name + ":" + (state.panes[key].online ? "1" : "0") + ":" + (state.panes[key].connected ? "1" : "0");
         }).join("|") + "@" + state.active + "@wide=" + (wideMode() ? "1" : "0");
         if (state.bar.getAttribute("data-tabs-signature") === signature) return;
         state.bar.setAttribute("data-tabs-signature", signature);
@@ -194,7 +202,7 @@
             var pane = state.panes[key];
             var shell = document.createElement("div");
             shell.className = "sirk-device-tab sirk-device-host-tab" +
-                (state.active === key ? " is-active" : "") + (pane.online ? " is-online" : " is-offline");
+                (state.active === key ? " is-active" : "") + (pane.online ? " is-online" : " is-offline") + (pane.connected ? " is-desktop-connected" : "");
             shell.setAttribute("role", "group");
             shell.setAttribute("data-device-host-tab", key);
 
@@ -210,29 +218,52 @@
             label.textContent = pane.name;
             main.appendChild(label);
 
+            var connectionActions = document.createElement("span");
+            connectionActions.className = "sirk-device-tab-connection-actions";
+
+            var connect = document.createElement("button");
+            connect.type = "button";
+            connect.className = "sirk-device-tab-connect";
+            connect.innerHTML = TAB_ICONS.connect + "<span>" + (language() === "en" ? "Connect" : "Połącz") + "</span>";
+            connect.setAttribute("data-device-tab-connect", key);
+            connect.setAttribute("aria-label", (language() === "en" ? "Connect to " : "Połącz z ") + pane.name);
+            connect.disabled = !pane.online || pane.connected === true;
+
+            var disconnect = document.createElement("button");
+            disconnect.type = "button";
+            disconnect.className = "sirk-device-tab-disconnect";
+            disconnect.innerHTML = TAB_ICONS.disconnect + "<span>" + (language() === "en" ? "Disconnect" : "Rozłącz") + "</span>";
+            disconnect.setAttribute("data-device-tab-disconnect", key);
+            disconnect.setAttribute("aria-label", (language() === "en" ? "Disconnect from " : "Rozłącz z ") + pane.name);
+            disconnect.disabled = pane.connected !== true;
+
+            connectionActions.appendChild(connect);
+            connectionActions.appendChild(disconnect);
+
             var actions = document.createElement("span");
             actions.className = "sirk-device-tab-actions";
 
             var close = document.createElement("button");
             close.type = "button";
             close.className = "sirk-device-tab-close";
-            close.textContent = "×";
+            close.innerHTML = TAB_ICONS.close;
             close.setAttribute("data-device-tab-close", key);
             close.setAttribute("aria-label", (language() === "en" ? "Close " : "Zamknij ") + pane.name);
 
             var menuToggle = document.createElement("button");
             menuToggle.type = "button";
             menuToggle.className = "sirk-device-tab-menu-toggle";
-            menuToggle.innerHTML = '<span aria-hidden="true">⌄</span>';
+            menuToggle.innerHTML = TAB_ICONS.menu;
             menuToggle.setAttribute("data-device-tab-menu-toggle", key);
             menuToggle.setAttribute("aria-haspopup", "menu");
             menuToggle.setAttribute("aria-expanded", "false");
             menuToggle.setAttribute("aria-label", language() === "en" ? "Host sections" : "Sekcje hosta");
-            menuToggle.disabled = !wideMode();
+            menuToggle.disabled = false;
 
             actions.appendChild(close);
             actions.appendChild(menuToggle);
             shell.appendChild(main);
+            shell.appendChild(connectionActions);
             shell.appendChild(actions);
             state.bar.appendChild(shell);
         });
@@ -351,6 +382,33 @@
         open();
     }
 
+    function requestDesktopAction(key, shouldConnect) {
+        var pane = state.panes[key];
+        if (!pane || (shouldConnect && !pane.online)) return;
+        hideMenu();
+        state.pendingDesktopAction[key] = shouldConnect ? "connect" : "disconnect";
+        activatePane(key, "desktop");
+
+        var attempts = 0;
+        function invoke() {
+            attempts += 1;
+            if (!state.pendingDesktopAction[key] || !state.panes[key]) return;
+            var currentId = clean(state.content && state.content.getAttribute("data-sirk-active-device-id"));
+            var selector = shouldConnect ? "[data-agent-desktop-connect]" : "[data-agent-desktop-disconnect]";
+            var button = state.content && state.content.querySelector(selector);
+            if (contentIsWorkspace() && currentId === pane.nodeId && button) {
+                delete state.pendingDesktopAction[key];
+                if (!button.disabled) {
+                    try { button.click(); } catch (error) {}
+                }
+                return;
+            }
+            if (attempts < 180) window.setTimeout(invoke, 50);
+            else delete state.pendingDesktopAction[key];
+        }
+        window.setTimeout(invoke, 0);
+    }
+
     function closeTab(key) {
         if (!state.panes[key]) return;
         hideMenu();
@@ -377,6 +435,24 @@
 
     function intercept(event) {
         if (!ensureInfrastructure()) return;
+
+        var connectAction = event.target && event.target.closest && event.target.closest("[data-device-tab-connect]");
+        if (connectAction && state.bar.contains(connectAction)) {
+            event.preventDefault();
+            event.stopPropagation();
+            if (typeof event.stopImmediatePropagation === "function") event.stopImmediatePropagation();
+            requestDesktopAction(connectAction.getAttribute("data-device-tab-connect"), true);
+            return;
+        }
+
+        var disconnectAction = event.target && event.target.closest && event.target.closest("[data-device-tab-disconnect]");
+        if (disconnectAction && state.bar.contains(disconnectAction)) {
+            event.preventDefault();
+            event.stopPropagation();
+            if (typeof event.stopImmediatePropagation === "function") event.stopImmediatePropagation();
+            requestDesktopAction(disconnectAction.getAttribute("data-device-tab-disconnect"), false);
+            return;
+        }
 
         var close = event.target && event.target.closest && event.target.closest("[data-device-tab-close]");
         if (close && state.bar.contains(close)) {
@@ -518,6 +594,18 @@
                 positionMenu(toggle);
             }
         }, true);
+        window.addEventListener("sirkportal:desktopconnectionstate", function (event) {
+            var detail = event && event.detail || {};
+            var nodeId = clean(detail.nodeId);
+            if (!nodeId) return;
+            Object.keys(state.panes).some(function (key) {
+                var pane = state.panes[key];
+                if (clean(pane.nodeId) !== nodeId) return false;
+                pane.connected = detail.connected === true;
+                renderTabs();
+                return true;
+            });
+        });
         window.addEventListener("sirkportal:languagechange", function () {
             renderTabs();
             if (state.menu && !state.menu.hidden) {

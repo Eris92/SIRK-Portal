@@ -335,6 +335,15 @@
         var policyEnable = host.querySelector("[data-agent-policy-enable]");
         var nativeWidth = 0, nativeHeight = 0, sourceWidth = 0, sourceHeight = 0;
         var streamGeneration = 0, connected = false;
+        function publishDesktopConnectionState(value) {
+            var detail = { nodeId: String(node && (node.id || node._id) || ""), connected: value === true };
+            try { window.dispatchEvent(new CustomEvent("sirkportal:desktopconnectionstate", { detail: detail })); } catch (error) {}
+            try {
+                if (window.top && window.top !== window)
+                    window.top.dispatchEvent(new window.top.CustomEvent("sirkportal:desktopconnectionstate", { detail: detail }));
+            } catch (error) {}
+        }
+        publishDesktopConnectionState(false);
         var inputSequence = 0, pendingInput = new Map();
         var hasCompleteFrame = false;
         var frameTimes = [], inputTimes = [], byteSamples = [], frameRenderTimes = [];
@@ -1092,6 +1101,7 @@
                 activeAutoProfile = "smooth"; lastAutoChangeAt = 0; lastStatsPaintAt = 0; lastFrameAt = 0;
                 lastTargetFps = effectiveProfile().targetFps;
                 connected = true;
+                publishDesktopConnectionState(true);
                 session.disabled = false;
                 monitor.disabled = false;
                 disconnectButton.disabled = false;
@@ -1099,6 +1109,7 @@
                 restartStream();
             }).catch(function (error) {
                 connectButton.disabled = false;
+                publishDesktopConnectionState(false);
                 status.textContent = error.message || String(error);
                 status.classList.add("is-error");
             });
@@ -1106,6 +1117,7 @@
         disconnectButton.addEventListener("click", function () {
             input({ action: "streamStop" }).catch(function () {});
             connected = false;
+            publishDesktopConnectionState(false);
             streamGeneration += 1;
             if (desktopSocket) { try { desktopSocket.close(); } catch (error) {} desktopSocket = null; }
             if (desktopInputSocket) { try { desktopInputSocket.close(); } catch (error) {} desktopInputSocket = null; }
@@ -1136,6 +1148,7 @@
         var observer = new MutationObserver(function () {
             if (!host.isConnected) {
                 stopped = true;
+                publishDesktopConnectionState(false);
                 clearInterval(statsTimer);
                 if (desktopSocket) { try { desktopSocket.close(); } catch (error) {} desktopSocket = null; }
                 if (desktopInputSocket) { try { desktopInputSocket.close(); } catch (error) {} desktopInputSocket = null; }
