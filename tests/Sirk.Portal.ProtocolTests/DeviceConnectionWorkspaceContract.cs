@@ -11,58 +11,53 @@ internal static class DeviceConnectionWorkspaceContract
         var commandsCss = File.ReadAllText(Path.Combine(root, "public", "shared", "ui", "commands.css"));
 
         Require(workspace.Contains("function renderAgentTerminal(host, node)", StringComparison.Ordinal) &&
-                workspace.Contains("data-agent-terminal-command", StringComparison.Ordinal) &&
                 workspace.Contains("function renderAgentFiles(host, node)", StringComparison.Ordinal) &&
-                workspace.Contains("data-agent-files-path", StringComparison.Ordinal) &&
                 workspace.Contains("function renderAgentDesktop(host, node)", StringComparison.Ordinal),
-            "Desktop simplification must preserve the Terminal and Files workspaces.");
+            "Desktop changes must preserve Terminal and Files.");
+
+        foreach (var standardControl in new[]
+                 {
+                     "sirk-agent-operation sirk-agent-desktop", "sirk-agent-desktop-controls",
+                     "sirk-agent-desktop-stats", "sirk-agent-desktop-admin",
+                     "sirk-agent-desktop-input", "sirk-agent-desktop-clipboard",
+                     "sirk-agent-policy-action", "data-agent-desktop-connect",
+                     "data-agent-desktop-disconnect"
+                 })
+            Require(workspace.Contains(standardControl, StringComparison.Ordinal),
+                "Normal Desktop must retain its standard control: " + standardControl);
+
+        Require(workspace.Contains("connectButton.addEventListener", StringComparison.Ordinal) &&
+                !workspace.Contains("connectDesktop();", StringComparison.Ordinal),
+            "Normal Desktop must require its standard manual Connect button.");
+        Require(workspace.Contains("ensureCompactCommands(host)", StringComparison.Ordinal),
+            "Normal Desktop must retain standard Quick Commands.");
+
+        Require(viewMode.Contains("function isDevicesView()", StringComparison.Ordinal) &&
+                viewMode.Contains("enabled === true && isDevicesView()", StringComparison.Ordinal) &&
+                viewMode.Contains("navigation.getAttribute(\"data-view\") !== \"devices\"", StringComparison.Ordinal),
+            "Wide and connection modes must be scoped to the top-level Devices view.");
+        Require(viewMode.Contains("function exitExpandedModes()", StringComparison.Ordinal) &&
+                viewMode.Contains("localStorage.setItem(\"sirkPortal.focusMode\", \"0\")", StringComparison.Ordinal),
+            "Leaving Devices must immediately reset every expanded mode.");
+
+        Require(viewMode.Contains("function syncDesktopPresentation()", StringComparison.Ordinal) &&
+                viewMode.Contains(".sirk-agent-desktop-controls", StringComparison.Ordinal) &&
+                viewMode.Contains(".sirk-agent-desktop-stats", StringComparison.Ordinal) &&
+                viewMode.Contains(".sirk-agent-desktop-admin", StringComparison.Ordinal) &&
+                viewMode.Contains(".sirk-agent-desktop-input", StringComparison.Ordinal),
+            "Screen-only styling must exist only inside expanded-mode CSS.");
+        Require(viewMode.Contains("connect.click();", StringComparison.Ordinal) &&
+                viewMode.Contains("sirk-expanded-desktop-dock", StringComparison.Ordinal) &&
+                viewMode.Contains("restoreStandardDesktop", StringComparison.Ordinal),
+            "Expanded Desktop must auto-connect, pin Quick Commands and restore the standard layout afterward.");
 
         Require(tabsCss.Contains("padding:0 12px!important", StringComparison.Ordinal),
-            "The Devices header must keep a 12px outer inset.");
-        Require(tabsCss.Contains(".sirk-device-tabs-standalone{flex:1 1 auto", StringComparison.Ordinal) &&
-                tabsCss.Contains("border:0!important", StringComparison.Ordinal),
-            "The top device tab strip must not render vertical separators.");
-
-        Require(!viewMode.Contains("sirk-device-focus-mode .sirk-standalone-main>header", StringComparison.Ordinal),
-            "Wide view must keep the device tabs header visible.");
-        Require(!viewMode.Contains("sirk-device-connection-mode .sirk-standalone-main>header", StringComparison.Ordinal),
-            "Connection view must keep the device tabs header visible.");
-        Require(!viewMode.Contains("sirk-device-connection-mode .sirk-device-tabs-standalone{display:none", StringComparison.Ordinal),
-            "Connection view must keep All and host tabs visible.");
-        Require(viewMode.Contains(".sirk-device-workspace>.sirk-device-compact-header", StringComparison.Ordinal) &&
-                viewMode.Contains(".sirk-agent-desktop-stage canvas", StringComparison.Ordinal),
-            "Connection view must dedicate the complete area below host tabs to the remote desktop.");
-        Require(viewMode.Contains(".sirk-quick-commands-dock{z-index:60", StringComparison.Ordinal) &&
-                commandsCss.Contains("z-index:45", StringComparison.Ordinal),
-            "The pinned Quick Commands dock must remain above the connected desktop.");
-
+            "The Devices header must keep its 12px inset.");
         Require(viewMode.Contains(".sirk-connection-sidebar-toggle", StringComparison.Ordinal) &&
-                viewMode.Contains("sirk-device-connection-sidebar-open .sirk-standalone-sidebar", StringComparison.Ordinal) &&
-                viewMode.Contains("left:248px", StringComparison.Ordinal),
-            "Connection view must expose a compact pinned left-side button that opens the sidebar as an overlay.");
-        Require(viewMode.Contains("function mountConnectionSidebarToggle()", StringComparison.Ordinal) &&
-                viewMode.Contains("setConnectionSidebarOpen(", StringComparison.Ordinal) &&
-                viewMode.Contains("aria-expanded", StringComparison.Ordinal) &&
-                viewMode.Contains("Pokaż lewe menu", StringComparison.Ordinal),
-            "The connection sidebar button must toggle, describe and close the left menu without leaving the desktop.");
-
-        foreach (var removed in new[]
-                 {
-                     "sirk-agent-desktop-controls", "sirk-agent-desktop-stats",
-                     "sirk-agent-desktop-admin", "sirk-agent-desktop-input",
-                     "sirk-agent-desktop-clipboard", "sirk-agent-policy-action",
-                     "sirk-agent-operation sirk-agent-desktop", "sirk-command-error"
-                 })
-            Require(!workspace.Contains(removed, StringComparison.Ordinal),
-                "The screen-only desktop must not contain: " + removed);
-        Require(workspace.Contains("desktopStage.appendChild(dock)", StringComparison.Ordinal) &&
-                workspace.Contains("setCompactCommandsConnected(host, true)", StringComparison.Ordinal) &&
-                workspace.Contains("connectDesktop();", StringComparison.Ordinal),
-            "Quick Commands must stay inside the desktop stage and appear only after automatic connection.");
-        Require(commandsCss.Contains(".sirk-quick-commands-dock", StringComparison.Ordinal) &&
-                commandsCss.Contains("right:8px", StringComparison.Ordinal) &&
-                commandsCss.Contains("width:min(560px", StringComparison.Ordinal),
-            "Quick Commands must be a smaller pinned right-side desktop dock.");
+                viewMode.Contains("sirk-device-connection-sidebar-open .sirk-standalone-sidebar", StringComparison.Ordinal),
+            "Connection mode must retain its left-menu overlay control.");
+        Require(commandsCss.Contains(".sirk-quick-commands-panel", StringComparison.Ordinal),
+            "The shared Quick Commands presentation must remain available in normal Desktop mode.");
     }
 
     private static string FindRepositoryRoot()

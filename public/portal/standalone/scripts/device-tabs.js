@@ -134,28 +134,8 @@
     }
 
     function syncQuickCommandsToggle() {
-        if (!state.header || !state.content) return;
-        var panel = state.content.querySelector("#sirkQuickCommandsPanel");
         var toggle = document.getElementById("sirkQuickCommandsToggle");
-        if (!panel) {
-            if (toggle && toggle.classList.contains("is-header-mounted")) toggle.remove();
-            return;
-        }
-        if (!toggle) return;
-        if (!desktopMode()) {
-            if (toggle.classList.contains("is-header-mounted")) {
-                var operation = panel.parentElement;
-                var stage = operation && operation.querySelector(".sirk-agent-desktop-stage");
-                toggle.classList.remove("is-header-mounted");
-                (stage || operation || state.content).appendChild(toggle);
-            }
-            return;
-        }
-        var anchor = state.header.querySelector(".sirk-device-view-mode") || state.header.querySelector("#sirkUserMenu");
-        toggle.classList.add("is-header-mounted");
-        if (toggle.parentNode !== state.header || toggle.nextElementSibling !== anchor) {
-            state.header.insertBefore(toggle, anchor || null);
-        }
+        if (toggle) toggle.classList.remove("is-header-mounted");
     }
 
     function positionMenu(toggle) {

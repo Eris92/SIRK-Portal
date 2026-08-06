@@ -70,10 +70,114 @@
             "html.sirk-device-connection-mode .sirk-agent-desktop{width:100%!important;height:100%!important;min-height:0!important;margin:0!important;padding:0!important;gap:0!important;border-radius:0!important;box-sizing:border-box!important;overflow:hidden!important}",
             "html.sirk-device-connection-mode .sirk-agent-desktop-stage{position:relative!important;display:flex!important;flex:1 1 auto!important;width:100%!important;height:100%!important;min-height:0!important;border-radius:0!important;overflow:hidden!important}",
             "html.sirk-device-connection-mode .sirk-agent-desktop-stage canvas{display:block!important;max-width:100%!important;max-height:100%!important;width:auto!important;height:auto!important;margin:auto!important}",
-            "html.sirk-device-connection-mode .sirk-quick-commands-dock,html.sirk-device-focus-mode .sirk-quick-commands-dock{z-index:60!important}",
+            "html.sirk-device-focus-mode .sirk-agent-desktop>header,html.sirk-device-focus-mode .sirk-agent-desktop-controls,html.sirk-device-focus-mode .sirk-agent-desktop-stats,html.sirk-device-focus-mode .sirk-agent-desktop-admin,html.sirk-device-focus-mode .sirk-agent-desktop-input,html.sirk-device-focus-mode .sirk-agent-desktop-clipboard,html.sirk-device-focus-mode .sirk-agent-policy-action,html.sirk-device-focus-mode .sirk-agent-desktop>pre,html.sirk-device-connection-mode .sirk-agent-desktop>header,html.sirk-device-connection-mode .sirk-agent-desktop-controls,html.sirk-device-connection-mode .sirk-agent-desktop-stats,html.sirk-device-connection-mode .sirk-agent-desktop-admin,html.sirk-device-connection-mode .sirk-agent-desktop-input,html.sirk-device-connection-mode .sirk-agent-desktop-clipboard,html.sirk-device-connection-mode .sirk-agent-policy-action,html.sirk-device-connection-mode .sirk-agent-desktop>pre{display:none!important}",
+            "html.sirk-device-focus-mode .sirk-agent-operation.sirk-agent-desktop,html.sirk-device-connection-mode .sirk-agent-operation.sirk-agent-desktop{display:flex!important;flex-direction:column!important;width:100%!important;height:100%!important;min-height:0!important;margin:0!important;padding:0!important;gap:0!important;border:0!important;border-radius:0!important;box-shadow:none!important;overflow:hidden!important}",
+            "html.sirk-device-focus-mode .sirk-expanded-desktop-dock,html.sirk-device-connection-mode .sirk-expanded-desktop-dock{position:absolute;z-index:60;top:8px;right:8px;display:block}",
+            "html.sirk-device-focus-mode .sirk-expanded-desktop-dock[hidden],html.sirk-device-connection-mode .sirk-expanded-desktop-dock[hidden]{display:none!important}",
+            "html.sirk-device-focus-mode .sirk-expanded-desktop-dock .sirk-quick-commands-toggle,html.sirk-device-connection-mode .sirk-expanded-desktop-dock .sirk-quick-commands-toggle{position:relative!important;inset:auto!important;width:34px!important;min-width:34px!important;height:34px!important;min-height:34px!important;padding:0!important;border-radius:9px!important}",
+            "html.sirk-device-focus-mode .sirk-expanded-desktop-dock .sirk-quick-commands-toggle span,html.sirk-device-connection-mode .sirk-expanded-desktop-dock .sirk-quick-commands-toggle span{display:none!important}",
+            "html.sirk-device-focus-mode .sirk-expanded-desktop-dock .sirk-quick-commands-panel,html.sirk-device-connection-mode .sirk-expanded-desktop-dock .sirk-quick-commands-panel{position:absolute!important;top:42px!important;right:0!important;width:min(560px,calc(100vw - 32px))!important;max-height:min(480px,calc(100vh - 90px))!important;overflow:auto!important}",
             "html.sirk-device-workspace-child .sirk-device-view-mode{display:none!important}"
         ].join("");
         (document.head || document.documentElement).appendChild(style);
+    }
+
+    function isDevicesView() {
+        var header = document.querySelector(".sirk-standalone-header");
+        return !!(header && header.classList.contains("is-devices-view"));
+    }
+
+    function expandedModeActive() {
+        return document.documentElement.classList.contains("sirk-device-focus-mode") ||
+            document.documentElement.classList.contains("sirk-device-connection-mode");
+    }
+
+    var desktopPresentationTimer = 0;
+
+    function scheduleDesktopPresentation() {
+        if (desktopPresentationTimer) return;
+        desktopPresentationTimer = window.setTimeout(function () {
+            desktopPresentationTimer = 0;
+            syncDesktopPresentation();
+        }, 0);
+    }
+
+    function restoreStandardDesktop(operation, stage, toggle, panel, dock) {
+        operation.classList.remove("is-expanded-desktop");
+        operation.removeAttribute("data-sirk-expanded-auto-connect");
+        if (toggle && stage && toggle.parentNode !== stage) stage.appendChild(toggle);
+        if (panel && panel.parentNode !== operation) operation.appendChild(panel);
+        if (dock) dock.remove();
+        if (toggle) toggle.hidden = false;
+    }
+
+    function syncDesktopPresentation() {
+        if (!isDevicesView() && expandedModeActive()) {
+            exitExpandedModes();
+            return;
+        }
+
+        var operation = document.querySelector("#sirkStandaloneContent .sirk-agent-operation.sirk-agent-desktop");
+        if (!operation) return;
+        var stage = operation.querySelector(".sirk-agent-desktop-stage");
+        var toggle = operation.querySelector("#sirkQuickCommandsToggle") || document.getElementById("sirkQuickCommandsToggle");
+        var panel = operation.querySelector("#sirkQuickCommandsPanel") || document.getElementById("sirkQuickCommandsPanel");
+        var dock = operation.querySelector(".sirk-expanded-desktop-dock");
+        var expanded = isDevicesView() && expandedModeActive();
+
+        if (!expanded || !stage) {
+            restoreStandardDesktop(operation, stage, toggle, panel, dock);
+            return;
+        }
+
+        operation.classList.add("is-expanded-desktop");
+        if (!dock) {
+            dock = document.createElement("div");
+            dock.className = "sirk-expanded-desktop-dock";
+            dock.hidden = true;
+            stage.appendChild(dock);
+        }
+        if (toggle && toggle.parentNode !== dock) dock.appendChild(toggle);
+        if (panel && panel.parentNode !== dock) dock.appendChild(panel);
+
+        var connect = operation.querySelector("[data-agent-desktop-connect]");
+        var disconnect = operation.querySelector("[data-agent-desktop-disconnect]");
+        var connected = !!(disconnect && !disconnect.disabled);
+        dock.hidden = !connected;
+        if (toggle) toggle.hidden = !connected;
+
+        if (!connected && connect && !connect.disabled &&
+            operation.getAttribute("data-sirk-expanded-auto-connect") !== "pending") {
+            operation.setAttribute("data-sirk-expanded-auto-connect", "pending");
+            connect.click();
+            window.setTimeout(function () {
+                if (!operation.isConnected) return;
+                var currentDisconnect = operation.querySelector("[data-agent-desktop-disconnect]");
+                if (!currentDisconnect || currentDisconnect.disabled)
+                    operation.removeAttribute("data-sirk-expanded-auto-connect");
+                scheduleDesktopPresentation();
+            }, 3000);
+        }
+        else if (connected) {
+            operation.setAttribute("data-sirk-expanded-auto-connect", "connected");
+        }
+    }
+
+    function exitExpandedModes() {
+        var changed = expandedModeActive() ||
+            document.documentElement.classList.contains("sirk-device-connection-sidebar-open");
+        document.documentElement.classList.remove("sirk-device-focus-mode");
+        document.documentElement.classList.remove("sirk-device-connection-mode");
+        document.documentElement.classList.remove("sirk-device-connection-sidebar-open");
+        try { localStorage.setItem("sirkPortal.focusMode", "0"); } catch (error) {}
+        updateConnectionSidebarToggle();
+        scheduleDesktopPresentation();
+        if (changed) {
+            window.dispatchEvent(new Event("resize"));
+            window.dispatchEvent(new CustomEvent("sirkportal:deviceviewmodechange", {
+                detail: { focus: false, connection: false }
+            }));
+        }
     }
 
     function updateConnectionSidebarToggle() {
@@ -95,6 +199,7 @@
     }
 
     function setFocusMode(enabled) {
+        enabled = enabled === true && isDevicesView();
         document.documentElement.classList.toggle("sirk-device-focus-mode", enabled);
         if (enabled) {
             document.documentElement.classList.remove("sirk-device-connection-mode");
@@ -103,15 +208,18 @@
         try { localStorage.setItem("sirkPortal.focusMode", enabled ? "1" : "0"); }
         catch (error) {}
         updateConnectionSidebarToggle();
+        scheduleDesktopPresentation();
         window.dispatchEvent(new Event("resize"));
         window.dispatchEvent(new CustomEvent("sirkportal:deviceviewmodechange", { detail: { focus: enabled, connection: false } }));
     }
 
     function setConnectionMode(enabled) {
+        enabled = enabled === true && isDevicesView();
         document.documentElement.classList.toggle("sirk-device-connection-mode", enabled);
         if (enabled) document.documentElement.classList.remove("sirk-device-focus-mode");
         else document.documentElement.classList.remove("sirk-device-connection-sidebar-open");
         updateConnectionSidebarToggle();
+        scheduleDesktopPresentation();
         window.dispatchEvent(new Event("resize"));
         window.dispatchEvent(new CustomEvent("sirkportal:deviceviewmodechange", { detail: { focus: false, connection: enabled } }));
     }
@@ -126,8 +234,7 @@
     }
 
     function restoreFocusMode() {
-        try { setFocusMode(localStorage.getItem("sirkPortal.focusMode") === "1"); }
-        catch (error) { setFocusMode(false); }
+        exitExpandedModes();
     }
 
     function mountConnectionSidebarToggle() {
@@ -219,6 +326,7 @@
             connectionFullscreen.classList.toggle("is-active", connectionActive && !!document.fullscreenElement);
             toggle.classList.toggle("is-active", focusActive || connectionActive);
             updateConnectionSidebarToggle();
+            scheduleDesktopPresentation();
         }
 
         function hideMenu() {
@@ -350,9 +458,24 @@
         }, 100);
     }
 
+    document.addEventListener("click", function (event) {
+        var navigation = event.target && event.target.closest &&
+            event.target.closest(".sirk-standalone-nav [data-view]");
+        if (!navigation) return;
+        if (navigation.getAttribute("data-view") !== "devices") exitExpandedModes();
+    }, true);
+
     var observerRoot = document.getElementById("sirkStandaloneRoot");
     if (observerRoot) new MutationObserver(function () {
         mountViewModeButton();
         mountConnectionSidebarToggle();
-    }).observe(observerRoot, { childList: true, subtree: true });
+        if (!isDevicesView() && expandedModeActive()) exitExpandedModes();
+        scheduleDesktopPresentation();
+    }).observe(observerRoot, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ["class", "disabled", "hidden"]
+    });
+    scheduleDesktopPresentation();
 }());
