@@ -56,3 +56,17 @@ new_codec = '''        foreach (var marker in new[]
 if codec_contract.count(old_codec) != 1:
     raise RuntimeError("Desktop codec UI contract block was not found exactly once.")
 codec_contract_path.write_text(codec_contract.replace(old_codec, new_codec, 1), encoding="utf-8", newline="\n")
+
+connection_contract_path = root / "tests" / "Sirk.Portal.ProtocolTests" / "DeviceConnectionWorkspaceContract.cs"
+connection_contract = connection_contract_path.read_text(encoding="utf-8-sig")
+old_layering = '''        Require(viewMode.Contains(".sirk-quick-commands-panel{z-index:59", StringComparison.Ordinal),
+            "Quick Commands must remain above the connected desktop.");'''
+new_layering = '''        Require(viewMode.Contains(".sirk-quick-commands-dock{z-index:60", StringComparison.Ordinal) &&
+                commandsCss.Contains("z-index:45", StringComparison.Ordinal),
+            "The pinned Quick Commands dock must remain above the connected desktop.");'''
+if connection_contract.count(old_layering) != 1:
+    raise RuntimeError("Quick Commands layering contract was not found exactly once.")
+connection_contract_path.write_text(
+    connection_contract.replace(old_layering, new_layering, 1),
+    encoding="utf-8",
+    newline="\n")
