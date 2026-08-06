@@ -41,7 +41,6 @@ builder.WebHost.ConfigureKestrel(options =>
 {
     options.AddServerHeader = false;
     options.Limits.MaxRequestBodySize = 8 * 1024 * 1024;
-    options.Listen(IPAddress.Loopback, 8080);
 });
 
 var portalPaths = new PortalPaths(builder.Configuration);

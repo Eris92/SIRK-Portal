@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Headers;
+using System.Net.Sockets;
 using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Options;
@@ -69,23 +70,12 @@ internal sealed class CentralTunnelService : BackgroundService
             Math.Clamp(_options.MaximumConcurrency, 1, 32),
             Math.Clamp(_options.MaximumConcurrency, 1, 32));
         _localOrigin = _options.Enabled
-            ? ResolveLocalOrigin(_options.LocalOrigin)
+            ? ValidateLocalOrigin(_options.LocalOrigin)
             : new Uri("http://127.0.0.1/", UriKind.Absolute);
 
-        var localHandler = new SocketsHttpHandler
-        {
-            AllowAutoRedirect = false,
-            AutomaticDecompression = DecompressionMethods.GZip |
-                                     DecompressionMethods.Deflate |
-                                     DecompressionMethods.Brotli,
-            UseCookies = false,
-            MaxConnectionsPerServer = 32,
-            ConnectTimeout = TimeSpan.FromSeconds(5),
-            PooledConnectionIdleTimeout = TimeSpan.FromMinutes(2),
-            PooledConnectionLifetime = TimeSpan.FromMinutes(10),
-            EnableMultipleHttp2Connections = true
-        };
-        _localClient = new HttpClient(localHandler, disposeHandler: true)
+        _localClient = new HttpClient(
+            CreateLoopbackHandler(useCookies: false, maximumConnections: 32),
+            disposeHandler: true)
         {
             BaseAddress = _localOrigin,
             Timeout = TimeSpan.FromSeconds(45),
@@ -265,17 +255,9 @@ internal sealed class CentralTunnelService : BackgroundService
         var client = _localClient;
         if (unsafeRequest)
         {
-            var handler = new HttpClientHandler
-            {
-                AllowAutoRedirect = false,
-                AutomaticDecompression = DecompressionMethods.GZip |
-                                         DecompressionMethods.Deflate |
-                                         DecompressionMethods.Brotli,
-                UseCookies = true,
-                CookieContainer = new CookieContainer(),
-                MaxConnectionsPerServer = 8
-            };
-            disposableClient = new HttpClient(handler)
+            disposableClient = new HttpClient(
+                CreateLoopbackHandler(useCookies: true, maximumConnections: 8),
+                disposeHandler: true)
             {
                 BaseAddress = _localOrigin,
                 Timeout = TimeSpan.FromSeconds(45),
@@ -466,17 +448,46 @@ internal sealed class CentralTunnelService : BackgroundService
     private static string ProxyPrefix(string portalId) =>
         "/connect/" + Uri.EscapeDataString(portalId);
 
-    private static Uri ResolveLocalOrigin(string value)
+    private static SocketsHttpHandler CreateLoopbackHandler(
+        bool useCookies,
+        int maximumConnections) =>
+        new()
+        {
+            AllowAutoRedirect = false,
+            AutomaticDecompression = DecompressionMethods.GZip |
+                                     DecompressionMethods.Deflate |
+                                     DecompressionMethods.Brotli,
+            UseCookies = useCookies,
+            CookieContainer = new CookieContainer(),
+            MaxConnectionsPerServer = maximumConnections,
+            ConnectTimeout = TimeSpan.FromSeconds(5),
+            PooledConnectionIdleTimeout = TimeSpan.FromMinutes(2),
+            PooledConnectionLifetime = TimeSpan.FromMinutes(10),
+            EnableMultipleHttp2Connections = true,
+            ConnectCallback = ConnectIpv4LoopbackAsync
+        };
+
+    private static async ValueTask<Stream> ConnectIpv4LoopbackAsync(
+        SocketsHttpConnectionContext context,
+        CancellationToken cancellationToken)
     {
-        var configured = ValidateLocalOrigin(value);
-        var legacyLocalhost = configured.Host.Equals(
-            "localhost",
-            StringComparison.OrdinalIgnoreCase);
-        var ipv6Loopback = IPAddress.TryParse(configured.Host, out var address) &&
-                           address.Equals(IPAddress.IPv6Loopback);
-        return legacyLocalhost || ipv6Loopback
-            ? new Uri("http://127.0.0.1:8080/", UriKind.Absolute)
-            : configured;
+        var socket = new Socket(
+            AddressFamily.InterNetwork,
+            SocketType.Stream,
+            ProtocolType.Tcp);
+        try
+        {
+            await socket.ConnectAsync(
+                IPAddress.Loopback,
+                context.DnsEndPoint.Port,
+                cancellationToken);
+            return new NetworkStream(socket, ownsSocket: true);
+        }
+        catch
+        {
+            socket.Dispose();
+            throw;
+        }
     }
 
     private static Uri ValidateLocalOrigin(string value)
