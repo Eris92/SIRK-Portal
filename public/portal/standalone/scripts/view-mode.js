@@ -44,16 +44,18 @@
             ".sirk-connection-sidebar-toggle{position:fixed!important;left:0;top:54px;z-index:2147483500;display:none!important;align-items:center;justify-content:flex-end;width:12px;height:34px;padding:0 5px 0 0;overflow:hidden;border:1px solid rgba(148,163,184,.72);border-left:0;border-radius:0 8px 8px 0;background:rgba(13,23,40,.9);color:#edf4ff;box-shadow:0 7px 18px rgba(15,23,42,.24);cursor:pointer;transition:left .18s ease,width .16s ease,padding .16s ease,background .18s ease,border-color .18s ease}",
             ".sirk-connection-sidebar-toggle:hover,.sirk-connection-sidebar-toggle:focus-visible{width:34px;padding-right:8px;border-color:#60a5fa;background:#17263d;color:#fff;outline:none}",
             ".sirk-connection-sidebar-toggle svg{display:block;flex:0 0 17px;width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;transition:transform .18s ease}",
-            ".sirk-connection-header-toggle{position:fixed!important;left:50%;top:0;z-index:2147483500;display:none!important;align-items:flex-end;justify-content:center;width:34px;height:12px;padding:0 0 5px;overflow:hidden;border:1px solid rgba(148,163,184,.72);border-top:0;border-radius:0 0 8px 8px;background:rgba(13,23,40,.9);color:#edf4ff;box-shadow:0 7px 18px rgba(15,23,42,.24);cursor:pointer;transform:translateX(-50%);transition:top .18s ease,height .16s ease,padding .16s ease,background .18s ease,border-color .18s ease}",
-            ".sirk-connection-header-toggle:hover,.sirk-connection-header-toggle:focus-visible{height:34px;padding-bottom:8px;border-color:#60a5fa;background:#17263d;color:#fff;outline:none}",
+            ".sirk-connection-header-toggle{position:fixed!important;left:14px;top:54px;z-index:2147483560;display:none!important;align-items:center;justify-content:flex-end;width:12px;height:34px;padding:0 5px 0 0;overflow:hidden;border:1px solid rgba(148,163,184,.72);border-radius:8px;background:rgba(13,23,40,.9);color:#edf4ff;box-shadow:0 7px 18px rgba(15,23,42,.24);cursor:pointer;transform:none;transition:left .18s ease,width .16s ease,padding .16s ease,background .18s ease,border-color .18s ease}",
+            ".sirk-connection-header-toggle:hover,.sirk-connection-header-toggle:focus-visible{width:34px;padding-right:8px;border-color:#60a5fa;background:#17263d;color:#fff;outline:none}",
             ".sirk-connection-header-toggle svg{display:block;flex:0 0 17px;width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;transition:transform .18s ease}",
+            ".sirk-connection-sidebar-toggle:hover+.sirk-connection-header-toggle,.sirk-connection-sidebar-toggle:focus-visible+.sirk-connection-header-toggle{left:36px}",
             "html.sirk-device-connection-mode .sirk-connection-header-toggle{display:flex!important}",
-            "html.sirk-device-connection-mode.sirk-device-connection-header-open .sirk-connection-header-toggle{top:69px;height:34px;padding-bottom:8px}",
+            "html.sirk-device-connection-mode.sirk-device-connection-header-open .sirk-connection-header-toggle{left:14px;width:34px;padding-right:8px}",
             "html.sirk-device-connection-mode.sirk-device-connection-header-open .sirk-connection-header-toggle svg{transform:rotate(180deg)}",
             "html.sirk-device-connection-mode:not(.sirk-device-connection-header-open) .sirk-standalone-header{display:none!important}",
             "html.sirk-device-connection-mode.sirk-device-connection-header-open .sirk-standalone-header{position:fixed!important;inset:0 0 auto 0!important;z-index:2147483450!important;display:flex!important;width:100%!important;height:69px!important;min-height:69px!important;box-shadow:0 12px 28px rgba(15,23,42,.28)}",
             "html.sirk-device-focus-mode .sirk-connection-sidebar-toggle,html.sirk-device-connection-mode .sirk-connection-sidebar-toggle{display:flex!important}",
             "html.sirk-device-focus-mode.sirk-device-connection-sidebar-open .sirk-connection-sidebar-toggle,html.sirk-device-connection-mode.sirk-device-connection-sidebar-open .sirk-connection-sidebar-toggle{left:var(--sirk-expanded-sidebar-width,248px);width:34px;padding-right:8px}",
+            "html.sirk-device-connection-mode.sirk-device-connection-sidebar-open .sirk-connection-header-toggle{left:calc(var(--sirk-expanded-sidebar-width,248px) + 36px)}",
             "html.sirk-device-focus-mode.sirk-device-connection-sidebar-open .sirk-connection-sidebar-toggle svg,html.sirk-device-connection-mode.sirk-device-connection-sidebar-open .sirk-connection-sidebar-toggle svg{transform:rotate(180deg)}",
             "html.sirk-device-focus-mode.sirk-device-connection-sidebar-open .sirk-standalone-sidebar,html.sirk-device-connection-mode.sirk-device-connection-sidebar-open .sirk-standalone-sidebar{position:fixed!important;inset:0 auto 0 0!important;z-index:2147483400!important;display:flex!important;width:var(--sirk-expanded-sidebar-width,248px)!important;height:100dvh!important;box-shadow:12px 0 30px rgba(15,23,42,.34)}",
             "html.sirk-device-focus-mode:not(.sirk-device-connection-sidebar-open) .sirk-standalone-sidebar{display:none!important}",
@@ -391,9 +393,14 @@
                 if (event.key === "Escape") setConnectionHeaderOpen(false);
             });
 
-            document.body.appendChild(button);
+            var sidebarButton = document.getElementById("sirkConnectionSidebarToggle");
+            if (sidebarButton) sidebarButton.insertAdjacentElement("afterend", button);
+            else document.body.appendChild(button);
         } else {
             button.setAttribute("aria-controls", header.id);
+            var currentSidebarButton = document.getElementById("sirkConnectionSidebarToggle");
+            if (currentSidebarButton && button.previousElementSibling !== currentSidebarButton)
+                currentSidebarButton.insertAdjacentElement("afterend", button);
         }
 
         updateConnectionHeaderToggle();
