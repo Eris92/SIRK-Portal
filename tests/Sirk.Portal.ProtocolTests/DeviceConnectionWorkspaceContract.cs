@@ -55,24 +55,27 @@ internal static class DeviceConnectionWorkspaceContract
 
         Require(tabsCss.Contains("padding:0 12px!important", StringComparison.Ordinal),
             "The Devices header must keep its 12px inset.");
-        Require(viewMode.Contains("top:54px", StringComparison.Ordinal) &&
+        Require(viewMode.Contains(".sirk-connection-sidebar-toggle{position:fixed!important;left:0;top:92px", StringComparison.Ordinal) &&
+                viewMode.Contains(".sirk-connection-header-toggle{position:fixed!important;left:0;top:54px", StringComparison.Ordinal) &&
                 viewMode.Contains("width:12px", StringComparison.Ordinal) &&
                 viewMode.Contains("width:34px", StringComparison.Ordinal) &&
                 viewMode.Contains("--sirk-expanded-sidebar-width", StringComparison.Ordinal) &&
                 viewMode.Contains("collapsed ? \"76px\" : \"248px\"", StringComparison.Ordinal),
-            "Expanded Devices must use a tiny top-edge hover handle and match collapsed or expanded sidebar width.");
+            "Expanded Devices must stack the top-header and side-menu handles on the left edge and match collapsed or expanded sidebar width.");
         Require(viewMode.Contains("if (button.contains(event.target) || sidebar.contains(event.target)) return;", StringComparison.Ordinal) &&
                 viewMode.Contains("setConnectionSidebarOpen(false);", StringComparison.Ordinal),
             "Clicking the expanded workspace outside the menu must hide the overlay.");
         Require(viewMode.Contains(".sirk-connection-header-toggle", StringComparison.Ordinal) &&
-                viewMode.Contains("left:14px;top:54px", StringComparison.Ordinal) &&
+                viewMode.Contains("left:0;top:54px", StringComparison.Ordinal) &&
                 viewMode.Contains("z-index:2147483560", StringComparison.Ordinal) &&
+                !viewMode.Contains(".sirk-connection-sidebar-toggle:hover+.sirk-connection-header-toggle", StringComparison.Ordinal) &&
+                viewMode.Contains("sirk-device-connection-sidebar-open .sirk-connection-header-toggle{left:var(--sirk-expanded-sidebar-width,248px)}", StringComparison.Ordinal) &&
                 viewMode.Contains("sidebarButton.insertAdjacentElement", StringComparison.Ordinal) &&
                 viewMode.Contains("afterend", StringComparison.Ordinal) &&
                 viewMode.Contains("sirk-device-connection-header-open .sirk-standalone-header", StringComparison.Ordinal) &&
                 viewMode.Contains("grid-template-rows:minmax(0,1fr)", StringComparison.Ordinal) &&
                 viewMode.Contains("function mountConnectionHeaderToggle()", StringComparison.Ordinal),
-            "Connection full view must place the top-header handle beside the menu handle and keep it above the overlay.");
+            "Connection full view must place the top-header handle above the side-menu handle and keep both aligned with the overlay edge.");
         Require(viewMode.Contains("if (button.contains(event.target) || header.contains(event.target)) return;", StringComparison.Ordinal) &&
                 viewMode.Contains("setConnectionHeaderOpen(false);", StringComparison.Ordinal),
             "Clicking outside the connection header overlay must hide it.");
