@@ -39,3 +39,5 @@ jobs:
           git add -A
           git commit -m "fix(maintenance): enable GUI updates and loopback Central tunnel"
           git push
+
+# Triggered after the workflow existed on main.
