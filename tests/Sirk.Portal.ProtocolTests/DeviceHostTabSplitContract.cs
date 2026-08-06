@@ -8,6 +8,7 @@ internal static class DeviceHostTabSplitContract
         var tabsScript = File.ReadAllText(Path.Combine(root, "public", "portal", "standalone", "scripts", "device-tabs.js"));
         var connectionScript = File.ReadAllText(Path.Combine(root, "public", "portal", "standalone", "scripts", "workspace-connection.js"));
         var lifecycleScript = File.ReadAllText(Path.Combine(root, "public", "portal", "standalone", "scripts", "device-tabs-lifecycle-v3.js"));
+        var headerContextScript = File.ReadAllText(Path.Combine(root, "public", "portal", "standalone", "scripts", "header-toggle-context-menu.js"));
         var bundler = File.ReadAllText(Path.Combine(root, "src", "Sirk.Portal", "Ui", "PortalAssetBundler.cs"));
 
         Require(tabsScript.Contains("data-device-tab-close", StringComparison.Ordinal) &&
@@ -64,12 +65,27 @@ internal static class DeviceHostTabSplitContract
                 lifecycleScript.Contains("#sirkPortalRoot.sirk-theme-dark", StringComparison.Ordinal),
             "Host tabs and their dropdown must follow the active light or dark Portal theme.");
 
+        Require(headerContextScript.Contains("#sirkConnectionHeaderToggle", StringComparison.Ordinal) &&
+                headerContextScript.Contains("contextmenu", StringComparison.Ordinal) &&
+                headerContextScript.Contains("data-header-context-connection", StringComparison.Ordinal),
+            "Right-clicking the top-bar visibility handle must open its workspace context menu with Connect or Disconnect first.");
+        Require(headerContextScript.Contains("data-header-context-section", StringComparison.Ordinal) &&
+                headerContextScript.Contains("Ogólne", StringComparison.Ordinal) &&
+                headerContextScript.Contains("Połączenie", StringComparison.Ordinal) &&
+                headerContextScript.Contains("Ustawienia", StringComparison.Ordinal),
+            "The top-bar handle context menu must expose the same device sections as the host dropdown.");
+        Require(headerContextScript.Contains("function connectionMode()", StringComparison.Ordinal) &&
+                headerContextScript.Contains("!connectionMode() || !ws", StringComparison.Ordinal),
+            "The top-bar handle context menu must be restricted to connection view.");
+
         var tabsIndex = bundler.IndexOf("portal/standalone/scripts/device-tabs.js", StringComparison.Ordinal);
         var connectionIndex = bundler.IndexOf("portal/standalone/scripts/workspace-connection.js", StringComparison.Ordinal);
         var lifecycleIndex = bundler.IndexOf("portal/standalone/scripts/device-tabs-lifecycle-v3.js", StringComparison.Ordinal);
+        var headerContextIndex = bundler.IndexOf("portal/standalone/scripts/header-toggle-context-menu.js", StringComparison.Ordinal);
         var terminalIndex = bundler.IndexOf("portal/standalone/scripts/terminal-connect.js", StringComparison.Ordinal);
-        Require(tabsIndex >= 0 && connectionIndex > tabsIndex && lifecycleIndex > connectionIndex && terminalIndex > lifecycleIndex,
-            "The lifecycle controller must be bundled after workspace connection and before Terminal integration.");
+        Require(tabsIndex >= 0 && connectionIndex > tabsIndex && lifecycleIndex > connectionIndex &&
+                headerContextIndex > lifecycleIndex && terminalIndex > headerContextIndex,
+            "The header context menu must be bundled after workspace lifecycle and before Terminal integration.");
     }
 
     private static string FindRepositoryRoot()
