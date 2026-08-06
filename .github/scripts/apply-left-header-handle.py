@@ -68,7 +68,8 @@ replace_once(
     '''        Require(viewMode.Contains(".sirk-connection-header-toggle", StringComparison.Ordinal) &&
                 viewMode.Contains("left:14px;top:54px", StringComparison.Ordinal) &&
                 viewMode.Contains("z-index:2147483560", StringComparison.Ordinal) &&
-                viewMode.Contains("sidebarButton.insertAdjacentElement(\"afterend\", button)", StringComparison.Ordinal) &&
+                viewMode.Contains("sidebarButton.insertAdjacentElement", StringComparison.Ordinal) &&
+                viewMode.Contains("afterend", StringComparison.Ordinal) &&
                 viewMode.Contains("sirk-device-connection-header-open .sirk-standalone-header", StringComparison.Ordinal) &&
                 viewMode.Contains("grid-template-rows:minmax(0,1fr)", StringComparison.Ordinal) &&
                 viewMode.Contains("function mountConnectionHeaderToggle()", StringComparison.Ordinal),
