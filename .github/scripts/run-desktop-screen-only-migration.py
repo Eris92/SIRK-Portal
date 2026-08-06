@@ -27,3 +27,32 @@ new = '''        Require(workspace.Contains("Agent odrzucił pobranie sesji", St
 if contract.count(old) != 1:
     raise RuntimeError("Canonical Agent policy UI contract was not found exactly once.")
 contract_path.write_text(contract.replace(old, new, 1), encoding="utf-8", newline="\n")
+
+codec_contract_path = root / "tests" / "Sirk.Portal.ProtocolTests" / "DesktopImageCodecUiContract.cs"
+codec_contract = codec_contract_path.read_text(encoding="utf-8-sig")
+old_codec = '''        foreach (var marker in new[]
+                 {
+                     "data-agent-desktop-codec", "data-agent-desktop-quality",
+                     "imageEncoding: settings.imageEncoding", "codec: \\\"webp\\\"",
+                     "codec: \\\"png\\\"", "codec: \\\"jpeg\\\"",
+                     "image\\\\/(?:jpeg|png|webp)", "Math"
+                 })
+            Require(workspace.Contains(marker, StringComparison.Ordinal),
+                "Desktop codec UI marker is missing: " + marker);
+'''
+new_codec = '''        foreach (var marker in new[]
+                 {
+                     "function effectiveProfile()", "imageEncoding: settings.imageEncoding",
+                     "codec: \\\"webp\\\"", "codec: \\\"png\\\"", "codec: \\\"jpeg\\\"",
+                     "image\\\\/(?:jpeg|png|webp)", "activeAutoProfile"
+                 })
+            Require(workspace.Contains(marker, StringComparison.Ordinal),
+                "Desktop automatic codec marker is missing: " + marker);
+
+        Require(!workspace.Contains("data-agent-desktop-codec", StringComparison.Ordinal) &&
+                !workspace.Contains("data-agent-desktop-quality", StringComparison.Ordinal),
+            "The screen-only desktop must not expose codec or quality controls.");
+'''
+if codec_contract.count(old_codec) != 1:
+    raise RuntimeError("Desktop codec UI contract block was not found exactly once.")
+codec_contract_path.write_text(codec_contract.replace(old_codec, new_codec, 1), encoding="utf-8", newline="\n")
