@@ -1,0 +1,3052 @@
+{
+  "repository": "Eris92/SIRK-Portal",
+  "commit": "4993b6a7f79601916d97dc6a40a9fd082fc3db53",
+  "summary": {
+    "files": 245,
+    "textFiles": 182,
+    "lines": 33635,
+    "extensions": {
+      ".1-trigger": 1,
+      ".2-pr-trigger": 1,
+      ".cs": 44,
+      ".csproj": 2,
+      ".css": 18,
+      ".html": 3,
+      ".js": 53,
+      ".json": 7,
+      ".md": 12,
+      ".menu": 22,
+      ".props": 1,
+      ".ps1": 33,
+      ".py": 7,
+      ".pyc": 1,
+      ".sh": 1,
+      ".svg": 25,
+      ".yaml": 5,
+      ".yml": 2,
+      "<none>": 7
+    },
+    "projects": 2,
+    "nodeArtifacts": 0,
+    "legacyPaths": 0,
+    "findingsBySeverity": {
+      "critical": 0,
+      "high": 1,
+      "medium": 213,
+      "low": 0,
+      "info": 1
+    }
+  },
+  "projects": [
+    {
+      "path": "tests/Sirk.Portal.ProtocolTests/Sirk.Portal.ProtocolTests.csproj",
+      "frameworks": [],
+      "packages": []
+    },
+    {
+      "path": "src/Sirk.Portal/Sirk.Portal.csproj",
+      "frameworks": [],
+      "packages": [
+        {
+          "name": "Microsoft.Extensions.Hosting.WindowsServices",
+          "version": "10.0.10"
+        }
+      ]
+    }
+  ],
+  "nodeArtifacts": [],
+  "legacyPaths": [],
+  "jsonConfigurationKeys": {
+    "config.json": [
+      "applicationId",
+      "author",
+      "changelogUrl",
+      "configUrl",
+      "description",
+      "downloadUrl",
+      "hasAdminPanel",
+      "homepage",
+      "name",
+      "repository:type",
+      "repository:url",
+      "updateChannels:beta",
+      "updateChannels:dev",
+      "updateChannels:stable",
+      "version",
+      "versionHistoryUrl"
+    ],
+    "src/Sirk.Portal/appsettings.json": [
+      "AllowedHosts",
+      "Logging:LogLevel:Default",
+      "Logging:LogLevel:Microsoft.AspNetCore",
+      "Sirk:Central:BaseUrl",
+      "Sirk:Central:ConnectionFile",
+      "Sirk:Central:Enabled",
+      "Sirk:Central:HeartbeatIntervalSeconds",
+      "Sirk:Central:PortalId",
+      "Sirk:Central:PortalName",
+      "Sirk:Central:PortalToken",
+      "Sirk:Central:PublicUrl",
+      "Sirk:Central:RequestTimeoutSeconds",
+      "Sirk:Central:UpdateChannel",
+      "Sirk:CentralTunnel:Enabled",
+      "Sirk:CentralTunnel:LocalOrigin",
+      "Sirk:CentralTunnel:MaximumBodyBytes",
+      "Sirk:CentralTunnel:MaximumConcurrency",
+      "Sirk:CentralTunnel:PollIntervalMilliseconds",
+      "Sirk:DataRoot",
+      "Sirk:ReverseProxy:TrustAll",
+      "Sirk:Security:BootstrapAccessCodeFile",
+      "Sirk:Security:BootstrapDisplayName",
+      "Sirk:Security:BootstrapPasswordFile",
+      "Sirk:Security:BootstrapUserName",
+      "Sirk:Security:Enabled",
+      "Sirk:Security:LoginAttemptsPerFiveMinutes",
+      "Sirk:Security:SessionMinutes"
+    ]
+  },
+  "configurationTypes": [
+    {
+      "path": "src/Sirk.Portal/Settings/PortalSettingsStore.cs",
+      "type": "PortalModuleSettings",
+      "properties": []
+    },
+    {
+      "path": "src/Sirk.Portal/Security/PortalSecurityOptions.cs",
+      "type": "PortalSecurityOptions",
+      "properties": [
+        "BootstrapAccessCodeFile",
+        "BootstrapDisplayName",
+        "BootstrapPasswordFile",
+        "BootstrapUserName",
+        "Enabled",
+        "LoginAttemptsPerFiveMinutes",
+        "SessionMinutes"
+      ]
+    },
+    {
+      "path": "src/Sirk.Portal/Central/CentralConnectionOptions.cs",
+      "type": "CentralConnectionOptions",
+      "properties": [
+        "BaseUrl",
+        "ConnectionFile",
+        "Enabled",
+        "HeartbeatIntervalSeconds",
+        "PortalId",
+        "PortalName",
+        "PortalToken",
+        "PublicUrl",
+        "RequestTimeoutSeconds",
+        "UpdateChannel"
+      ]
+    },
+    {
+      "path": "src/Sirk.Portal/Central/CentralTunnelService.cs",
+      "type": "CentralTunnelOptions",
+      "properties": [
+        "Enabled",
+        "LocalOrigin",
+        "MaximumBodyBytes",
+        "MaximumConcurrency",
+        "PollIntervalMilliseconds"
+      ]
+    }
+  ],
+  "endpoints": [
+    {
+      "path": "tools/Configure-SirkCentral.ps1",
+      "value": "$($configuration.centralUrl)/api/portal/v1/config"
+    },
+    {
+      "path": ".github/scripts/validate-node-free-dotnet10.sh",
+      "value": "management"
+    },
+    {
+      "path": ".github/scripts/validate-node-free-dotnet10.sh",
+      "value": "tree"
+    },
+    {
+      "path": ".github/scripts/validate-node-free-dotnet10.sh",
+      "value": "scripts"
+    },
+    {
+      "path": ".github/scripts/Test-NodeFreeWindowsInstall.ps1",
+      "value": "$baseUrl/api/v1/auth/local-access"
+    },
+    {
+      "path": ".github/scripts/Test-NodeFreeWindowsInstall.ps1",
+      "value": "$baseUrl/api/v1/auth/login"
+    },
+    {
+      "path": "src/Sirk.Portal/Program.cs",
+      "value": "/healthz"
+    },
+    {
+      "path": "src/Sirk.Portal/Program.cs",
+      "value": "/readyz"
+    },
+    {
+      "path": "src/Sirk.Portal/Program.cs",
+      "value": "/api/v1/portal/status"
+    },
+    {
+      "path": "src/Sirk.Portal/Ui/PortalUiCompatibilityEndpoints.cs",
+      "value": "/api/v1/modules/portal/devices"
+    },
+    {
+      "path": "src/Sirk.Portal/Ui/PortalUiCompatibilityEndpoints.cs",
+      "value": "/api/v1/modules/portal/overview"
+    },
+    {
+      "path": "src/Sirk.Portal/Ui/PortalUiCompatibilityEndpoints.cs",
+      "value": "/api/devices"
+    },
+    {
+      "path": "src/Sirk.Portal/Ui/PortalUiCompatibilityEndpoints.cs",
+      "value": "/api/bootstrap"
+    },
+    {
+      "path": "src/Sirk.Portal/Ui/PortalUiCompatibilityEndpoints.cs",
+      "value": "/api/admin/agent-groups"
+    },
+    {
+      "path": "src/Sirk.Portal/Ui/PortalUiCompatibilityEndpoints.cs",
+      "value": "/api/admin/identity"
+    },
+    {
+      "path": "src/Sirk.Portal/Ui/PortalUiCompatibilityEndpoints.cs",
+      "value": "/api/admin/settings"
+    },
+    {
+      "path": "src/Sirk.Portal/Ui/PortalUiCompatibilityEndpoints.cs",
+      "value": "/api/admin/runtime"
+    },
+    {
+      "path": "src/Sirk.Portal/Ui/PortalUiCompatibilityEndpoints.cs",
+      "value": "/api/system/updates/status"
+    },
+    {
+      "path": "src/Sirk.Portal/Ui/PortalUiCompatibilityEndpoints.cs",
+      "value": "/api/system/updates/{action}"
+    },
+    {
+      "path": "src/Sirk.Portal/Ui/PortalUiEndpoints.cs",
+      "value": "/"
+    },
+    {
+      "path": "src/Sirk.Portal/Ui/PortalUiEndpoints.cs",
+      "value": "/login"
+    },
+    {
+      "path": "src/Sirk.Portal/Ui/PortalUiEndpoints.cs",
+      "value": "/assets/{**asset}"
+    },
+    {
+      "path": "src/Sirk.Portal/Ui/PortalUiEndpoints.cs",
+      "value": "/auth/logout"
+    },
+    {
+      "path": "src/Sirk.Portal/Ui/PortalUiEndpoints.cs",
+      "value": "/maintenance.json"
+    },
+    {
+      "path": "src/Sirk.Portal/Maintenance/PortalMaintenanceEndpoints.cs",
+      "value": "/api/v1/admin/maintenance"
+    },
+    {
+      "path": "src/Sirk.Portal/Maintenance/PortalMaintenanceEndpoints.cs",
+      "value": "/status"
+    },
+    {
+      "path": "src/Sirk.Portal/Maintenance/PortalMaintenanceEndpoints.cs",
+      "value": "/check"
+    },
+    {
+      "path": "src/Sirk.Portal/Maintenance/PortalMaintenanceEndpoints.cs",
+      "value": "/backup"
+    },
+    {
+      "path": "src/Sirk.Portal/Maintenance/PortalMaintenanceEndpoints.cs",
+      "value": "/channel"
+    },
+    {
+      "path": "src/Sirk.Portal/Maintenance/PortalMaintenanceEndpoints.cs",
+      "value": "/delete-backup"
+    },
+    {
+      "path": "src/Sirk.Portal/Maintenance/PortalMaintenanceEndpoints.cs",
+      "value": "/restart"
+    },
+    {
+      "path": "src/Sirk.Portal/Maintenance/PortalMaintenanceEndpoints.cs",
+      "value": "/restore"
+    },
+    {
+      "path": "src/Sirk.Portal/Agent/AgentEndpoints.cs",
+      "value": "/api/v1/agent/enroll"
+    },
+    {
+      "path": "src/Sirk.Portal/Agent/AgentEndpoints.cs",
+      "value": "/api/v1/agent/heartbeat"
+    },
+    {
+      "path": "src/Sirk.Portal/Agent/AgentEndpoints.cs",
+      "value": "/api/v1/agent/commands"
+    },
+    {
+      "path": "src/Sirk.Portal/Agent/AgentEndpoints.cs",
+      "value": "/api/v1/agent/commands/results"
+    },
+    {
+      "path": "src/Sirk.Portal/Agent/AgentEndpoints.cs",
+      "value": "/api/v1/agent/policy"
+    },
+    {
+      "path": "src/Sirk.Portal/Agent/AgentEndpoints.cs",
+      "value": "/api/v1/agent/desktop/stream"
+    },
+    {
+      "path": "src/Sirk.Portal/Agent/AgentEndpoints.cs",
+      "value": "/api/v1/admin"
+    },
+    {
+      "path": "src/Sirk.Portal/Agent/AgentEndpoints.cs",
+      "value": "/agents"
+    },
+    {
+      "path": "src/Sirk.Portal/Agent/AgentEndpoints.cs",
+      "value": "/agent-groups"
+    },
+    {
+      "path": "src/Sirk.Portal/Agent/AgentEndpoints.cs",
+      "value": "/agent-commands"
+    },
+    {
+      "path": "src/Sirk.Portal/Agent/AgentEndpoints.cs",
+      "value": "/agent-commands/{commandId}"
+    },
+    {
+      "path": "src/Sirk.Portal/Agent/AgentEndpoints.cs",
+      "value": "/agent-policies"
+    },
+    {
+      "path": "src/Sirk.Portal/Agent/AgentEndpoints.cs",
+      "value": "/agent-policies/{scopeType}/{scopeId}"
+    },
+    {
+      "path": "src/Sirk.Portal/Agent/AgentEndpoints.cs",
+      "value": "/api/v1/desktop/stream"
+    },
+    {
+      "path": "src/Sirk.Portal/Agent/AgentEndpoints.cs",
+      "value": "/api/v1/desktop/status/{deviceId}"
+    },
+    {
+      "path": "src/Sirk.Portal/Agent/AgentInstallScriptEndpoint.cs",
+      "value": "/api/v1/agent/install-script"
+    },
+    {
+      "path": "src/Sirk.Portal/Agent/LegacyAgentCompatibilityEndpoints.cs",
+      "value": "/api/agent/v1/enroll"
+    },
+    {
+      "path": "src/Sirk.Portal/Agent/LegacyAgentCompatibilityEndpoints.cs",
+      "value": "/api/agent/v1/checkin"
+    },
+    {
+      "path": "src/Sirk.Portal/Modules/PortalModuleEndpoints.cs",
+      "value": "/api/v1/bootstrap"
+    },
+    {
+      "path": "src/Sirk.Portal/Modules/PortalModuleEndpoints.cs",
+      "value": "/api/v1/devices"
+    },
+    {
+      "path": "src/Sirk.Portal/Modules/PortalModuleEndpoints.cs",
+      "value": "/api/v1/modules"
+    },
+    {
+      "path": "src/Sirk.Portal/Modules/PortalModuleEndpoints.cs",
+      "value": "/{module}/{action}"
+    },
+    {
+      "path": "src/Sirk.Portal/Administration/PortalAdministrationEndpoints.cs",
+      "value": "/api/v1/system/info"
+    },
+    {
+      "path": "src/Sirk.Portal/Administration/PortalAdministrationEndpoints.cs",
+      "value": "/settings"
+    },
+    {
+      "path": "src/Sirk.Portal/Administration/PortalAdministrationEndpoints.cs",
+      "value": "/runtime"
+    },
+    {
+      "path": "src/Sirk.Portal/Administration/PortalAdministrationEndpoints.cs",
+      "value": "/central"
+    },
+    {
+      "path": "src/Sirk.Portal/Administration/PortalAdministrationEndpoints.cs",
+      "value": "/computer-groups"
+    },
+    {
+      "path": "src/Sirk.Portal/Administration/PortalAdministrationEndpoints.cs",
+      "value": "/computer-groups/{groupId}"
+    },
+    {
+      "path": "src/Sirk.Portal/Administration/PortalAdministrationEndpoints.cs",
+      "value": "/computer-groups/{groupId}/rotate-token"
+    },
+    {
+      "path": "src/Sirk.Portal/Administration/PortalAdministrationEndpoints.cs",
+      "value": "/maintenance/purge"
+    },
+    {
+      "path": "src/Sirk.Portal/Administration/PortalAdministrationEndpoints.cs",
+      "value": "/api/v1/audit"
+    },
+    {
+      "path": "src/Sirk.Portal/Security/PortalAuthenticationEndpoints.cs",
+      "value": "/api/v1/auth"
+    },
+    {
+      "path": "src/Sirk.Portal/Security/PortalAuthenticationEndpoints.cs",
+      "value": "/local-access"
+    },
+    {
+      "path": "src/Sirk.Portal/Security/PortalAuthenticationEndpoints.cs",
+      "value": "/session"
+    },
+    {
+      "path": "src/Sirk.Portal/Security/PortalAuthenticationEndpoints.cs",
+      "value": "/csrf"
+    },
+    {
+      "path": "src/Sirk.Portal/Security/PortalAuthenticationEndpoints.cs",
+      "value": "/logout"
+    },
+    {
+      "path": "src/Sirk.Portal/Security/PortalAuthenticationEndpoints.cs",
+      "value": "/password"
+    },
+    {
+      "path": "src/Sirk.Portal/Security/PortalAuthenticationEndpoints.cs",
+      "value": "/break-glass/access-code/rotate"
+    },
+    {
+      "path": "src/Sirk.Portal/Security/PortalAuthenticationEndpoints.cs",
+      "value": "/api/v1/setup/status"
+    },
+    {
+      "path": "src/Sirk.Portal/Security/PortalIdentityEndpoints.cs",
+      "value": "/api/v1/admin/identity"
+    },
+    {
+      "path": "public/portal/management.js",
+      "value": "script"
+    },
+    {
+      "path": "public/portal/management.js",
+      "value": "results"
+    },
+    {
+      "path": "public/portal/approvals.js",
+      "value": "approvals"
+    },
+    {
+      "path": "public/portal/approvals.js",
+      "value": "requests"
+    },
+    {
+      "path": "public/portal/approvals.js",
+      "value": "providers"
+    },
+    {
+      "path": "public/portal/subfolder-icons.js",
+      "value": "/api/admin/runtime?action=server-state"
+    },
+    {
+      "path": "public/portal/subfolder-icons.js",
+      "value": "/api/admin/runtime?action=server-restart"
+    },
+    {
+      "path": "public/modules/commands/index.js",
+      "value": "output"
+    },
+    {
+      "path": "public/modules/move-requests/index.js",
+      "value": "groups"
+    },
+    {
+      "path": "public/modules/security/index.js",
+      "value": "settings"
+    },
+    {
+      "path": "public/modules/security/index.js",
+      "value": "incidents"
+    },
+    {
+      "path": "public/modules/security/index.js",
+      "value": "agent-overview"
+    },
+    {
+      "path": "public/modules/jira/index.js",
+      "value": "assets"
+    },
+    {
+      "path": "public/modules/jira/index.js",
+      "value": "issues"
+    },
+    {
+      "path": "public/modules/jira/index.js",
+      "value": "issue"
+    },
+    {
+      "path": "public/shared/ui/system-credentials-form.js",
+      "value": "system-credentials"
+    },
+    {
+      "path": "public/shared/ui/script-tools.js",
+      "value": "definition"
+    },
+    {
+      "path": "public/shared/ui/script-tools.js",
+      "value": "script-secrets"
+    },
+    {
+      "path": "public/portal/standalone/index.html",
+      "value": "move-requests"
+    },
+    {
+      "path": "public/portal/standalone/scripts/navigation.js",
+      "value": "/api/modules/_central/bootstrap"
+    },
+    {
+      "path": "public/portal/standalone/scripts/core.js",
+      "value": "/api/v1/auth/csrf"
+    },
+    {
+      "path": "public/portal/standalone/scripts/app.js",
+      "value": "portal"
+    },
+    {
+      "path": "public/portal/standalone/scripts/settings-native-v2.js",
+      "value": "/api/v1/admin/settings"
+    },
+    {
+      "path": "public/portal/standalone/scripts/settings-native-v2.js",
+      "value": "/api/v1/admin/identity/"
+    },
+    {
+      "path": "public/portal/standalone/scripts/settings-native-v2.js",
+      "value": "/api/v1/admin/runtime"
+    },
+    {
+      "path": "public/portal/standalone/scripts/settings-native-v2.js",
+      "value": "/api/v1/admin/maintenance/status"
+    },
+    {
+      "path": "public/portal/standalone/scripts/settings-native-v2.js",
+      "value": "/api/v1/admin/central"
+    },
+    {
+      "path": "public/portal/standalone/scripts/settings-native-v2.js",
+      "value": "/api/v1/admin/computer-groups"
+    },
+    {
+      "path": "public/portal/standalone/scripts/settings-native-v2.js",
+      "value": "/api/v1/admin/maintenance/"
+    },
+    {
+      "path": "public/portal/standalone/scripts/settings-native-v2.js",
+      "value": "/api/v1/auth/password"
+    },
+    {
+      "path": "public/portal/standalone/scripts/settings-native-v2.js",
+      "value": "/api/v1/auth/break-glass/access-code/rotate"
+    },
+    {
+      "path": "public/portal/standalone/scripts/settings-native-v2.js",
+      "value": "/api/v1/admin/computer-groups/"
+    },
+    {
+      "path": "public/portal/standalone/scripts/login.js",
+      "value": "/api/v1/auth/local-access"
+    },
+    {
+      "path": "public/portal/standalone/scripts/login.js",
+      "value": "/api/v1/auth/login"
+    },
+    {
+      "path": "public/portal/standalone/scripts/device-workspace.js",
+      "value": "/api/agent-desktop/input"
+    },
+    {
+      "path": "public/portal/standalone/scripts/device-workspace.js",
+      "value": "commands"
+    }
+  ],
+  "integrations": {
+    "central": [
+      {
+        "path": "src/Sirk.Portal/Central/CentralConnectionFile.cs",
+        "count": 72
+      },
+      {
+        "path": "src/Sirk.Portal/Central/CentralTunnelService.cs",
+        "count": 52
+      },
+      {
+        "path": "src/Sirk.Portal/Administration/PortalAdministrationEndpoints.cs",
+        "count": 45
+      },
+      {
+        "path": "src/Sirk.Portal/Central/CentralHeartbeatService.cs",
+        "count": 41
+      },
+      {
+        "path": "public/portal/standalone/scripts/navigation.js",
+        "count": 41
+      },
+      {
+        "path": "src/Sirk.Portal/Central/CentralConnectionMaintenanceCommand.cs",
+        "count": 29
+      },
+      {
+        "path": "public/portal/subfolder-icons.js",
+        "count": 26
+      },
+      {
+        "path": "public/portal/standalone/scripts/settings-native-v2.js",
+        "count": 21
+      },
+      {
+        "path": "tools/Configure-SirkCentral.ps1",
+        "count": 19
+      },
+      {
+        "path": "tests/Sirk.Portal.ProtocolTests/Program.cs",
+        "count": 19
+      },
+      {
+        "path": "src/Sirk.Portal/Central/CentralConnectionState.cs",
+        "count": 16
+      },
+      {
+        "path": "src/Sirk.Portal/Central/InternalTunnelAuthentication.cs",
+        "count": 15
+      },
+      {
+        "path": "changelog.md",
+        "count": 14
+      },
+      {
+        "path": "src/Sirk.Portal/Program.cs",
+        "count": 14
+      },
+      {
+        "path": "src/Sirk.Portal/Central/PortalCentralIdentityMapper.cs",
+        "count": 13
+      },
+      {
+        "path": "version-history.json",
+        "count": 9
+      },
+      {
+        "path": ".agents/skills/deploy-mycompany-local/SKILL.md",
+        "count": 8
+      },
+      {
+        "path": ".agents/skills/restart-meshcentral-service/SKILL.md",
+        "count": 7
+      },
+      {
+        "path": ".agents/skills/read-meshcentral-log/SKILL.md",
+        "count": 6
+      },
+      {
+        "path": ".agents/skills/deploy-mycompany-local/scripts/Publish-MyCompanyLocal.ps1",
+        "count": 6
+      }
+    ],
+    "portal": [
+      {
+        "path": "src/Sirk.Portal/Program.cs",
+        "count": 85
+      },
+      {
+        "path": "src/Sirk.Portal/Administration/PortalAdministrationEndpoints.cs",
+        "count": 84
+      },
+      {
+        "path": "src/Sirk.Portal/Ui/PortalUiCompatibilityEndpoints.cs",
+        "count": 79
+      },
+      {
+        "path": "public/portal/standalone/styles/cleanup.css",
+        "count": 78
+      },
+      {
+        "path": "src/Sirk.Portal/Ui/PortalUiEndpoints.cs",
+        "count": 77
+      },
+      {
+        "path": "src/Sirk.Portal/Settings/PortalSettingsStore.cs",
+        "count": 71
+      },
+      {
+        "path": "public/portal/subfolder-icons.js",
+        "count": 66
+      },
+      {
+        "path": "install-dotnet10.ps1",
+        "count": 65
+      },
+      {
+        "path": "src/Sirk.Portal/Maintenance/PortalMaintenanceEndpoints.cs",
+        "count": 63
+      },
+      {
+        "path": ".github/scripts/validate-node-free-dotnet10.sh",
+        "count": 60
+      },
+      {
+        "path": ".github/scripts/Test-NodeFreeWindowsInstall.ps1",
+        "count": 56
+      },
+      {
+        "path": "src/Sirk.Portal/Modules/PortalModuleEndpoints.cs",
+        "count": 54
+      },
+      {
+        "path": "public/portal/fixes.js",
+        "count": 54
+      },
+      {
+        "path": "src/Sirk.Portal/Agent/AgentEndpoints.cs",
+        "count": 53
+      },
+      {
+        "path": "public/portal/settings.css",
+        "count": 53
+      },
+      {
+        "path": "src/Sirk.Portal/Security/PortalIdentityStore.cs",
+        "count": 52
+      },
+      {
+        "path": "public/portal/standalone/scripts/settings-native-v2.js",
+        "count": 51
+      },
+      {
+        "path": "public/portal/latest-ui.js",
+        "count": 46
+      },
+      {
+        "path": "public/portal/standalone/scripts/app.js",
+        "count": 46
+      },
+      {
+        "path": "changelog.md",
+        "count": 45
+      }
+    ],
+    "agent": [
+      {
+        "path": "src/Sirk.Portal/Agent/AgentEndpoints.cs",
+        "count": 125
+      },
+      {
+        "path": "public/portal/standalone/scripts/device-workspace.js",
+        "count": 116
+      },
+      {
+        "path": "src/Sirk.Portal/Agent/AgentStore.cs",
+        "count": 62
+      },
+      {
+        "path": "src/Sirk.Portal/Agent/LegacyAgentCompatibilityEndpoints.cs",
+        "count": 55
+      },
+      {
+        "path": "src/Sirk.Portal/Agent/AgentCommandStore.cs",
+        "count": 48
+      },
+      {
+        "path": "public/portal/standalone/styles/device-workspace.css",
+        "count": 46
+      },
+      {
+        "path": "AGENTS.md",
+        "count": 41
+      },
+      {
+        "path": "src/Sirk.Portal/Ui/PortalUiCompatibilityEndpoints.cs",
+        "count": 36
+      },
+      {
+        "path": "src/Sirk.Portal/Agent/AgentPolicyStore.cs",
+        "count": 32
+      },
+      {
+        "path": "src/Sirk.Portal/Administration/PortalAdministrationEndpoints.cs",
+        "count": 28
+      },
+      {
+        "path": "public/modules/security/index.js",
+        "count": 27
+      },
+      {
+        "path": "src/Sirk.Portal/Agent/DesktopRelayHub.cs",
+        "count": 24
+      },
+      {
+        "path": "src/Sirk.Portal/Agent/AgentRequestAuthenticator.cs",
+        "count": 20
+      },
+      {
+        "path": "changelog.md",
+        "count": 18
+      },
+      {
+        "path": "src/Sirk.Portal/Agent/AgentInstallScriptEndpoint.cs",
+        "count": 18
+      },
+      {
+        "path": "src/Sirk.Portal/Modules/PortalModuleEndpoints.cs",
+        "count": 13
+      },
+      {
+        "path": "version-history.json",
+        "count": 12
+      },
+      {
+        "path": "src/Sirk.Portal/Program.cs",
+        "count": 11
+      },
+      {
+        "path": "src/Sirk.Portal/Workflows/WorkflowExecutionService.cs",
+        "count": 8
+      },
+      {
+        "path": "public/portal/subfolder-icons.js",
+        "count": 8
+      }
+    ],
+    "updater": [
+      {
+        "path": "tools/installer/Ensure-SirkUpdater.ps1",
+        "count": 26
+      },
+      {
+        "path": "tools/test/Test-SirkPortal-Rc.ps1",
+        "count": 15
+      },
+      {
+        "path": "install.ps1",
+        "count": 12
+      },
+      {
+        "path": ".github/scripts/validate-node-free-dotnet10.sh",
+        "count": 6
+      },
+      {
+        "path": ".github/scripts/Test-NodeFreeWindowsInstall.ps1",
+        "count": 5
+      },
+      {
+        "path": "README.md",
+        "count": 4
+      },
+      {
+        "path": "public/portal/vendor/settings-structure.js",
+        "count": 3
+      },
+      {
+        "path": "src/Sirk.Portal/Settings/PortalSettingsStore.cs",
+        "count": 2
+      },
+      {
+        "path": "src/Sirk.Portal/Agent/AgentPolicyStore.cs",
+        "count": 2
+      },
+      {
+        "path": "public/portal/standalone/scripts/settings-native-v2.js",
+        "count": 2
+      },
+      {
+        "path": "changelog.md",
+        "count": 1
+      },
+      {
+        "path": "version-history.json",
+        "count": 1
+      },
+      {
+        "path": "docs/TESTING.md",
+        "count": 1
+      },
+      {
+        "path": "docs/PROJECT-STATE.md",
+        "count": 1
+      },
+      {
+        "path": "src/Sirk.Portal/Ui/PortalUiCompatibilityEndpoints.cs",
+        "count": 1
+      },
+      {
+        "path": "src/Sirk.Portal/Agent/AgentEndpoints.cs",
+        "count": 1
+      },
+      {
+        "path": "src/Sirk.Portal/Agent/AgentInstallScriptEndpoint.cs",
+        "count": 1
+      },
+      {
+        "path": "src/Sirk.Portal/Modules/PortalModuleEndpoints.cs",
+        "count": 1
+      },
+      {
+        "path": "src/Sirk.Portal/Administration/PortalAdministrationEndpoints.cs",
+        "count": 1
+      }
+    ],
+    "entra": [
+      {
+        "path": "src/Sirk.Portal/Central/CentralConnectionFile.cs",
+        "count": 72
+      },
+      {
+        "path": "src/Sirk.Portal/Central/CentralTunnelService.cs",
+        "count": 52
+      },
+      {
+        "path": "src/Sirk.Portal/Administration/PortalAdministrationEndpoints.cs",
+        "count": 45
+      },
+      {
+        "path": "src/Sirk.Portal/Central/CentralHeartbeatService.cs",
+        "count": 41
+      },
+      {
+        "path": "public/portal/standalone/scripts/navigation.js",
+        "count": 41
+      },
+      {
+        "path": "src/Sirk.Portal/Central/CentralConnectionMaintenanceCommand.cs",
+        "count": 29
+      },
+      {
+        "path": "public/portal/subfolder-icons.js",
+        "count": 26
+      },
+      {
+        "path": "seed/Files/commands/aaSerwer_Testowy/ConnectO365Services.ps1",
+        "count": 21
+      },
+      {
+        "path": "public/portal/standalone/scripts/settings-native-v2.js",
+        "count": 21
+      },
+      {
+        "path": "tools/Configure-SirkCentral.ps1",
+        "count": 19
+      },
+      {
+        "path": "tests/Sirk.Portal.ProtocolTests/Program.cs",
+        "count": 19
+      },
+      {
+        "path": "src/Sirk.Portal/Central/CentralConnectionState.cs",
+        "count": 16
+      },
+      {
+        "path": "changelog.md",
+        "count": 15
+      },
+      {
+        "path": "src/Sirk.Portal/Central/InternalTunnelAuthentication.cs",
+        "count": 15
+      },
+      {
+        "path": "src/Sirk.Portal/Program.cs",
+        "count": 14
+      },
+      {
+        "path": "src/Sirk.Portal/Central/PortalCentralIdentityMapper.cs",
+        "count": 13
+      },
+      {
+        "path": "version-history.json",
+        "count": 10
+      },
+      {
+        "path": ".agents/skills/deploy-mycompany-local/SKILL.md",
+        "count": 8
+      },
+      {
+        "path": ".agents/skills/restart-meshcentral-service/SKILL.md",
+        "count": 7
+      },
+      {
+        "path": ".agents/skills/read-meshcentral-log/SKILL.md",
+        "count": 6
+      }
+    ],
+    "openid": [],
+    "oidc": [],
+    "saml": [],
+    "ldap": [
+      {
+        "path": "seed/Files/management/Examples/settings_check.ps1",
+        "count": 3
+      }
+    ],
+    "active directory": [
+      {
+        "path": "seed/Files/management/Raporty/Active Directory/List AD users.ps1",
+        "count": 3
+      },
+      {
+        "path": "seed/Files/commands/Active Directory/Get-AdUsers-Table.ps1",
+        "count": 2
+      },
+      {
+        "path": "seed/Files/management/Examples/List AD users.ps1",
+        "count": 2
+      },
+      {
+        "path": "public/portal/standalone/scripts/app.js",
+        "count": 1
+      }
+    ],
+    "jira": [
+      {
+        "path": "public/portal/standalone/scripts/app.js",
+        "count": 8
+      },
+      {
+        "path": "public/modules/jira/index.js",
+        "count": 7
+      },
+      {
+        "path": "src/Sirk.Portal/Settings/PortalSettingsStore.cs",
+        "count": 6
+      },
+      {
+        "path": "seed/Files/management/Examples/Local Asset Report.ps1",
+        "count": 4
+      },
+      {
+        "path": "public/shared/runtime.js",
+        "count": 4
+      },
+      {
+        "path": "src/Sirk.Portal/Ui/PortalUiCompatibilityEndpoints.cs",
+        "count": 3
+      },
+      {
+        "path": "public/INDEX.md",
+        "count": 2
+      },
+      {
+        "path": "src/Sirk.Portal/Ui/PortalUiEndpoints.cs",
+        "count": 2
+      },
+      {
+        "path": "public/portal/latest-ui.js",
+        "count": 2
+      },
+      {
+        "path": "public/portal/fixes.js",
+        "count": 2
+      },
+      {
+        "path": "public/portal/vendor/settings-structure.js",
+        "count": 2
+      },
+      {
+        "path": ".github/scripts/validate-node-free-dotnet10.sh",
+        "count": 1
+      },
+      {
+        "path": "src/Sirk.Portal/Modules/PortalModuleEndpoints.cs",
+        "count": 1
+      },
+      {
+        "path": "public/shared/module-shell.js",
+        "count": 1
+      },
+      {
+        "path": "public/portal/ui-fixes.js",
+        "count": 1
+      },
+      {
+        "path": "public/portal/settings.js",
+        "count": 1
+      },
+      {
+        "path": "public/portal/standalone/scripts/cleanup.js",
+        "count": 1
+      },
+      {
+        "path": "public/portal/standalone/scripts/terminal-connect.js",
+        "count": 1
+      }
+    ],
+    "servicedesk": [],
+    "service desk": [],
+    "zabbix": [
+      {
+        "path": "public/portal/standalone/scripts/app.js",
+        "count": 6
+      },
+      {
+        "path": "public/portal/latest-ui.js",
+        "count": 2
+      },
+      {
+        "path": "public/portal/fixes.js",
+        "count": 2
+      },
+      {
+        "path": "public/portal/vendor/settings-structure.js",
+        "count": 2
+      },
+      {
+        "path": "src/Sirk.Portal/Ui/PortalUiCompatibilityEndpoints.cs",
+        "count": 1
+      }
+    ],
+    "wazuh": [],
+    "ticket": [
+      {
+        "path": "public/modules/jira/index.js",
+        "count": 8
+      }
+    ],
+    "smtp": [],
+    "email": [
+      {
+        "path": "seed/Files/management/Defender/Email Explorer.ps1",
+        "count": 6
+      },
+      {
+        "path": "public/modules/security/index.js",
+        "count": 4
+      },
+      {
+        "path": "seed/Files/management/Examples/List AD users.ps1",
+        "count": 2
+      },
+      {
+        "path": "seed/Files/management/Raporty/Active Directory/List AD users.ps1",
+        "count": 2
+      },
+      {
+        "path": "seed/Files/management/Raporty/Active Directory/Users created recently - approval.ps1",
+        "count": 2
+      },
+      {
+        "path": "seed/Files/management/Raporty/Active Directory/Users created recently.ps1",
+        "count": 2
+      },
+      {
+        "path": ".github/workflows/full-product-audit-pr.yml",
+        "count": 1
+      },
+      {
+        "path": "public/portal/standalone/styles/native-login.css",
+        "count": 1
+      }
+    ],
+    "webhook": [],
+    "remote desktop": [
+      {
+        "path": "changelog.md",
+        "count": 2
+      },
+      {
+        "path": "version-history.json",
+        "count": 1
+      }
+    ],
+    "rdp": [
+      {
+        "path": "seed/Files/management/Examples/settings_check.ps1",
+        "count": 6
+      }
+    ],
+    "backup": [
+      {
+        "path": "src/Sirk.Portal/Maintenance/PortalMaintenanceEndpoints.cs",
+        "count": 68
+      },
+      {
+        "path": "public/portal/standalone/scripts/settings-native-v2.js",
+        "count": 26
+      },
+      {
+        "path": ".agents/skills/deploy-mycompany-local/scripts/Publish-MyCompanyLocal.ps1",
+        "count": 20
+      },
+      {
+        "path": "install-dotnet10.ps1",
+        "count": 7
+      },
+      {
+        "path": ".agents/skills/deploy-mycompany-local/SKILL.md",
+        "count": 4
+      },
+      {
+        "path": "changelog.md",
+        "count": 3
+      },
+      {
+        "path": "version-history.json",
+        "count": 3
+      },
+      {
+        "path": "public/portal/folder-collapse.js",
+        "count": 3
+      },
+      {
+        "path": "public/portal/settings.js",
+        "count": 3
+      },
+      {
+        "path": "public/portal/standalone/styles/cleanup.css",
+        "count": 2
+      },
+      {
+        "path": "public/portal/standalone/scripts/navigation.js",
+        "count": 2
+      },
+      {
+        "path": "src/Sirk.Portal/Ui/PortalUiCompatibilityEndpoints.cs",
+        "count": 1
+      },
+      {
+        "path": "src/Sirk.Portal/Security/PortalAuthorization.cs",
+        "count": 1
+      }
+    ],
+    "restore": [
+      {
+        "path": "public/portal/standalone/scripts/branding.js",
+        "count": 12
+      },
+      {
+        "path": "src/Sirk.Portal/Maintenance/PortalMaintenanceEndpoints.cs",
+        "count": 11
+      },
+      {
+        "path": "public/portal/standalone/scripts/device-tabs.js",
+        "count": 8
+      },
+      {
+        "path": "public/portal/standalone/scripts/settings-native-v2.js",
+        "count": 5
+      },
+      {
+        "path": "changelog.md",
+        "count": 4
+      },
+      {
+        "path": "version-history.json",
+        "count": 4
+      },
+      {
+        "path": "public/portal/standalone/scripts/core.js",
+        "count": 4
+      },
+      {
+        "path": "docs/TESTING.md",
+        "count": 2
+      },
+      {
+        "path": ".github/scripts/validate-node-free-dotnet10.sh",
+        "count": 2
+      },
+      {
+        "path": "public/shared/runtime.js",
+        "count": 2
+      },
+      {
+        "path": "public/portal/standalone/scripts/view-mode.js",
+        "count": 2
+      },
+      {
+        "path": "public/portal/standalone/scripts/view-mode-base.js",
+        "count": 2
+      },
+      {
+        "path": "public/portal/folder-collapse.js",
+        "count": 1
+      },
+      {
+        "path": "public/modules/commands/index.js",
+        "count": 1
+      },
+      {
+        "path": "public/shared/ui/script-tools.js",
+        "count": 1
+      }
+    ],
+    "yubikey": [],
+    "webauthn": [],
+    "fido": [],
+    "mfa": [
+      {
+        "path": "seed/Files/commands/aaSerwer_Testowy/ConnectO365Services.ps1",
+        "count": 3
+      },
+      {
+        "path": "changelog.md",
+        "count": 1
+      },
+      {
+        "path": "version-history.json",
+        "count": 1
+      }
+    ]
+  },
+  "workflows": [
+    {
+      "path": ".github/workflows/full-product-audit-pr.yml",
+      "name": "Full Product Audit PR",
+      "has_pull_request": true,
+      "has_push": false,
+      "permissions_write": true
+    },
+    {
+      "path": ".github/workflows/portal-dotnet10-ci.yml",
+      "name": "SIRK Portal .NET 10 CI",
+      "has_pull_request": true,
+      "has_push": true,
+      "permissions_write": false
+    }
+  ],
+  "findings": [
+    {
+      "severity": "high",
+      "category": "secret",
+      "path": "src/Sirk.Portal/Agent/AgentStore.cs",
+      "line": 397,
+      "rule": "hardcoded-secret-like-value",
+      "snippet": "$EnrollmentToken = '{{enrollmentToken.Replace(\"'\", \"''\", StringComparison.Ordinal)}}'"
+    },
+    {
+      "severity": "medium",
+      "category": "transport",
+      "path": "Dockerfile",
+      "line": 13,
+      "rule": "plaintext-http-url",
+      "snippet": "ENV ASPNETCORE_URLS=http://+:8080 \\"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/modules/approvals/index.js",
+      "line": 63,
+      "rule": "dynamic-innerhtml",
+      "snippet": "icon.innerHTML = options.icon || icons.all;"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/modules/approvals/index.js",
+      "line": 94,
+      "rule": "dynamic-innerhtml",
+      "snippet": "host.innerHTML = \"\";"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/modules/approvals/index.js",
+      "line": 119,
+      "rule": "dynamic-innerhtml",
+      "snippet": "host.innerHTML = \"\";"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/modules/approvals/index.js",
+      "line": 140,
+      "rule": "dynamic-innerhtml",
+      "snippet": "host.innerHTML = \"\";"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/modules/approvals/index.js",
+      "line": 185,
+      "rule": "dynamic-innerhtml",
+      "snippet": "host.innerHTML = \"\";"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/modules/approvals/index.js",
+      "line": 227,
+      "rule": "dynamic-innerhtml",
+      "snippet": "host.innerHTML = \"\";"
+    },
+    {
+      "severity": "medium",
+      "category": "browser-storage",
+      "path": "public/modules/commands/index.js",
+      "line": 51,
+      "rule": "local-storage",
+      "snippet": "try { return localStorage.getItem(\"sirkPortal.language\") === \"en\" ? \"en\" : \"pl\"; }"
+    },
+    {
+      "severity": "medium",
+      "category": "transport",
+      "path": "public/modules/commands/index.js",
+      "line": 56,
+      "rule": "plaintext-http-url",
+      "snippet": "function svgData(svg) { return \"data:image/svg+xml;charset=UTF-8,\" + encodeURIComponent(svg.replace('<svg ', '<svg xmlns=\"http://www.w3.org/2000/svg\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\" ')); }"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/modules/commands/index.js",
+      "line": 61,
+      "rule": "dynamic-innerhtml",
+      "snippet": "function note(shell, title, message, error) { var host = shell.state.page.details; host.innerHTML = \"\"; var card = shell.card(title, message); if (error) card.classList.add(\"sirk-error\"); host.appendChild(card); sync(shell); }"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/modules/commands/index.js",
+      "line": 104,
+      "rule": "dynamic-innerhtml",
+      "snippet": "function renderOutput(host, value) { host.innerHTML = \"\"; if (window.SharedResultsView && typeof window.SharedResultsView.mountResult === \"function\") { window.SharedResultsView.mountResult(host, value || msg(\"Brak wyniku.\", \"No output.\")); return; } var pre = document.createElement(\"pre\"); pre.class"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/modules/commands/index.js",
+      "line": 105,
+      "rule": "dynamic-innerhtml",
+      "snippet": "function renderWaiting(host, value) { host.innerHTML = \"\"; var pre = document.createElement(\"pre\"); pre.className = \"sirk-output\"; pre.textContent = value; host.appendChild(pre); }"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/modules/commands/index.js",
+      "line": 132,
+      "rule": "dynamic-innerhtml",
+      "snippet": "var host = shell.state.page.details; host.innerHTML = \"\";"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/modules/jira/index.js",
+      "line": 35,
+      "rule": "dynamic-innerhtml",
+      "snippet": "shell.state.page.secondary.innerHTML = \"\";"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/modules/move-requests/index.js",
+      "line": 15,
+      "rule": "dynamic-innerhtml",
+      "snippet": "shell.state.page.details.innerHTML = \"\";"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/modules/security/index.js",
+      "line": 15,
+      "rule": "dynamic-innerhtml",
+      "snippet": "if (active === \"incidents\") return shell.api(\"incidents\").then(function (result) { shell.state.page.details.innerHTML = \"\"; (result.incidents || []).forEach(function (incident) { shell.state.page.details.appendChild(shell.card(incident.displayName || incident.incidentName || (\"Incident \" + incident."
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/modules/security/index.js",
+      "line": 45,
+      "rule": "dynamic-innerhtml",
+      "snippet": "table.innerHTML = \"<thead><tr><th>Parametr</th><th>Odczyt</th></tr></thead>\";"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/modules/security/index.js",
+      "line": 52,
+      "rule": "dynamic-innerhtml",
+      "snippet": "section.appendChild(element(\"h3\", \"\", \"Urządzenia zgłoszone przez SIRK Agent\")); table.innerHTML = \"<thead><tr><th>Urządzenie</th><th>Tenant / Device ID</th><th>Wersja</th><th>Stan</th><th>Ostatni check-in</th></tr></thead>\";"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/modules/security/index.js",
+      "line": 72,
+      "rule": "dynamic-innerhtml",
+      "snippet": "shell.nav(shell.state.page.primary, [{ key: \"agent\", title: \"SIRK Agent\", icon: \"S\" }], \"agent\", function () {}); shell.state.page.secondary.innerHTML = \"\"; shell.state.page.details.innerHTML = \"\"; shell.state.page.details.appendChild(shell.card(\"SIRK Agent\", \"Ładowanie pełnego katalogu możliwości…\""
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/portal/approvals-hook.js",
+      "line": 33,
+      "rule": "dynamic-innerhtml",
+      "snippet": "target.innerHTML = '<div class=\"sirk-card\"><h3>Akceptacje</h3><p>Renderer Approval Center nie został załadowany.</p></div>';"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/portal/approvals-hook.js",
+      "line": 37,
+      "rule": "dynamic-innerhtml",
+      "snippet": "target.innerHTML = \"\";"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/portal/approvals.js",
+      "line": 141,
+      "rule": "dynamic-innerhtml",
+      "snippet": "refresh.innerHTML = icon(\"refresh\");"
+    },
+    {
+      "severity": "medium",
+      "category": "incomplete",
+      "path": "public/portal/approvals.js",
+      "line": 146,
+      "rule": "incomplete-implementation",
+      "snippet": "search.placeholder = \"Filter requests...\";"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/portal/approvals.js",
+      "line": 158,
+      "rule": "dynamic-innerhtml",
+      "snippet": "iconHost.innerHTML = icon(iconName);"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/portal/approvals.js",
+      "line": 170,
+      "rule": "dynamic-innerhtml",
+      "snippet": "host.innerHTML = \"\";"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/portal/approvals.js",
+      "line": 185,
+      "rule": "dynamic-innerhtml",
+      "snippet": "host.innerHTML = \"\";"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/portal/approvals.js",
+      "line": 192,
+      "rule": "dynamic-innerhtml",
+      "snippet": "iconHost.innerHTML = icon(value || \"all\");"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/portal/approvals.js",
+      "line": 222,
+      "rule": "dynamic-innerhtml",
+      "snippet": "details.innerHTML = \"\";"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/portal/approvals.js",
+      "line": 288,
+      "rule": "dynamic-innerhtml",
+      "snippet": "host.innerHTML = \"\";"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/portal/approvals.js",
+      "line": 314,
+      "rule": "dynamic-innerhtml",
+      "snippet": "host.innerHTML = \"\";"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/portal/fixes.js",
+      "line": 118,
+      "rule": "dynamic-innerhtml",
+      "snippet": "host.innerHTML = '<div class=\"sirk-card\"><h3>Zarządzanie</h3><p>Renderer Management nie został załadowany.</p></div>';"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/portal/fixes.js",
+      "line": 122,
+      "rule": "dynamic-innerhtml",
+      "snippet": "host.innerHTML = \"\";"
+    },
+    {
+      "severity": "medium",
+      "category": "browser-storage",
+      "path": "public/portal/fixes.js",
+      "line": 136,
+      "rule": "local-storage",
+      "snippet": "try { return window.localStorage.getItem(collapsedKey) === \"1\"; }"
+    },
+    {
+      "severity": "medium",
+      "category": "browser-storage",
+      "path": "public/portal/fixes.js",
+      "line": 152,
+      "rule": "local-storage",
+      "snippet": "try { window.localStorage.setItem(collapsedKey, value ? \"1\" : \"0\"); }"
+    },
+    {
+      "severity": "medium",
+      "category": "browser-storage",
+      "path": "public/portal/folder-collapse.js",
+      "line": 274,
+      "rule": "local-storage",
+      "snippet": "try { return localStorage.getItem(\"sirkPortal.language\") === \"en\" ? \"en\" : \"pl\"; }"
+    },
+    {
+      "severity": "medium",
+      "category": "incomplete",
+      "path": "public/portal/folder-collapse.js",
+      "line": 331,
+      "rule": "incomplete-implementation",
+      "snippet": "[\"placeholder\", \"title\", \"aria-label\"].forEach(function (attribute) {"
+    },
+    {
+      "severity": "medium",
+      "category": "incomplete",
+      "path": "public/portal/folder-collapse.js",
+      "line": 369,
+      "rule": "incomplete-implementation",
+      "snippet": "}).observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: [\"title\", \"aria-label\", \"placeholder\"] });"
+    },
+    {
+      "severity": "medium",
+      "category": "browser-storage",
+      "path": "public/portal/management.js",
+      "line": 31,
+      "rule": "local-storage",
+      "snippet": "try { return window.localStorage.getItem(COLLAPSE_STORAGE_KEY) === \"true\"; }"
+    },
+    {
+      "severity": "medium",
+      "category": "browser-storage",
+      "path": "public/portal/management.js",
+      "line": 36,
+      "rule": "local-storage",
+      "snippet": "try { window.localStorage.setItem(COLLAPSE_STORAGE_KEY, state.collapsed ? \"true\" : \"false\"); }"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/portal/management.js",
+      "line": 161,
+      "rule": "dynamic-innerhtml",
+      "snippet": "button.innerHTML = icon;"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/portal/management.js",
+      "line": 166,
+      "rule": "dynamic-innerhtml",
+      "snippet": "host.innerHTML = \"\";"
+    },
+    {
+      "severity": "medium",
+      "category": "incomplete",
+      "path": "public/portal/management.js",
+      "line": 178,
+      "rule": "incomplete-implementation",
+      "snippet": "search.placeholder = t(\"searchPlaceholder\");"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/portal/management.js",
+      "line": 206,
+      "rule": "dynamic-innerhtml",
+      "snippet": "button.innerHTML = '<span class=\"sirk-nav-icon\">' + (item.icon || icons.folder) + '</span><span></span>';"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/portal/management.js",
+      "line": 215,
+      "rule": "dynamic-innerhtml",
+      "snippet": "host.innerHTML = \"\";"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/portal/management.js",
+      "line": 241,
+      "rule": "dynamic-innerhtml",
+      "snippet": "button.innerHTML = icon;"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/portal/management.js",
+      "line": 252,
+      "rule": "dynamic-innerhtml",
+      "snippet": "open.innerHTML = '<span class=\"sirk-nav-icon' + (script.requiresApproval ? ' sirk-script-approval-icon' : '') + '\">' + (script.requiresApproval ? icons.approval : icons.script) + '</span><span class=\"sirk-script-label\"></span>';"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/portal/management.js",
+      "line": 285,
+      "rule": "dynamic-innerhtml",
+      "snippet": "heading.innerHTML = '<span class=\"sirk-nav-icon\">' + icons.folder + '</span><span></span>';"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/portal/management.js",
+      "line": 296,
+      "rule": "dynamic-innerhtml",
+      "snippet": "host.innerHTML = \"\";"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/portal/management.js",
+      "line": 311,
+      "rule": "dynamic-innerhtml",
+      "snippet": "button.innerHTML = '<span class=\"sirk-nav-icon sirk-result-status-icon\">' + item.icon + '</span><span></span>';"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/portal/management.js",
+      "line": 342,
+      "rule": "dynamic-innerhtml",
+      "snippet": "host.innerHTML = \"\";"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/portal/management.js",
+      "line": 352,
+      "rule": "dynamic-innerhtml",
+      "snippet": "host.innerHTML = \"\";"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/portal/management.js",
+      "line": 411,
+      "rule": "dynamic-innerhtml",
+      "snippet": "host.innerHTML = \"\";"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/portal/management.js",
+      "line": 453,
+      "rule": "dynamic-innerhtml",
+      "snippet": "host.innerHTML = \"\";"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/portal/management.js",
+      "line": 473,
+      "rule": "dynamic-innerhtml",
+      "snippet": "host.innerHTML = \"\";"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/portal/management.js",
+      "line": 502,
+      "rule": "dynamic-innerhtml",
+      "snippet": "collapse.innerHTML = state.collapsed ? icons.expand : icons.collapse;"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/portal/management.js",
+      "line": 612,
+      "rule": "dynamic-innerhtml",
+      "snippet": "host.innerHTML = \"\";"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/portal/settings.js",
+      "line": 68,
+      "rule": "dynamic-innerhtml",
+      "snippet": "host.innerHTML = '<div class=\"sirk-restart-screen\" role=\"status\" aria-live=\"polite\"><div class=\"sirk-restart-spinner\" aria-hidden=\"true\"></div><h2>Ładowanie usługi…</h2><p>Portal czeka na powrót usługi.</p></div>';"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/portal/settings.js",
+      "line": 81,
+      "rule": "dynamic-innerhtml",
+      "snippet": "host.innerHTML = '<div class=\"sirk-card\" data-error=\"1\">Nie udało się potwierdzić powrotu usługi. Odśwież stronę, aby spróbować ponownie.</div>';"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/portal/settings.js",
+      "line": 687,
+      "rule": "dynamic-innerhtml",
+      "snippet": "userTable.innerHTML = \"<thead><tr><th>Użytkownik</th><th>Role</th><th>Grupy</th><th>Stan</th><th>Akcje</th></tr></thead>\";"
+    },
+    {
+      "severity": "medium",
+      "category": "incomplete",
+      "path": "public/portal/settings.js",
+      "line": 721,
+      "rule": "incomplete-implementation",
+      "snippet": "password.placeholder = \"Nowe hasło (opcjonalnie, min. 10 znaków)\";"
+    },
+    {
+      "severity": "medium",
+      "category": "incomplete",
+      "path": "public/portal/settings.js",
+      "line": 763,
+      "rule": "incomplete-implementation",
+      "snippet": "var username = el(\"input\"); username.placeholder = \"Nazwa użytkownika\";"
+    },
+    {
+      "severity": "medium",
+      "category": "incomplete",
+      "path": "public/portal/settings.js",
+      "line": 764,
+      "rule": "incomplete-implementation",
+      "snippet": "var displayName = el(\"input\"); displayName.placeholder = \"Nazwa wyświetlana\";"
+    },
+    {
+      "severity": "medium",
+      "category": "incomplete",
+      "path": "public/portal/settings.js",
+      "line": 765,
+      "rule": "incomplete-implementation",
+      "snippet": "var password = el(\"input\"); password.type = \"password\"; password.placeholder = \"Hasło (min. 10 znaków)\";"
+    },
+    {
+      "severity": "medium",
+      "category": "incomplete",
+      "path": "public/portal/settings.js",
+      "line": 811,
+      "rule": "incomplete-implementation",
+      "snippet": "var groupName = el(\"input\"); groupName.placeholder = \"Nazwa nowej grupy\";"
+    },
+    {
+      "severity": "medium",
+      "category": "incomplete",
+      "path": "public/portal/settings.js",
+      "line": 812,
+      "rule": "incomplete-implementation",
+      "snippet": "var groupDescription = el(\"input\"); groupDescription.placeholder = \"Opis\";"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/portal/settings.js",
+      "line": 848,
+      "rule": "dynamic-innerhtml",
+      "snippet": "host.innerHTML = '<section class=\"sirk-view-shell\" data-portal-settings>' +"
+    },
+    {
+      "severity": "medium",
+      "category": "incomplete",
+      "path": "public/portal/settings.js",
+      "line": 852,
+      "rule": "incomplete-implementation",
+      "snippet": "'<input type=\"search\" data-settings-search placeholder=\"Szukaj…\" aria-label=\"Szukaj\"></div></div>' +"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/portal/settings.js",
+      "line": 868,
+      "rule": "dynamic-innerhtml",
+      "snippet": "details.innerHTML = '<div class=\"sirk-card\">Odświeżanie…</div>';"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/portal/settings.js",
+      "line": 873,
+      "rule": "dynamic-innerhtml",
+      "snippet": "details.innerHTML = \"\";"
+    },
+    {
+      "severity": "medium",
+      "category": "browser-storage",
+      "path": "public/portal/standalone/index.html",
+      "line": 28,
+      "rule": "local-storage",
+      "snippet": "if (localStorage.getItem(\"sirkPortal.standaloneCollapsed\") === \"1\") {"
+    },
+    {
+      "severity": "medium",
+      "category": "browser-storage",
+      "path": "public/portal/standalone/index.html",
+      "line": 82,
+      "rule": "local-storage",
+      "snippet": "function text(pl,en){try{return localStorage.getItem(\"sirkPortal.language\")===\"en\"?en:pl;}catch(error){return pl;}}"
+    },
+    {
+      "severity": "medium",
+      "category": "browser-storage",
+      "path": "public/portal/standalone/index.html",
+      "line": 97,
+      "rule": "local-storage",
+      "snippet": "function text(pl,en){try{return localStorage.getItem(\"sirkPortal.language\")===\"en\"?en:pl;}catch(error){return pl;}}"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/portal/standalone/index.html",
+      "line": 104,
+      "rule": "dynamic-innerhtml",
+      "snippet": "function enhance(){var actions=document.querySelector(\"#sirkDeviceTabBody .sirk-device-general-actions\");if(!actions)return;var old=actions.querySelector(\"a\");if(!enabled()){actions.innerHTML=\"\";actions.hidden=true;return;}actions.hidden=false;if(actions.querySelector(\"[data-device-transfer-action]\""
+    },
+    {
+      "severity": "medium",
+      "category": "browser-storage",
+      "path": "public/portal/standalone/scripts/app.js",
+      "line": 101,
+      "rule": "local-storage",
+      "snippet": "try { return window.localStorage.getItem(STORAGE_LANGUAGE) === \"en\" ? \"en\" : \"pl\"; }"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/portal/standalone/scripts/app.js",
+      "line": 179,
+      "rule": "dynamic-innerhtml",
+      "snippet": "content.innerHTML = \"\";"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/portal/standalone/scripts/app.js",
+      "line": 191,
+      "rule": "dynamic-innerhtml",
+      "snippet": "content.innerHTML = \"\";"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/portal/standalone/scripts/app.js",
+      "line": 224,
+      "rule": "dynamic-innerhtml",
+      "snippet": "button.innerHTML = dark ? THEME_ICONS.sun : THEME_ICONS.moon;"
+    },
+    {
+      "severity": "medium",
+      "category": "browser-storage",
+      "path": "public/portal/standalone/scripts/app.js",
+      "line": 280,
+      "rule": "local-storage",
+      "snippet": "try { window.localStorage.setItem(STORAGE_LANGUAGE, next); } catch (error) {}"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/portal/standalone/scripts/app.js",
+      "line": 311,
+      "rule": "dynamic-innerhtml",
+      "snippet": "overlay.innerHTML = '<span></span><p>' + escapeHtml(message || t(\"loading\")) + '</p>';"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/portal/standalone/scripts/app.js",
+      "line": 315,
+      "rule": "dynamic-innerhtml",
+      "snippet": "content.innerHTML = '<div class=\"sirk-standalone-loading\"><span></span><p>' + escapeHtml(message || t(\"loading\")) + '</p></div>';"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/portal/standalone/scripts/app.js",
+      "line": 319,
+      "rule": "dynamic-innerhtml",
+      "snippet": "content.innerHTML = \"\";"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/portal/standalone/scripts/app.js",
+      "line": 396,
+      "rule": "dynamic-innerhtml",
+      "snippet": "page.details.innerHTML = '<div class=\"sirk-standalone-grid\">' + cards.join(\"\") + '</div>';"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/portal/standalone/scripts/app.js",
+      "line": 432,
+      "rule": "dynamic-innerhtml",
+      "snippet": "issues.innerHTML = healthItems.map(function (item) {"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/portal/standalone/scripts/app.js",
+      "line": 551,
+      "rule": "dynamic-innerhtml",
+      "snippet": "page.toolbar.innerHTML = '<button type=\"button\" class=\"sirk-device-back\" data-device-back=\"1\">← ' + escapeHtml(t(\"backToDevices\")) + '</button>';"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/portal/standalone/scripts/app.js",
+      "line": 552,
+      "rule": "dynamic-innerhtml",
+      "snippet": "page.details.innerHTML ="
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/portal/standalone/scripts/app.js",
+      "line": 585,
+      "rule": "dynamic-innerhtml",
+      "snippet": "host.innerHTML = '<div class=\"sirk-device-status\">' + escapeHtml(t(\"noDevices\")) + '</div>';"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/portal/standalone/scripts/app.js",
+      "line": 589,
+      "rule": "dynamic-innerhtml",
+      "snippet": "host.innerHTML = '<div class=\"sirk-device-status\">' + escapeHtml(t(\"noFilteredDevices\")) + '</div>';"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/portal/standalone/scripts/app.js",
+      "line": 600,
+      "rule": "dynamic-innerhtml",
+      "snippet": "host.innerHTML = Object.keys(groups).sort(function (a, b) { return a.localeCompare(b, language()); }).map(function (group) {"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/portal/standalone/scripts/app.js",
+      "line": 612,
+      "rule": "dynamic-innerhtml",
+      "snippet": "page.toolbar.innerHTML = '<div class=\"sirk-device-summary\"><span><strong id=\"sirkDeviceTotal\">0</strong>' + escapeHtml(t(\"total\")) + '</span><span><strong id=\"sirkDeviceOnline\">0</strong>' + escapeHtml(t(\"online\")) + '</span><span><strong id=\"sirkDeviceOffline\">0</strong>' + escapeHtml(t(\"offline\"))"
+    },
+    {
+      "severity": "medium",
+      "category": "incomplete",
+      "path": "public/portal/standalone/scripts/app.js",
+      "line": 612,
+      "rule": "incomplete-implementation",
+      "snippet": "page.toolbar.innerHTML = '<div class=\"sirk-device-summary\"><span><strong id=\"sirkDeviceTotal\">0</strong>' + escapeHtml(t(\"total\")) + '</span><span><strong id=\"sirkDeviceOnline\">0</strong>' + escapeHtml(t(\"online\")) + '</span><span><strong id=\"sirkDeviceOffline\">0</strong>' + escapeHtml(t(\"offline\"))"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/portal/standalone/scripts/app.js",
+      "line": 613,
+      "rule": "dynamic-innerhtml",
+      "snippet": "page.details.innerHTML = '<div id=\"sirkDevicesHost\" class=\"sirk-device-groups\"><div class=\"sirk-device-status\">' + escapeHtml(t(\"waitingDevices\")) + '</div></div>';"
+    },
+    {
+      "severity": "medium",
+      "category": "incomplete",
+      "path": "public/portal/standalone/scripts/app.js",
+      "line": 639,
+      "rule": "incomplete-implementation",
+      "snippet": "function placeholder(view, description) {"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/portal/standalone/scripts/app.js",
+      "line": 641,
+      "rule": "dynamic-innerhtml",
+      "snippet": "page.details.innerHTML = '<div class=\"sirk-content\"><h2>' + escapeHtml(viewName(view)) + '</h2><p class=\"sirk-muted\">' + escapeHtml(description) + '</p></div>';"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/portal/standalone/scripts/app.js",
+      "line": 647,
+      "rule": "dynamic-innerhtml",
+      "snippet": "page.details.innerHTML = '<div class=\"sirk-content\"><h2>' + escapeHtml(viewName(\"automation\")) + '</h2><div class=\"sirk-card\"><h3>Harmonogram serwera</h3><p class=\"sirk-muted\">Automatyzacje zarządzają zadaniami serwera w katalogu harmonogramu <strong>SIRK</strong>. Polecenia urządzeń są dostępne w w"
+    },
+    {
+      "severity": "medium",
+      "category": "incomplete",
+      "path": "public/portal/standalone/scripts/app.js",
+      "line": 669,
+      "rule": "incomplete-implementation",
+      "snippet": "else if (view === \"monitoring\") placeholder(view, t(\"monitoringPlaceholder\"));"
+    },
+    {
+      "severity": "medium",
+      "category": "incomplete",
+      "path": "public/portal/standalone/scripts/app.js",
+      "line": 670,
+      "rule": "incomplete-implementation",
+      "snippet": "else if (view === \"reports\") placeholder(view, t(\"reportsPlaceholder\"));"
+    },
+    {
+      "severity": "medium",
+      "category": "incomplete",
+      "path": "public/portal/standalone/scripts/app.js",
+      "line": 671,
+      "rule": "incomplete-implementation",
+      "snippet": "else placeholder(view, t(\"genericPlaceholder\"));"
+    },
+    {
+      "severity": "medium",
+      "category": "browser-storage",
+      "path": "public/portal/standalone/scripts/app.js",
+      "line": 680,
+      "rule": "local-storage",
+      "snippet": "try { localStorage.setItem(\"sirkPortal.theme\", dark ? \"dark\" : \"light\"); } catch (ignored) {}"
+    },
+    {
+      "severity": "medium",
+      "category": "browser-storage",
+      "path": "public/portal/standalone/scripts/app.js",
+      "line": 720,
+      "rule": "local-storage",
+      "snippet": "try { localStorage.setItem(\"sirkPortal.standaloneCollapsed\", value ? \"1\" : \"0\"); } catch (ignored) {}"
+    },
+    {
+      "severity": "medium",
+      "category": "browser-storage",
+      "path": "public/portal/standalone/scripts/app.js",
+      "line": 750,
+      "rule": "local-storage",
+      "snippet": "if (localStorage.getItem(\"sirkPortal.standaloneCollapsed\") === \"1\") root.classList.add(\"is-collapsed\");"
+    },
+    {
+      "severity": "medium",
+      "category": "browser-storage",
+      "path": "public/portal/standalone/scripts/app.js",
+      "line": 751,
+      "rule": "local-storage",
+      "snippet": "setTheme(localStorage.getItem(\"sirkPortal.theme\") === \"dark\");"
+    },
+    {
+      "severity": "medium",
+      "category": "browser-storage",
+      "path": "public/portal/standalone/scripts/branding.js",
+      "line": 26,
+      "rule": "local-storage",
+      "snippet": "try { return localStorage.getItem(LANGUAGE_STORAGE) === \"en\" ? \"en\" : \"pl\"; }"
+    },
+    {
+      "severity": "medium",
+      "category": "browser-storage",
+      "path": "public/portal/standalone/scripts/branding.js",
+      "line": 31,
+      "rule": "local-storage",
+      "snippet": "try { return localStorage.getItem(THEME_STORAGE) === \"dark\"; }"
+    },
+    {
+      "severity": "medium",
+      "category": "browser-storage",
+      "path": "public/portal/standalone/scripts/branding.js",
+      "line": 50,
+      "rule": "local-storage",
+      "snippet": "var value = JSON.parse(localStorage.getItem(DEVICE_TAB_STORAGE) || \"{}\");"
+    },
+    {
+      "severity": "medium",
+      "category": "browser-storage",
+      "path": "public/portal/standalone/scripts/branding.js",
+      "line": 60,
+      "rule": "local-storage",
+      "snippet": "try { localStorage.setItem(DEVICE_TAB_STORAGE, JSON.stringify(state)); }"
+    },
+    {
+      "severity": "medium",
+      "category": "browser-storage",
+      "path": "public/portal/standalone/scripts/branding.js",
+      "line": 225,
+      "rule": "local-storage",
+      "snippet": "try { if (localStorage.getItem(key) === \"1\") return; }"
+    },
+    {
+      "severity": "medium",
+      "category": "browser-storage",
+      "path": "public/portal/standalone/scripts/branding.js",
+      "line": 258,
+      "rule": "local-storage",
+      "snippet": "try { localStorage.setItem(key, \"1\"); }"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/portal/standalone/scripts/cleanup.js",
+      "line": 354,
+      "rule": "dynamic-innerhtml",
+      "snippet": "details.innerHTML = '<div class=\"sirk-card\">Ładowanie polityk akceptacji…</div>';"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/portal/standalone/scripts/cleanup.js",
+      "line": 357,
+      "rule": "dynamic-innerhtml",
+      "snippet": "details.innerHTML = \"\";"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/portal/standalone/scripts/cleanup.js",
+      "line": 431,
+      "rule": "dynamic-innerhtml",
+      "snippet": "details.innerHTML = '<div class=\"sirk-card\" data-error=\"1\"></div>';"
+    },
+    {
+      "severity": "medium",
+      "category": "browser-storage",
+      "path": "public/portal/standalone/scripts/core.js",
+      "line": 28,
+      "rule": "local-storage",
+      "snippet": "var saved = JSON.parse(localStorage.getItem(\"sirkPortal.deviceTabs\") || \"{}\");"
+    },
+    {
+      "severity": "medium",
+      "category": "browser-storage",
+      "path": "public/portal/standalone/scripts/core.js",
+      "line": 71,
+      "rule": "local-storage",
+      "snippet": "var value = JSON.parse(localStorage.getItem(\"sirkPortal.deviceActiveTabs\") || \"{}\");"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/portal/standalone/scripts/core.js",
+      "line": 277,
+      "rule": "dynamic-innerhtml",
+      "snippet": "host.innerHTML = \"\";"
+    },
+    {
+      "severity": "medium",
+      "category": "browser-storage",
+      "path": "public/portal/standalone/scripts/device-tabs.js",
+      "line": 15,
+      "rule": "local-storage",
+      "snippet": "try { return localStorage.getItem(\"sirkPortal.language\") === \"en\" ? \"en\" : \"pl\"; }"
+    },
+    {
+      "severity": "medium",
+      "category": "browser-storage",
+      "path": "public/portal/standalone/scripts/device-tabs.js",
+      "line": 81,
+      "rule": "local-storage",
+      "snippet": "var value = JSON.parse(localStorage.getItem(STORAGE_KEY) || \"{}\");"
+    },
+    {
+      "severity": "medium",
+      "category": "browser-storage",
+      "path": "public/portal/standalone/scripts/device-tabs.js",
+      "line": 92,
+      "rule": "local-storage",
+      "snippet": "localStorage.setItem(STORAGE_KEY, JSON.stringify({ active: state.active, tabs: tabs }));"
+    },
+    {
+      "severity": "medium",
+      "category": "browser-storage",
+      "path": "public/portal/standalone/scripts/device-workspace.js",
+      "line": 44,
+      "rule": "local-storage",
+      "snippet": "try { return localStorage.getItem(\"sirkPortal.language\") === \"en\" ? \"en\" : \"pl\"; }"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/portal/standalone/scripts/device-workspace.js",
+      "line": 188,
+      "rule": "dynamic-innerhtml",
+      "snippet": "host.innerHTML = '<div class=\"sirk-agent-operation\"><header><strong>Terminal SIRK Agent</strong><small>PowerShell uruchamiany przez usługę na urządzeniu</small></header><textarea data-agent-terminal-command spellcheck=\"false\" placeholder=\"Get-ComputerInfo | Select-Object WindowsProductName, OsVersio"
+    },
+    {
+      "severity": "medium",
+      "category": "incomplete",
+      "path": "public/portal/standalone/scripts/device-workspace.js",
+      "line": 188,
+      "rule": "incomplete-implementation",
+      "snippet": "host.innerHTML = '<div class=\"sirk-agent-operation\"><header><strong>Terminal SIRK Agent</strong><small>PowerShell uruchamiany przez usługę na urządzeniu</small></header><textarea data-agent-terminal-command spellcheck=\"false\" placeholder=\"Get-ComputerInfo | Select-Object WindowsProductName, OsVersio"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/portal/standalone/scripts/device-workspace.js",
+      "line": 207,
+      "rule": "dynamic-innerhtml",
+      "snippet": "host.innerHTML = '<div class=\"sirk-agent-operation\"><header><strong>Pliki SIRK Agent</strong><small>Lista jest ograniczona do 1000 pozycji, transfer do 1 MiB</small></header><div class=\"sirk-agent-path\"><input data-agent-files-path value=\"C:\\\\\\\\\" spellcheck=\"false\"><button type=\"button\" data-agent-f"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/portal/standalone/scripts/device-workspace.js",
+      "line": 220,
+      "rule": "dynamic-innerhtml",
+      "snippet": "list.innerHTML = entries.map(function (entry) {"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/portal/standalone/scripts/device-workspace.js",
+      "line": 284,
+      "rule": "dynamic-innerhtml",
+      "snippet": "host.innerHTML = '<div class=\"sirk-agent-operation sirk-agent-desktop\"><header><strong>Pulpit SIRK Agent Live</strong><small>Natychmiastowa pomoc zdalna w wybranej sesji użytkownika</small></header><div class=\"sirk-agent-desktop-controls\"><label>Sesja<select data-agent-desktop-session disabled></sel"
+    },
+    {
+      "severity": "medium",
+      "category": "incomplete",
+      "path": "public/portal/standalone/scripts/device-workspace.js",
+      "line": 284,
+      "rule": "incomplete-implementation",
+      "snippet": "host.innerHTML = '<div class=\"sirk-agent-operation sirk-agent-desktop\"><header><strong>Pulpit SIRK Agent Live</strong><small>Natychmiastowa pomoc zdalna w wybranej sesji użytkownika</small></header><div class=\"sirk-agent-desktop-controls\"><label>Sesja<select data-agent-desktop-session disabled></sel"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/portal/standalone/scripts/device-workspace.js",
+      "line": 447,
+      "rule": "dynamic-innerhtml",
+      "snippet": "monitor.innerHTML = '<option value=\"-1\">Wszystkie monitory</option>';"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/portal/standalone/scripts/device-workspace.js",
+      "line": 462,
+      "rule": "dynamic-innerhtml",
+      "snippet": "session.innerHTML = \"\";"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/portal/standalone/scripts/device-workspace.js",
+      "line": 1010,
+      "rule": "dynamic-innerhtml",
+      "snippet": "host.innerHTML = '<div class=\"sirk-device-general\"><div class=\"sirk-device-detail-grid\">' +"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/portal/standalone/scripts/device-workspace.js",
+      "line": 1021,
+      "rule": "dynamic-innerhtml",
+      "snippet": "host.innerHTML = '<div class=\"sirk-device-command-error\">' + esc(t(\"noCommands\")) + '</div>';"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/portal/standalone/scripts/device-workspace.js",
+      "line": 1024,
+      "rule": "dynamic-innerhtml",
+      "snippet": "host.innerHTML = '<div class=\"sirk-device-commands-host\"></div>';"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/portal/standalone/scripts/device-workspace.js",
+      "line": 1123,
+      "rule": "dynamic-innerhtml",
+      "snippet": "panel.innerHTML = '<header><strong>' + esc(t(\"quickCommands\")) + '</strong><button type=\"button\" data-quick-command-close=\"1\" title=\"' + esc(t(\"close\")) + '\">×</button></header><input class=\"sirk-quick-command-search\" type=\"search\" placeholder=\"' + esc(t(\"searchCommands\")) + '\" value=\"' + esc(quickC"
+    },
+    {
+      "severity": "medium",
+      "category": "incomplete",
+      "path": "public/portal/standalone/scripts/device-workspace.js",
+      "line": 1123,
+      "rule": "incomplete-implementation",
+      "snippet": "panel.innerHTML = '<header><strong>' + esc(t(\"quickCommands\")) + '</strong><button type=\"button\" data-quick-command-close=\"1\" title=\"' + esc(t(\"close\")) + '\">×</button></header><input class=\"sirk-quick-command-search\" type=\"search\" placeholder=\"' + esc(t(\"searchCommands\")) + '\" value=\"' + esc(quickC"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/portal/standalone/scripts/device-workspace.js",
+      "line": 1132,
+      "rule": "dynamic-innerhtml",
+      "snippet": "runHost.innerHTML = \"\";"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/portal/standalone/scripts/device-workspace.js",
+      "line": 1165,
+      "rule": "dynamic-innerhtml",
+      "snippet": "content.innerHTML = '<div class=\"sirk-device-workspace\"><header class=\"sirk-device-compact-header\"><button type=\"button\" class=\"sirk-device-compact-back\" data-device-back=\"1\" title=\"' + esc(t(\"back\")) + '\">‹</button><span class=\"sirk-device-compact-icon\" aria-hidden=\"true\">' + DEVICE_ICON + '</span>"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/portal/standalone/scripts/navigation.js",
+      "line": 56,
+      "rule": "dynamic-innerhtml",
+      "snippet": "if (host) host.innerHTML = window.SirkIcons.svg(map[view], \"sirk-nav-svg\");"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/portal/standalone/scripts/navigation.js",
+      "line": 59,
+      "rule": "dynamic-innerhtml",
+      "snippet": "if (sidebar) sidebar.innerHTML = window.SirkIcons.svg(\"chevron-left\", \"sirk-control-svg\");"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/portal/standalone/scripts/navigation.js",
+      "line": 61,
+      "rule": "dynamic-innerhtml",
+      "snippet": "if (nativeLink) nativeLink.innerHTML = window.SirkIcons.svg(\"external-link\", \"sirk-nav-svg\");"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/portal/standalone/scripts/navigation.js",
+      "line": 126,
+      "rule": "dynamic-innerhtml",
+      "snippet": "details.innerHTML = '<div data-central-status><div class=\"sirk-card\"><strong>Ładowanie konfiguracji Central…</strong></div></div>' +"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/portal/standalone/scripts/navigation.js",
+      "line": 156,
+      "rule": "dynamic-innerhtml",
+      "snippet": "details.querySelector(\"[data-central-status]\").innerHTML = centralStatusMarkup(result.value);"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/portal/standalone/scripts/navigation.js",
+      "line": 168,
+      "rule": "dynamic-innerhtml",
+      "snippet": "if (host) host.innerHTML = centralStatusMarkup(result.value);"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/portal/standalone/scripts/navigation.js",
+      "line": 171,
+      "rule": "dynamic-innerhtml",
+      "snippet": "if (host) host.innerHTML = '<div class=\"sirk-card\" data-error=\"1\">' + String(error.message || error) + '</div>';"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/portal/standalone/scripts/settings-native-v2.js",
+      "line": 425,
+      "rule": "dynamic-innerhtml",
+      "snippet": "table.innerHTML = \"<thead><tr><th>Użytkownik</th><th>Rola</th><th>Aktywny</th><th>Akcje</th></tr></thead>\";"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/portal/standalone/scripts/settings-native-v2.js",
+      "line": 813,
+      "rule": "dynamic-innerhtml",
+      "snippet": "state.page.details.innerHTML = \"\";"
+    },
+    {
+      "severity": "medium",
+      "category": "browser-storage",
+      "path": "public/portal/standalone/scripts/terminal-connect.js",
+      "line": 24,
+      "rule": "local-storage",
+      "snippet": "try { return localStorage.getItem(\"sirkPortal.language\") === \"en\" ? \"en\" : \"pl\"; }"
+    },
+    {
+      "severity": "medium",
+      "category": "browser-storage",
+      "path": "public/portal/standalone/scripts/view-mode-base.js",
+      "line": 23,
+      "rule": "local-storage",
+      "snippet": "try { return localStorage.getItem(\"sirkPortal.language\") === \"en\" ? \"en\" : \"pl\"; }"
+    },
+    {
+      "severity": "medium",
+      "category": "browser-storage",
+      "path": "public/portal/standalone/scripts/view-mode-base.js",
+      "line": 63,
+      "rule": "local-storage",
+      "snippet": "try { localStorage.setItem(\"sirkPortal.focusMode\", enabled ? \"1\" : \"0\"); }"
+    },
+    {
+      "severity": "medium",
+      "category": "browser-storage",
+      "path": "public/portal/standalone/scripts/view-mode-base.js",
+      "line": 84,
+      "rule": "local-storage",
+      "snippet": "try { setFocusMode(localStorage.getItem(\"sirkPortal.focusMode\") === \"1\"); }"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/portal/standalone/scripts/view-mode-base.js",
+      "line": 101,
+      "rule": "dynamic-innerhtml",
+      "snippet": "toggle.innerHTML = '<svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5\"/></svg>';"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/portal/standalone/scripts/view-mode-base.js",
+      "line": 112,
+      "rule": "dynamic-innerhtml",
+      "snippet": "button.innerHTML = \"<span>\" + icon + \"</span><span>\" + text(pl, en) + \"</span>\";"
+    },
+    {
+      "severity": "medium",
+      "category": "browser-storage",
+      "path": "public/portal/standalone/scripts/view-mode.js",
+      "line": 23,
+      "rule": "local-storage",
+      "snippet": "try { return localStorage.getItem(\"sirkPortal.language\") === \"en\" ? \"en\" : \"pl\"; }"
+    },
+    {
+      "severity": "medium",
+      "category": "browser-storage",
+      "path": "public/portal/standalone/scripts/view-mode.js",
+      "line": 63,
+      "rule": "local-storage",
+      "snippet": "try { localStorage.setItem(\"sirkPortal.focusMode\", enabled ? \"1\" : \"0\"); }"
+    },
+    {
+      "severity": "medium",
+      "category": "browser-storage",
+      "path": "public/portal/standalone/scripts/view-mode.js",
+      "line": 84,
+      "rule": "local-storage",
+      "snippet": "try { setFocusMode(localStorage.getItem(\"sirkPortal.focusMode\") === \"1\"); }"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/portal/standalone/scripts/view-mode.js",
+      "line": 101,
+      "rule": "dynamic-innerhtml",
+      "snippet": "toggle.innerHTML = '<svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5\"/></svg>';"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/portal/standalone/scripts/view-mode.js",
+      "line": 112,
+      "rule": "dynamic-innerhtml",
+      "snippet": "button.innerHTML = \"<span>\" + icon + \"</span><span>\" + text(pl, en) + \"</span>\";"
+    },
+    {
+      "severity": "medium",
+      "category": "incomplete",
+      "path": "public/portal/standalone/styles/base.css",
+      "line": 439,
+      "rule": "incomplete-implementation",
+      "snippet": ".sirk-standalone-placeholder,"
+    },
+    {
+      "severity": "medium",
+      "category": "incomplete",
+      "path": "public/portal/standalone/styles/base.css",
+      "line": 454,
+      "rule": "incomplete-implementation",
+      "snippet": ".sirk-standalone-placeholder h2{"
+    },
+    {
+      "severity": "medium",
+      "category": "incomplete",
+      "path": "public/portal/standalone/styles/base.css",
+      "line": 460,
+      "rule": "incomplete-implementation",
+      "snippet": ".sirk-standalone-placeholder p{"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/portal/subfolder-icons.js",
+      "line": 55,
+      "rule": "dynamic-innerhtml",
+      "snippet": "iconHost.innerHTML = iconFor(label);"
+    },
+    {
+      "severity": "medium",
+      "category": "incomplete",
+      "path": "public/portal/subfolder-icons.js",
+      "line": 85,
+      "rule": "incomplete-implementation",
+      "snippet": "if (/^(title|aria-label|placeholder)$/i.test(String(name)) && this.getAttribute(name) === textValue) return;"
+    },
+    {
+      "severity": "medium",
+      "category": "browser-storage",
+      "path": "public/portal/subfolder-icons.js",
+      "line": 108,
+      "rule": "local-storage",
+      "snippet": "try { return localStorage.getItem(\"sirkPortal.language\") === \"en\" ? \"en\" : \"pl\"; }"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/portal/subfolder-icons.js",
+      "line": 205,
+      "rule": "dynamic-innerhtml",
+      "snippet": "host.innerHTML = \"\";"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/portal/subfolder-icons.js",
+      "line": 383,
+      "rule": "dynamic-innerhtml",
+      "snippet": "host.innerHTML = \"\";"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/portal/subfolder-icons.js",
+      "line": 391,
+      "rule": "dynamic-innerhtml",
+      "snippet": "host.innerHTML = \"\";"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/portal/subfolder-icons.js",
+      "line": 422,
+      "rule": "dynamic-innerhtml",
+      "snippet": "if (secondary) { secondary.innerHTML = \"\"; secondary.hidden = true; }"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/portal/subfolder-icons.js",
+      "line": 423,
+      "rule": "dynamic-innerhtml",
+      "snippet": "details.innerHTML = \"\";"
+    },
+    {
+      "severity": "medium",
+      "category": "browser-storage",
+      "path": "public/portal/ui-fixes.js",
+      "line": 23,
+      "rule": "local-storage",
+      "snippet": "try { window.localStorage.setItem(\"sirkPortal.enabled\", \"1\"); }"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/portal/ui-fixes.js",
+      "line": 44,
+      "rule": "dynamic-innerhtml",
+      "snippet": "host.innerHTML = markup;"
+    },
+    {
+      "severity": "medium",
+      "category": "browser-storage",
+      "path": "public/portal/vendor/portal-ui-contract.js",
+      "line": 35,
+      "rule": "local-storage",
+      "snippet": "try { return localStorage.getItem(THEME_STORAGE) === \"dark\"; }"
+    },
+    {
+      "severity": "medium",
+      "category": "browser-storage",
+      "path": "public/portal/vendor/settings-structure-stable.js",
+      "line": 13,
+      "rule": "local-storage",
+      "snippet": "try { return localStorage.getItem(\"sirkPortal.language\") === \"en\" ? \"en\" : \"pl\"; }"
+    },
+    {
+      "severity": "medium",
+      "category": "browser-storage",
+      "path": "public/portal/vendor/settings-structure.js",
+      "line": 26,
+      "rule": "local-storage",
+      "snippet": "try { return localStorage.getItem(\"sirkPortal.language\") === \"en\" ? \"en\" : \"pl\"; }"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/shared/icon-registry.js",
+      "line": 28,
+      "rule": "dynamic-innerhtml",
+      "snippet": "wrapper.innerHTML = svg(name, className, title);"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/shared/module-shell.js",
+      "line": 14,
+      "rule": "dynamic-innerhtml",
+      "snippet": "host.innerHTML = \"\";"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/shared/module-shell.js",
+      "line": 27,
+      "rule": "dynamic-innerhtml",
+      "snippet": "host.innerHTML = \"\";"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/shared/module-shell.js",
+      "line": 34,
+      "rule": "dynamic-innerhtml",
+      "snippet": "host.innerHTML = \"\";"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/shared/module-shell.js",
+      "line": 159,
+      "rule": "dynamic-innerhtml",
+      "snippet": "host.innerHTML = \"\";"
+    },
+    {
+      "severity": "medium",
+      "category": "browser-storage",
+      "path": "public/shared/runtime.js",
+      "line": 109,
+      "rule": "local-storage",
+      "snippet": "try { return localStorage.getItem(\"sirkPortal.language\") === \"en\" ? \"en\" : \"pl\"; }"
+    },
+    {
+      "severity": "medium",
+      "category": "browser-storage",
+      "path": "public/shared/runtime.js",
+      "line": 114,
+      "rule": "local-storage",
+      "snippet": "try { return JSON.parse(localStorage.getItem(STORAGE) || \"{}\"); }"
+    },
+    {
+      "severity": "medium",
+      "category": "browser-storage",
+      "path": "public/shared/runtime.js",
+      "line": 117,
+      "rule": "local-storage",
+      "snippet": "function savePreferences(value) { try { localStorage.setItem(STORAGE, JSON.stringify(value)); } catch (error) {} }"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/shared/runtime.js",
+      "line": 147,
+      "rule": "dynamic-innerhtml",
+      "snippet": "host.innerHTML = \"\";"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/shared/runtime.js",
+      "line": 177,
+      "rule": "dynamic-innerhtml",
+      "snippet": ".then(function (response) { card.innerHTML = \"\"; card.appendChild(document.createTextNode((language() === \"pl\" ? \"Wysłano: \" : \"Submitted: \") + (response.submitted || 0) + \", \" + (language() === \"pl\" ? \"błędy: \" : \"failed: \") + (response.failed || 0))); })"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/shared/runtime.js",
+      "line": 201,
+      "rule": "dynamic-innerhtml",
+      "snippet": "if (icon && ICONS[command.id]) { icon.innerHTML = ICONS[command.id]; icon.classList.add(\"sirk-nav-icon\"); }"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/shared/ui/catalog.js",
+      "line": 13,
+      "rule": "dynamic-innerhtml",
+      "snippet": "icon.innerHTML = '<svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M4 5h16v14H4z\"/><path d=\"M8 9h8M8 13h8\"/></svg>';"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/shared/ui/catalog.js",
+      "line": 34,
+      "rule": "dynamic-innerhtml",
+      "snippet": "host.innerHTML = \"\";"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/shared/ui/layout.js",
+      "line": 15,
+      "rule": "dynamic-innerhtml",
+      "snippet": "root.innerHTML = \"\";"
+    },
+    {
+      "severity": "medium",
+      "category": "browser-storage",
+      "path": "public/shared/ui/layout.js",
+      "line": 23,
+      "rule": "local-storage",
+      "snippet": "try { collapsed = key && window.localStorage.getItem(key) === \"collapsed\"; } catch (error) {}"
+    },
+    {
+      "severity": "medium",
+      "category": "browser-storage",
+      "path": "public/shared/ui/layout.js",
+      "line": 29,
+      "rule": "local-storage",
+      "snippet": "try { if (key) window.localStorage.setItem(key, collapsed ? \"collapsed\" : \"expanded\"); } catch (error) {}"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/shared/ui/layout.js",
+      "line": 46,
+      "rule": "dynamic-innerhtml",
+      "snippet": "clear: function () { primary.innerHTML = \"\"; secondary.innerHTML = \"\"; details.innerHTML = \"\"; }"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/shared/ui/page.js",
+      "line": 14,
+      "rule": "dynamic-innerhtml",
+      "snippet": "host.innerHTML = \"\";"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/shared/ui/result-layout.js",
+      "line": 31,
+      "rule": "dynamic-innerhtml",
+      "snippet": "detailsHost.innerHTML = \"\";"
+    },
+    {
+      "severity": "medium",
+      "category": "incomplete",
+      "path": "public/shared/ui/results.js",
+      "line": 153,
+      "rule": "incomplete-implementation",
+      "snippet": "var filter = document.createElement(\"input\"); filter.type = \"search\"; filter.className = \"sirk-results-filter\"; filter.placeholder = \"Filter result rows\"; host.appendChild(filter);"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/shared/ui/results.js",
+      "line": 156,
+      "rule": "dynamic-innerhtml",
+      "snippet": "wrapper.innerHTML = \"\";"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/shared/ui/results.js",
+      "line": 240,
+      "rule": "dynamic-innerhtml",
+      "snippet": "host.innerHTML = \"\";"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/shared/ui/results.js",
+      "line": 251,
+      "rule": "dynamic-innerhtml",
+      "snippet": "host.innerHTML = \"\";"
+    },
+    {
+      "severity": "medium",
+      "category": "incomplete",
+      "path": "public/shared/ui/results.js",
+      "line": 253,
+      "rule": "incomplete-implementation",
+      "snippet": "var filter = document.createElement(\"input\"); filter.type = \"search\"; filter.className = \"sirk-results-filter\"; filter.placeholder = options.filterPlaceholder || \"Filter results\"; filter.value = options.filterValue || \"\";"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/shared/ui/results.js",
+      "line": 257,
+      "rule": "dynamic-innerhtml",
+      "snippet": "tableHost.innerHTML = \"\";"
+    },
+    {
+      "severity": "medium",
+      "category": "incomplete",
+      "path": "public/shared/ui/script-definition-form.js",
+      "line": 98,
+      "rule": "incomplete-implementation",
+      "snippet": "name.placeholder = \"ApiToken\";"
+    },
+    {
+      "severity": "medium",
+      "category": "incomplete",
+      "path": "public/shared/ui/script-definition-form.js",
+      "line": 102,
+      "rule": "incomplete-implementation",
+      "snippet": "pl.placeholder = \"Polska nazwa | Polski opis\";"
+    },
+    {
+      "severity": "medium",
+      "category": "incomplete",
+      "path": "public/shared/ui/script-definition-form.js",
+      "line": 106,
+      "rule": "incomplete-implementation",
+      "snippet": "en.placeholder = \"English name | English description\";"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/shared/ui/script-definition-form.js",
+      "line": 232,
+      "rule": "dynamic-innerhtml",
+      "snippet": "host.innerHTML = \"\";"
+    },
+    {
+      "severity": "medium",
+      "category": "browser-storage",
+      "path": "public/shared/ui/script-tools.js",
+      "line": 152,
+      "rule": "local-storage",
+      "snippet": "var stored = JSON.parse(window.localStorage.getItem(storageKey) || \"{}\");"
+    },
+    {
+      "severity": "medium",
+      "category": "browser-storage",
+      "path": "public/shared/ui/script-tools.js",
+      "line": 163,
+      "rule": "local-storage",
+      "snippet": "window.localStorage.setItem(storageKey, JSON.stringify(current));"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/shared/ui/script-tools.js",
+      "line": 204,
+      "rule": "dynamic-innerhtml",
+      "snippet": "host.innerHTML = \"\";"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/shared/ui/script-tools.js",
+      "line": 255,
+      "rule": "dynamic-innerhtml",
+      "snippet": "host.innerHTML = \"\";"
+    },
+    {
+      "severity": "medium",
+      "category": "incomplete",
+      "path": "public/shared/ui/script-tools.js",
+      "line": 262,
+      "rule": "incomplete-implementation",
+      "snippet": "input.placeholder = variable.configured ? \"Configured — leave empty to keep\" : \"Enter secret\";"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/shared/ui/script-tools.js",
+      "line": 284,
+      "rule": "dynamic-innerhtml",
+      "snippet": "host.innerHTML = \"\";"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/shared/ui/status-nav.js",
+      "line": 20,
+      "rule": "dynamic-innerhtml",
+      "snippet": "host.innerHTML = \"\";"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/shared/ui/status-nav.js",
+      "line": 28,
+      "rule": "dynamic-innerhtml",
+      "snippet": "icon.innerHTML = item.icon;"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/shared/ui/tabs.js",
+      "line": 8,
+      "rule": "dynamic-innerhtml",
+      "snippet": "root.innerHTML = \"\";"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/shared/ui/toolbar-api.js",
+      "line": 15,
+      "rule": "dynamic-innerhtml",
+      "snippet": "setIcon: function (key, value) { var item = context.buttons[key], icon = item && item.querySelector(\".sirk-toolbar-icon\"), text = String(value || \"\"); if (!icon) return; if (text.indexOf(\"<svg\") === 0) icon.innerHTML = text; else icon.textContent = text; },"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/shared/ui/toolbar.js",
+      "line": 12,
+      "rule": "dynamic-innerhtml",
+      "snippet": "value.innerHTML = '<span class=\"sirk-toolbar-icon\"></span>';"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/shared/ui/toolbar.js",
+      "line": 14,
+      "rule": "dynamic-innerhtml",
+      "snippet": "if (String(icon).indexOf(\"<svg\") === 0) value.firstChild.innerHTML = icon;"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/shared/ui/toolbar.js",
+      "line": 24,
+      "rule": "dynamic-innerhtml",
+      "snippet": "root.innerHTML = \"\";"
+    },
+    {
+      "severity": "medium",
+      "category": "incomplete",
+      "path": "public/shared/ui/toolbar.js",
+      "line": 31,
+      "rule": "incomplete-implementation",
+      "snippet": "var searchInput = document.createElement(\"input\"); searchInput.type = \"search\"; searchInput.className = \"sirk-filter\"; searchInput.placeholder = options.searchPlaceholder || \"Search\"; searchWrap.appendChild(searchInput);"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/shared/ui/tree.js",
+      "line": 201,
+      "rule": "dynamic-innerhtml",
+      "snippet": "rootsHost.innerHTML = \"\";"
+    },
+    {
+      "severity": "medium",
+      "category": "javascript",
+      "path": "public/shared/ui/tree.js",
+      "line": 202,
+      "rule": "dynamic-innerhtml",
+      "snippet": "treeHost.innerHTML = \"\";"
+    },
+    {
+      "severity": "info",
+      "category": "browser-storage",
+      "path": "public/portal/latest-ui.js",
+      "line": 12,
+      "rule": "local-storage",
+      "snippet": "try { return localStorage.getItem(\"sirkPortal.language\") === \"en\" ? \"en\" : \"pl\"; }"
+    }
+  ]
+}
