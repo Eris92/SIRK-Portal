@@ -36,6 +36,16 @@ internal static class DeviceConnectionWorkspaceContract
                 commandsCss.Contains("z-index:45", StringComparison.Ordinal),
             "The pinned Quick Commands dock must remain above the connected desktop.");
 
+        Require(viewMode.Contains(".sirk-connection-sidebar-toggle", StringComparison.Ordinal) &&
+                viewMode.Contains("sirk-device-connection-sidebar-open .sirk-standalone-sidebar", StringComparison.Ordinal) &&
+                viewMode.Contains("left:248px", StringComparison.Ordinal),
+            "Connection view must expose a compact pinned left-side button that opens the sidebar as an overlay.");
+        Require(viewMode.Contains("function mountConnectionSidebarToggle()", StringComparison.Ordinal) &&
+                viewMode.Contains("setConnectionSidebarOpen(", StringComparison.Ordinal) &&
+                viewMode.Contains("aria-expanded", StringComparison.Ordinal) &&
+                viewMode.Contains("Pokaż lewe menu", StringComparison.Ordinal),
+            "The connection sidebar button must toggle, describe and close the left menu without leaving the desktop.");
+
         foreach (var removed in new[]
                  {
                      "sirk-agent-desktop-controls", "sirk-agent-desktop-stats",
