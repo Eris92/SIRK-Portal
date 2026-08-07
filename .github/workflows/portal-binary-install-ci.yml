@@ -5,6 +5,8 @@ on:
   push:
     branches: [main]
     paths:
+      - 'install.ps1'
+      - 'install-core.ps1'
       - 'install-binary.ps1'
       - '.github/workflows/portal-binary-install-ci.yml'
       - 'tools/installer/Ensure-SirkUpdater.ps1'
@@ -27,29 +29,32 @@ jobs:
       - name: Validate Windows PowerShell 5.1 syntax
         shell: powershell
         run: |
-          $tokens = $null
-          $errors = $null
-          [void][System.Management.Automation.Language.Parser]::ParseFile(
-            (Resolve-Path .\install-binary.ps1),
-            [ref]$tokens,
-            [ref]$errors)
-          if ($errors.Count -gt 0) {
-            $errors | ForEach-Object { Write-Error $_.Message }
-            throw 'install-binary.ps1 contains PowerShell syntax errors.'
+          foreach ($path in @('.\install.ps1','.\install-core.ps1','.\install-binary.ps1')) {
+            $tokens = $null
+            $errors = $null
+            [void][System.Management.Automation.Language.Parser]::ParseFile(
+              (Resolve-Path $path),
+              [ref]$tokens,
+              [ref]$errors)
+            if ($errors.Count -gt 0) {
+              $errors | ForEach-Object { Write-Error $_.Message }
+              throw "$path contains PowerShell syntax errors."
+            }
           }
 
       - name: Run binary installer contract
         shell: powershell
         run: .\tests\binary-install-contract.ps1
 
-      - name: Clean install from verified release
+      - name: Clean install through canonical router
         shell: powershell
         env:
           SIRK_INSTALL_BREAKGLASS_PASSWORD: 'CI-Portal-BreakGlass-2026!'
           SIRK_INSTALL_TRUST_CERTIFICATE: 'true'
         run: |
           $ErrorActionPreference = 'Stop'
-          .\install-binary.ps1 `
+          .\install.ps1 `
+            -Branch main `
             -PortalFqdn 'portal-ci.sir-k.local' `
             -HttpsPort 443 `
             -BootstrapUserName 'admin' `
@@ -85,4 +90,4 @@ jobs:
             throw 'Binary clean installation must not download a build SDK.'
           }
 
-          Write-Host ('Binary clean install verified. Commit=' + $manifest.commit) -ForegroundColor Green
+          Write-Host ('Canonical binary clean install verified. Commit=' + $manifest.commit) -ForegroundColor Green
