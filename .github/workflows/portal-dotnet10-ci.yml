@@ -201,33 +201,52 @@ jobs:
             createdAtUtc = [DateTimeOffset]::UtcNow.ToString('O')
           } | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $metadata -Encoding UTF8
 
-      - name: Replace moving main release
+      - name: Publish moving main release without availability gap
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           $ErrorActionPreference = 'Stop'
           $PSNativeCommandUseErrorActionPreference = $false
+          $tag = 'portal-main-latest'
 
-          gh release view portal-main-latest *> $null
+          gh release view $tag *> $null
           if ($LASTEXITCODE -eq 0) {
-            gh release delete portal-main-latest --yes --cleanup-tag
-            if ($LASTEXITCODE -ne 0) {
-              throw "Unable to remove previous binary release. ExitCode=$LASTEXITCODE"
-            }
-          }
-          elseif ($LASTEXITCODE -ne 1) {
-            throw "Unable to query previous binary release. ExitCode=$LASTEXITCODE"
-          }
+            # Keep the release and tag available while assets are replaced.
+            # Upload the package first and metadata last: readers holding old
+            # metadata either get a verified old pair or retry a transient
+            # mismatch; they never see a missing release.
+            gh release upload $tag artifacts/sirk-portal-win-x64.zip --clobber
+            if ($LASTEXITCODE -ne 0) { throw "Unable to replace binary package. ExitCode=$LASTEXITCODE" }
+            gh release upload $tag artifacts/portal-update.json --clobber
+            if ($LASTEXITCODE -ne 0) { throw "Unable to replace binary metadata. ExitCode=$LASTEXITCODE" }
 
-          gh release create portal-main-latest `
-            artifacts/sirk-portal-win-x64.zip `
-            artifacts/portal-update.json `
-            --target '${{ github.sha }}' `
-            --title 'SIRK Portal main binary update' `
-            --notes 'Automatically built, SHA-256 verified framework-dependent win-x64 update package.' `
-            --prerelease
-          if ($LASTEXITCODE -ne 0) { throw "Unable to publish binary release. ExitCode=$LASTEXITCODE" }
+            gh api `
+              --method PATCH `
+              "repos/${{ github.repository }}/git/refs/tags/$tag" `
+              -f sha='${{ github.sha }}' `
+              -F force=true *> $null
+            if ($LASTEXITCODE -ne 0) { throw "Unable to move binary release tag. ExitCode=$LASTEXITCODE" }
+
+            gh release edit $tag `
+              --title 'SIRK Portal main binary update' `
+              --notes 'Automatically built, SHA-256 verified framework-dependent win-x64 update package.' `
+              --prerelease
+            if ($LASTEXITCODE -ne 0) { throw "Unable to update binary release metadata. ExitCode=$LASTEXITCODE" }
+          }
+          elseif ($LASTEXITCODE -eq 1) {
+            gh release create $tag `
+              artifacts/sirk-portal-win-x64.zip `
+              artifacts/portal-update.json `
+              --target '${{ github.sha }}' `
+              --title 'SIRK Portal main binary update' `
+              --notes 'Automatically built, SHA-256 verified framework-dependent win-x64 update package.' `
+              --prerelease
+            if ($LASTEXITCODE -ne 0) { throw "Unable to publish binary release. ExitCode=$LASTEXITCODE" }
+          }
+          else {
+            throw "Unable to query binary release. ExitCode=$LASTEXITCODE"
+          }
 
       - uses: actions/upload-artifact@v4
         with:
