@@ -18,24 +18,34 @@ internal static class PortalUpdateProbe
     private const string MetadataUrl =
         "https://github.com/Eris92/SIRK-Portal/releases/download/portal-main-latest/portal-update.json";
 
+    private static readonly object Sync = new();
+    private static readonly TimeSpan CacheLifetime = TimeSpan.FromMinutes(1);
     private static readonly HttpClient Client = new()
     {
         Timeout = TimeSpan.FromSeconds(10)
     };
+    private static PortalUpdateProbeResult? _cached;
 
-    public static PortalUpdateProbeResult InitialState()
+    public static PortalUpdateProbeResult Probe(bool force = false)
     {
-        var installedCommit = ReadInstalledCommit();
-        return new PortalUpdateProbeResult(
-            "main/latest",
-            installedCommit,
-            null,
-            false,
-            null,
-            DateTimeOffset.MinValue);
+        if (!force)
+        {
+            lock (Sync)
+            {
+                if (_cached is not null &&
+                    DateTimeOffset.UtcNow - _cached.CheckedAtUtc < CacheLifetime)
+                {
+                    return _cached;
+                }
+            }
+        }
+
+        var result = ProbeCore();
+        lock (Sync) _cached = result;
+        return result;
     }
 
-    public static PortalUpdateProbeResult Probe()
+    private static PortalUpdateProbeResult ProbeCore()
     {
         var installedCommit = ReadInstalledCommit();
         if (!OperatingSystem.IsWindows())
