@@ -1,0 +1,147 @@
+using System.Text.Json;
+
+namespace Sirk.Portal.Maintenance;
+
+internal sealed record PortalUpdateProbeResult(
+    string AvailableVersion,
+    string? InstalledCommit,
+    string? RemoteCommit,
+    bool UpdateAvailable,
+    string? Error,
+    DateTimeOffset CheckedAtUtc);
+
+internal static class PortalUpdateProbe
+{
+    private const string ApplicationId = "sirk-portal";
+    private const string Channel = "main";
+    private const string PackageName = "sirk-portal-win-x64.zip";
+    private const string MetadataUrl =
+        "https://github.com/Eris92/SIRK-Portal/releases/download/portal-main-latest/portal-update.json";
+
+    private static readonly HttpClient Client = new()
+    {
+        Timeout = TimeSpan.FromSeconds(10)
+    };
+
+    public static PortalUpdateProbeResult InitialState()
+    {
+        var installedCommit = ReadInstalledCommit();
+        return new PortalUpdateProbeResult(
+            "main/latest",
+            installedCommit,
+            null,
+            false,
+            null,
+            DateTimeOffset.MinValue);
+    }
+
+    public static PortalUpdateProbeResult Probe()
+    {
+        var installedCommit = ReadInstalledCommit();
+        if (!OperatingSystem.IsWindows())
+        {
+            return new PortalUpdateProbeResult(
+                "main/latest",
+                installedCommit,
+                null,
+                false,
+                null,
+                DateTimeOffset.UtcNow);
+        }
+
+        try
+        {
+            var metadataUrl = MetadataUrl + "?nocache=" + Guid.NewGuid().ToString("N");
+            var json = Client.GetStringAsync(metadataUrl).GetAwaiter().GetResult();
+            using var document = JsonDocument.Parse(json);
+            var root = document.RootElement;
+
+            var applicationId = RequiredString(root, "applicationId");
+            var channel = RequiredString(root, "channel");
+            var package = RequiredString(root, "package");
+            var remoteCommit = RequiredCommit(root, "commit");
+            var sha256 = RequiredString(root, "sha256");
+
+            if (!string.Equals(applicationId, ApplicationId, StringComparison.Ordinal) ||
+                !string.Equals(channel, Channel, StringComparison.Ordinal) ||
+                !string.Equals(package, PackageName, StringComparison.Ordinal) ||
+                sha256.Length != 64 || !sha256.All(Uri.IsHexDigit))
+            {
+                throw new InvalidDataException("Portal release metadata is invalid.");
+            }
+
+            var updateAvailable = installedCommit is null ||
+                                  !string.Equals(
+                                      installedCommit,
+                                      remoteCommit,
+                                      StringComparison.OrdinalIgnoreCase);
+
+            return new PortalUpdateProbeResult(
+                "main/latest",
+                installedCommit,
+                remoteCommit,
+                updateAvailable,
+                null,
+                DateTimeOffset.UtcNow);
+        }
+        catch (Exception exception) when (
+            exception is HttpRequestException or TaskCanceledException or
+            JsonException or InvalidDataException or IOException)
+        {
+            return new PortalUpdateProbeResult(
+                "main/latest",
+                installedCommit,
+                null,
+                false,
+                exception.Message,
+                DateTimeOffset.UtcNow);
+        }
+    }
+
+    internal static string? ReadInstalledCommit()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "release-manifest.json");
+        if (!File.Exists(path)) return null;
+
+        try
+        {
+            using var document = JsonDocument.Parse(File.ReadAllText(path));
+            var root = document.RootElement;
+            var applicationId = RequiredString(root, "applicationId");
+            var channel = RequiredString(root, "channel");
+            var commit = RequiredCommit(root, "commit");
+            if (!string.Equals(applicationId, ApplicationId, StringComparison.Ordinal) ||
+                !string.Equals(channel, Channel, StringComparison.Ordinal))
+            {
+                return null;
+            }
+            return commit;
+        }
+        catch (Exception exception) when (
+            exception is JsonException or InvalidDataException or IOException or UnauthorizedAccessException)
+        {
+            return null;
+        }
+    }
+
+    private static string RequiredString(JsonElement root, string property)
+    {
+        if (!root.TryGetProperty(property, out var element) ||
+            element.ValueKind != JsonValueKind.String)
+        {
+            throw new InvalidDataException("Portal release metadata is missing " + property + ".");
+        }
+        var value = (element.GetString() ?? string.Empty).Trim();
+        if (value.Length == 0)
+            throw new InvalidDataException("Portal release metadata contains an empty " + property + ".");
+        return value;
+    }
+
+    private static string RequiredCommit(JsonElement root, string property)
+    {
+        var value = RequiredString(root, property);
+        if (value.Length != 40 || !value.All(Uri.IsHexDigit))
+            throw new InvalidDataException("Portal release metadata contains an invalid commit SHA.");
+        return value.ToLowerInvariant();
+    }
+}
