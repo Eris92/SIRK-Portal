@@ -66,6 +66,7 @@ internal static class PortalAssetBundler
                 "portal/system-updates.js",
                 "portal/standalone/scripts/maintenance-update-restart-guard.js",
                 "portal/standalone/scripts/settings-native-v2.js",
+                "portal/standalone/scripts/update-availability-ui.js",
                 "shared/icon-registry.js",
                 "portal/standalone/scripts/navigation.js"
             ])
