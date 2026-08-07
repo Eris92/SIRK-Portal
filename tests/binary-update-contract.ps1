@@ -1,8 +1,21 @@
 #requires -Version 7.4
 $ErrorActionPreference = 'Stop'
 
-$bootstrap = Get-Content 'install.ps1' -Raw -Encoding UTF8
+$router = Get-Content 'install.ps1' -Raw -Encoding UTF8
+$core = Get-Content 'install-core.ps1' -Raw -Encoding UTF8
 $workflow = Get-Content '.github/workflows/portal-dotnet10-ci.yml' -Raw -Encoding UTF8
+
+foreach ($required in @(
+    'install-binary.ps1',
+    'install-core.ps1',
+    '$useBinaryInstaller',
+    '$cleanInstall',
+    'ForceSourceBuild'
+)) {
+    if (-not $router.Contains($required, [StringComparison]::Ordinal)) {
+        throw "Portal install router is missing contract: $required"
+    }
+}
 
 foreach ($required in @(
     'Invoke-SirkPortalBinaryUpdate',
@@ -16,17 +29,17 @@ foreach ($required in @(
     'SIRK_PORTAL_BINARY_UPDATE_OK',
     'ForceSourceBuild'
 )) {
-    if (-not $bootstrap.Contains($required, [StringComparison]::Ordinal)) {
-        throw "Portal bootstrap is missing binary updater contract: $required"
+    if (-not $core.Contains($required, [StringComparison]::Ordinal)) {
+        throw "Portal core installer is missing binary updater contract: $required"
     }
 }
 
-$binaryStart = $bootstrap.IndexOf('function Invoke-SirkPortalBinaryUpdate', [StringComparison]::Ordinal)
-$binaryEnd = $bootstrap.IndexOf('$defaultFqdn =', $binaryStart, [StringComparison]::Ordinal)
+$binaryStart = $core.IndexOf('function Invoke-SirkPortalBinaryUpdate', [StringComparison]::Ordinal)
+$binaryEnd = $core.IndexOf('$defaultFqdn =', $binaryStart, [StringComparison]::Ordinal)
 if ($binaryStart -lt 0 -or $binaryEnd -le $binaryStart) {
     throw 'Unable to locate Portal binary update function boundaries.'
 }
-$binarySection = $bootstrap.Substring($binaryStart, $binaryEnd - $binaryStart)
+$binarySection = $core.Substring($binaryStart, $binaryEnd - $binaryStart)
 
 foreach ($forbidden in @(
     '& $dotnetExe publish',
