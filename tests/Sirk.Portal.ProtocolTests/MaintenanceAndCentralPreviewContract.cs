@@ -14,6 +14,18 @@ internal static class MaintenanceAndCentralPreviewContract
             "Sirk.Portal",
             "Maintenance",
             "PortalMaintenanceEndpoints.cs"));
+        var updateClient = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "Sirk.Portal",
+            "Maintenance",
+            "PortalUpdateProbe.cs"));
+        var verifier = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "Sirk.Portal",
+            "Maintenance",
+            "PortalUpdatePackageVerifier.cs"));
         var settings = File.ReadAllText(Path.Combine(
             root,
             "public",
@@ -39,24 +51,38 @@ internal static class MaintenanceAndCentralPreviewContract
             maintenance.Contains("public object ScheduleUpdate()", StringComparison.Ordinal) &&
             maintenance.Contains("SupportsServiceMaintenance", StringComparison.Ordinal) &&
             maintenance.Contains("OperatingSystem.IsWindows() || OperatingSystem.IsLinux()", StringComparison.Ordinal) &&
-            maintenance.Contains("RunLinuxMaintenanceHelper(\"update-helper\")", StringComparison.Ordinal) &&
-            maintenance.Contains("RunLinuxMaintenanceHelper(\"restart-helper\")", StringComparison.Ordinal),
-            "Portal maintenance must expose GUI update and restart on Windows and Linux systemd.");
+            maintenance.Contains("_updates.PrepareUpdate()", StringComparison.Ordinal) &&
+            maintenance.Contains("RunLinuxMaintenanceHelper(\n                    \"update-helper\",", StringComparison.Ordinal) &&
+            maintenance.Contains("SirkUpdater.exe", StringComparison.Ordinal) &&
+            maintenance.Contains("RunLinuxMaintenanceHelper(\"restart-helper\", [])", StringComparison.Ordinal),
+            "Portal maintenance must use one Central-prepared package and the shared SIRK Updater on Windows/Linux.");
 
         Require(
-            maintenance.Contains("-TrustCertificate -NonInteractive -KeepBuildSdk", StringComparison.Ordinal) &&
-            !maintenance.Contains("-RemoveData *>> $logPath", StringComparison.Ordinal) &&
+            !maintenance.Contains("raw.githubusercontent.com", StringComparison.OrdinalIgnoreCase) &&
+            !maintenance.Contains("github.com/Eris92", StringComparison.OrdinalIgnoreCase) &&
+            !updateClient.Contains("raw.githubusercontent.com", StringComparison.OrdinalIgnoreCase) &&
+            !updateClient.Contains("github.com/Eris92", StringComparison.OrdinalIgnoreCase) &&
+            updateClient.Contains("/api/portal/v1/update/products/sirk-portal/latest", StringComparison.Ordinal) &&
+            updateClient.Contains("PortalRequestSigner.Create", StringComparison.Ordinal) &&
+            updateClient.Contains("VerifyDescriptorSignature", StringComparison.Ordinal) &&
+            verifier.Contains("--verify-update-payload", StringComparison.Ordinal) &&
+            verifier.Contains("ES256", StringComparison.Ordinal),
+            "Installed Portal runtime updates must be Central-only and locally verify signed release metadata/payloads.");
+
+        Require(
             maintenance.Contains("maintenance-update.lock", StringComparison.Ordinal) &&
-            maintenance.Contains("gui-update-", StringComparison.Ordinal),
-            "Windows GUI updates must preserve Portal data, trust the certificate, retain the isolated SDK cache and serialize execution.");
+            !maintenance.Contains("Invoke-WebRequest", StringComparison.Ordinal) &&
+            !maintenance.Contains("install.ps1", StringComparison.OrdinalIgnoreCase),
+            "Portal GUI update must serialize execution without downloading installers at runtime.");
 
         Require(
             linuxInstaller.Contains("systemd-run", StringComparison.Ordinal) &&
-            linuxInstaller.Contains("update-runner", StringComparison.Ordinal) &&
-            linuxInstaller.Contains("--update-only --non-interactive", StringComparison.Ordinal) &&
-            linuxInstaller.Contains("SIRK_PORTAL_LINUX_UPDATE_OK", StringComparison.Ordinal) &&
-            linuxInstaller.Contains("Type=simple", StringComparison.Ordinal),
-            "Linux maintenance must detach update/restart work from the Portal cgroup and retain transactional updates.");
+            linuxInstaller.Contains("update-helper", StringComparison.Ordinal) &&
+            linuxInstaller.Contains("sirk-central-cache", StringComparison.Ordinal) &&
+            linuxInstaller.Contains("\"signatureRequired\": true", StringComparison.Ordinal) &&
+            linuxInstaller.Contains("--verify-update-payload", StringComparison.Ordinal) &&
+            !linuxInstaller.Contains("--update-only", StringComparison.Ordinal),
+            "Linux installed update path must detach privileged work, require signed payloads and consume only Central-cached packages.");
 
         Require(
             settings.Contains("maintenance(\"update\", {}, true)", StringComparison.Ordinal),
@@ -85,9 +111,7 @@ internal static class MaintenanceAndCentralPreviewContract
                     "src",
                     "Sirk.Portal",
                     "Sirk.Portal.csproj")))
-            {
                 return current.FullName;
-            }
             current = current.Parent;
         }
         throw new DirectoryNotFoundException("SIRK Portal repository root was not found.");
