@@ -9,6 +9,7 @@ internal static class PortalUiEndpoints
 {
     private const string AssetRevision = "agent-remote-transport-20260804-1";
     private const string ProxyPrefixHeader = "X-SIRK-Proxy-Prefix";
+    private const string DemoPrefixHeader = "X-SIRK-Demo-Prefix";
     private static readonly IReadOnlyDictionary<string, string> Assets = BuildAssets();
 
     public static IEndpointRouteBuilder MapPortalUi(this IEndpointRouteBuilder endpoints)
@@ -62,6 +63,11 @@ internal static class PortalUiEndpoints
             "</head>",
             $"<link rel=\"stylesheet\" href=\"{assetBase}/portal-management-frame.css?v={Uri.EscapeDataString(assetVersion)}\"></head>",
             StringComparison.Ordinal);
+        if (context.User.HasClaim("sirk:demo", "true"))
+        {
+            const string banner = "<div id=\"sirk-demo-banner\" role=\"status\" aria-label=\"SIRK Demo environment\" style=\"position:fixed;right:12px;bottom:12px;z-index:2147483000;padding:8px 12px;border:1px solid #f59e0b;border-radius:999px;background:#111827;color:#fbbf24;font:700 12px/1.2 Segoe UI,Arial,sans-serif;box-shadow:0 8px 24px rgba(0,0,0,.28)\">SIRK DEMO · synthetic data · read-only</div>";
+            html = html.Replace("</body>", banner + "</body>", StringComparison.Ordinal);
+        }
         return Results.Content(html, "text/html; charset=utf-8", Encoding.UTF8);
     }
 
@@ -72,7 +78,7 @@ internal static class PortalUiEndpoints
         NoStore(context);
         var prefix = ResolveProxyPrefix(context);
         if (context.User.Identity?.IsAuthenticated == true)
-            return Results.Redirect("/", permanent: false, preserveMethod: false);
+            return Results.Redirect(WithPrefix(prefix, "/"), permanent: false, preserveMethod: false);
 
         var path = Path.Combine(environment.WebRootPath, "portal", "standalone", "login.html");
         var html = await File.ReadAllTextAsync(path, Encoding.UTF8, context.RequestAborted);
@@ -114,11 +120,19 @@ internal static class PortalUiEndpoints
         NoStore(context);
         if (context.User.Identity?.IsAuthenticated == true)
             await context.SignOutAsync(PortalAuthenticationSchemes.Session);
-        return Results.Redirect("/login", permanent: false, preserveMethod: false);
+        return Results.Redirect(WithPrefix(ResolveProxyPrefix(context), "/login"), permanent: false, preserveMethod: false);
     }
 
     private static string ResolveProxyPrefix(HttpContext context)
     {
+        if (context.User.HasClaim("sirk:demo", "true"))
+        {
+            var demoPrefix = context.Request.Headers[DemoPrefixHeader].ToString().Trim();
+            return Regex.IsMatch(demoPrefix, "^/[a-f0-9]{32}$", RegexOptions.CultureInvariant)
+                ? demoPrefix
+                : string.Empty;
+        }
+
         if (context.Items["Sirk.InternalTunnel"] is not true) return string.Empty;
         var value = context.Request.Headers[ProxyPrefixHeader].ToString().Trim();
         return Regex.IsMatch(
