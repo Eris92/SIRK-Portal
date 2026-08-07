@@ -198,3 +198,5 @@ jobs:
           sudo journalctl -u sirk-portal.service -n 120 --no-pager || true
           sudo journalctl -u sirk-updater.service -n 120 --no-pager || true
           sudo cat /var/lib/sirk-portal/Logs/gui-update-linux.log 2>/dev/null || true
+          echo '=== SIRK Updater transaction states ==='
+          sudo find /var/lib/sirk-updater/operations/sirk-portal -type f -name state.json -print -exec cat {} \; 2>/dev/null || true
