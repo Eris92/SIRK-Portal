@@ -28,7 +28,7 @@ Instalator pyta o FQDN, hasło Break-Glass i zaufanie certyfikatu. Następnie:
 
 ## Aktualizacja istniejącej instalacji
 
-Aktualizacja z `main` nie wykonuje ponownej kompilacji na serwerze. CI publikuje gotową paczkę `sirk-portal-win-x64.zip` oraz metadane zawierające rozmiar, commit i SHA-256. Bootstrap aktualizacji:
+Aktualizacja z `main` nie wykonuje ponownej kompilacji na serwerze. CI publikuje gotową paczkę `sirk-portal-win-x64.zip` oraz metadane zawierające rozmiar, commit i SHA-256. Paczka `portal-main-latest` jest odświeżana automatycznie po pushu do `main`. Bootstrap aktualizacji:
 
 1. pobiera metadane oraz paczkę binarną,
 2. weryfikuje nazwę aplikacji, kanał, rozmiar i SHA-256,
