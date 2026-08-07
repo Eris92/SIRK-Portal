@@ -8,54 +8,25 @@ internal static class MaintenanceAndCentralPreviewContract
     internal static void Run()
     {
         var root = FindRepositoryRoot();
-        var maintenance = File.ReadAllText(Path.Combine(
-            root,
-            "src",
-            "Sirk.Portal",
-            "Maintenance",
-            "PortalMaintenanceEndpoints.cs"));
-        var updateClient = File.ReadAllText(Path.Combine(
-            root,
-            "src",
-            "Sirk.Portal",
-            "Maintenance",
-            "PortalUpdateProbe.cs"));
-        var verifier = File.ReadAllText(Path.Combine(
-            root,
-            "src",
-            "Sirk.Portal",
-            "Maintenance",
-            "PortalUpdatePackageVerifier.cs"));
-        var settings = File.ReadAllText(Path.Combine(
-            root,
-            "public",
-            "portal",
-            "standalone",
-            "scripts",
-            "settings-native-v2.js"));
-        var tunnel = File.ReadAllText(Path.Combine(
-            root,
-            "src",
-            "Sirk.Portal",
-            "Central",
-            "CentralTunnelService.cs"));
-        var program = File.ReadAllText(Path.Combine(
-            root,
-            "src",
-            "Sirk.Portal",
-            "Program.cs"));
+        var maintenance = File.ReadAllText(Path.Combine(root, "src", "Sirk.Portal", "Maintenance", "PortalMaintenanceEndpoints.cs"));
+        var updateClient = File.ReadAllText(Path.Combine(root, "src", "Sirk.Portal", "Maintenance", "PortalUpdateProbe.cs"));
+        var verifier = File.ReadAllText(Path.Combine(root, "src", "Sirk.Portal", "Maintenance", "PortalUpdatePackageVerifier.cs"));
+        var settings = File.ReadAllText(Path.Combine(root, "public", "portal", "standalone", "scripts", "settings-native-v2.js"));
+        var tunnel = File.ReadAllText(Path.Combine(root, "src", "Sirk.Portal", "Central", "CentralTunnelService.cs"));
+        var program = File.ReadAllText(Path.Combine(root, "src", "Sirk.Portal", "Program.cs"));
         var linuxInstaller = File.ReadAllText(Path.Combine(root, "install-linux.sh"));
 
         Require(
             maintenance.Contains("group.MapPost(\"/update\", UpdateAsync);", StringComparison.Ordinal) &&
             maintenance.Contains("public object ScheduleUpdate()", StringComparison.Ordinal) &&
-            maintenance.Contains("SupportsServiceMaintenance", StringComparison.Ordinal) &&
-            maintenance.Contains("OperatingSystem.IsWindows() || OperatingSystem.IsLinux()", StringComparison.Ordinal) &&
             maintenance.Contains("_updates.PrepareUpdate()", StringComparison.Ordinal) &&
-            maintenance.Contains("RunLinuxMaintenanceHelper(\n                    \"update-helper\",", StringComparison.Ordinal) &&
+            maintenance.Contains("[prepared.PackagePath, prepared.Sha256, prepared.Version]", StringComparison.Ordinal) &&
             maintenance.Contains("SirkUpdater.exe", StringComparison.Ordinal) &&
+            maintenance.Contains("QuotePs(prepared.PackagePath)", StringComparison.Ordinal) &&
+            maintenance.Contains("QuotePs(prepared.Sha256)", StringComparison.Ordinal) &&
+            maintenance.Contains("QuotePs(prepared.Version)", StringComparison.Ordinal) &&
             maintenance.Contains("RunLinuxMaintenanceHelper(\"restart-helper\", [])", StringComparison.Ordinal),
-            "Portal maintenance must use one Central-prepared package and the shared SIRK Updater on Windows/Linux.");
+            "Portal maintenance must hand one Central-prepared package to the shared SIRK Updater on Windows/Linux.");
 
         Require(
             !maintenance.Contains("raw.githubusercontent.com", StringComparison.OrdinalIgnoreCase) &&
@@ -84,8 +55,7 @@ internal static class MaintenanceAndCentralPreviewContract
             !linuxInstaller.Contains("--update-only", StringComparison.Ordinal),
             "Linux installed update path must detach privileged work, require signed payloads and consume only Central-cached packages.");
 
-        Require(
-            settings.Contains("maintenance(\"update\", {}, true)", StringComparison.Ordinal),
+        Require(settings.Contains("maintenance(\"update\", {}, true)", StringComparison.Ordinal),
             "Portal Settings must invoke the maintenance update endpoint.");
 
         Require(
@@ -106,11 +76,7 @@ internal static class MaintenanceAndCentralPreviewContract
         var current = new DirectoryInfo(Directory.GetCurrentDirectory());
         while (current is not null)
         {
-            if (File.Exists(Path.Combine(
-                    current.FullName,
-                    "src",
-                    "Sirk.Portal",
-                    "Sirk.Portal.csproj")))
+            if (File.Exists(Path.Combine(current.FullName, "src", "Sirk.Portal", "Sirk.Portal.csproj")))
                 return current.FullName;
             current = current.Parent;
         }
