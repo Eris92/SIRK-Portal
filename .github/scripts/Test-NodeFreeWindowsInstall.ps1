@@ -85,7 +85,7 @@ try {
     if ($ready.status -ne 'ready') { throw 'Portal readiness endpoint failed.' }
 
     $bundle = (Invoke-WebRequest "$baseUrl/assets/bundles/portal-devices.bundle.js" -UseBasicParsing).Content
-    if ($bundle -notmatch 'SirkPortalDeviceTabs') { throw 'Device bundle marker is missing.' }
+    if ($bundle -notmatch '__sirkPlatformDeviceTabsV16Loaded') { throw 'Current device bundle marker is missing.' }
 
     $shellIconCss = (Invoke-WebRequest "$baseUrl/portal/standalone/styles/shell-icons.css" -UseBasicParsing).Content
     foreach ($marker in @(
