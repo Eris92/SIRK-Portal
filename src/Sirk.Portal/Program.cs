@@ -336,6 +336,7 @@ app.MapPortalAuthentication();
 app.MapPortalIdentity();
 app.MapAgentEndpoints();
 app.MapAgentManagementV1();
+app.MapAgentUpdateAccess();
 app.MapAgentInstallScript();
 app.MapAgentInstallerPackages();
 app.MapPortalModules();
