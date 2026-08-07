@@ -22,6 +22,7 @@ internal static class PortalAssetBundler
             [
                 "portal/standalone/scripts/central-tunnel-transport.js",
                 "portal/standalone/scripts/central-desktop-longpoll.js",
+                "portal/standalone/scripts/quick-commands-api-compat.js",
                 "portal/standalone/scripts/device-workspace.js",
                 "portal/standalone/scripts/device-tabs.js",
                 "portal/standalone/scripts/workspace-connection.js",
