@@ -172,6 +172,14 @@
     margin: 0 5px 5px 0;
 }
 
+[data-portal-settings] .sirk-button:disabled,
+[data-portal-settings] .sirk-button[disabled]{
+    opacity: .45;
+    filter: saturate(.35);
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
 [data-portal-settings] [data-debug-output]{
     min-height: 420px;
     overflow: auto;
