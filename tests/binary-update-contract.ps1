@@ -58,12 +58,18 @@ foreach ($required in @(
     '--self-contained false',
     'appsettings.Production.json must not be published',
     'Get-FileHash -LiteralPath $package -Algorithm SHA256',
-    'gh release create portal-main-latest',
+    'gh release upload $tag artifacts/sirk-portal-win-x64.zip --clobber',
+    'gh release upload $tag artifacts/portal-update.json --clobber',
+    'gh release create $tag',
     'portal-update.json'
 )) {
     if (-not $workflow.Contains($required, [StringComparison]::Ordinal)) {
         throw "Canonical Portal CI is missing binary release contract: $required"
     }
+}
+
+if ($workflow.Contains('gh release delete', [StringComparison]::Ordinal)) {
+    throw 'The moving Portal release must not be deleted during publication.'
 }
 
 Write-Host 'binary-update-contract: OK'
