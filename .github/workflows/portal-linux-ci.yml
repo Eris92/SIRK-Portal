@@ -24,11 +24,12 @@ jobs:
           cache: true
           cache-dependency-path: '**/*.csproj'
 
-      - name: Validate Linux installer syntax and protocol contracts
+      - name: Validate Linux installers and protocol contracts
         shell: bash
         run: |
           set -euo pipefail
           bash -n install.sh
+          bash -n install-linux.sh
           dotnet run --project tests/Sirk.Portal.ProtocolTests/Sirk.Portal.ProtocolTests.csproj --configuration Release
 
       - name: Publish framework-dependent linux-x64 Portal
@@ -48,7 +49,7 @@ jobs:
           test -f "$publish/Sirk.Portal.runtimeconfig.json"
           test -f "$publish/public/portal/standalone/index.html"
           test ! -f "$publish/appsettings.Production.json"
-          cp install.sh "$publish/install-linux.sh"
+          cp install-linux.sh "$publish/install-linux.sh"
           chmod 0755 "$publish/install-linux.sh"
 
       - name: Create linux-x64 package and SHA-256 metadata
@@ -121,14 +122,15 @@ jobs:
   linux-clean-install:
     needs: linux-binary-package
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
     env:
       SIRK_INSTALL_BREAKGLASS_PASSWORD: CI-Portal-BreakGlass-2026!
       SIRK_INSTALL_FQDN: portal-ci.sirk.local
       SIRK_INSTALL_HTTPS_PORT: '8443'
     steps:
       - uses: actions/checkout@v4
-      - name: Clean install through public moving release
+
+      - name: Clean install through public router
         shell: bash
         run: |
           set -euo pipefail
@@ -140,18 +142,21 @@ jobs:
         run: |
           set -euo pipefail
           sudo systemctl is-active --quiet sirk-portal.service
+          sudo systemctl is-enabled --quiet sirk-portal.service
           sudo systemctl is-active --quiet sirk-updater.service
           curl --fail --silent --show-error https://localhost:8443/healthz | grep -q healthy
           curl --fail --silent --show-error https://localhost:8443/readyz | grep -q ready
           test "$(python3 -c 'import json;print(json.load(open("/opt/sirk/portal/release-manifest.json"))["commit"])')" = "$GITHUB_SHA"
           sudo /opt/sirk/updater/SirkUpdater show sirk-portal | grep -q 'sirk-portal.service'
           test -x /usr/lib/sirk-portal/update-helper
+          test -x /usr/lib/sirk-portal/update-runner
+          test -x /usr/lib/sirk-portal/restart-helper
           sudo -u sirkportal sudo -n /usr/lib/sirk-portal/restart-helper
-          sleep 3
+          sleep 5
           sudo systemctl is-active --quiet sirk-portal.service
           curl --fail --silent --show-error https://localhost:8443/readyz | grep -q ready
 
-      - name: Verify transactional systemd update path
+      - name: Verify transactional systemd updater
         shell: bash
         run: |
           set -euo pipefail
@@ -163,11 +168,33 @@ jobs:
           sudo systemctl is-active --quiet sirk-portal.service
           curl --fail --silent --show-error https://localhost:8443/readyz | grep -q ready
 
+      - name: Verify detached GUI update helper
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo -u sirkportal sh -c 'printf test > /var/lib/sirk-portal/maintenance-update.lock'
+          sudo -u sirkportal sudo -n /usr/lib/sirk-portal/update-helper
+          for attempt in $(seq 1 90); do
+            if [[ ! -e /var/lib/sirk-portal/maintenance-update.lock ]] && \
+               grep -q 'SIRK_PORTAL_LINUX_UPDATE_OK' /var/lib/sirk-portal/Logs/gui-update-linux.log 2>/dev/null; then
+              break
+            fi
+            if [[ "$attempt" == 90 ]]; then
+              echo 'Detached GUI update did not complete.' >&2
+              sudo cat /var/lib/sirk-portal/Logs/gui-update-linux.log >&2 || true
+              exit 1
+            fi
+            sleep 2
+          done
+          sudo systemctl is-active --quiet sirk-portal.service
+          curl --fail --silent --show-error https://localhost:8443/readyz | grep -q ready
+
       - name: Diagnostics
         if: always()
         shell: bash
         run: |
           sudo systemctl status sirk-portal.service --no-pager || true
           sudo systemctl status sirk-updater.service --no-pager || true
-          sudo journalctl -u sirk-portal.service -n 100 --no-pager || true
-          sudo journalctl -u sirk-updater.service -n 100 --no-pager || true
+          sudo journalctl -u sirk-portal.service -n 120 --no-pager || true
+          sudo journalctl -u sirk-updater.service -n 120 --no-pager || true
+          sudo cat /var/lib/sirk-portal/Logs/gui-update-linux.log 2>/dev/null || true
