@@ -95,7 +95,12 @@
         if (!isOnline && s.connected) { desktopStop(ws); s.connected = false; s.explicit = "general"; }
         paintToggle(toggle(ws, s), s.connected, isOnline);
         gate(ws, s, isOnline);
-        if (active(ws) !== "general" && (!s.connected || s.explicit !== active(ws))) general(ws, s);
+        var section = active(ws);
+        if (!s.connected) {
+            if (section !== "general") general(ws, s);
+        } else if (section !== s.explicit) {
+            s.explicit = section;
+        }
         desktopStart(ws, s);
     }
     function sync() {
