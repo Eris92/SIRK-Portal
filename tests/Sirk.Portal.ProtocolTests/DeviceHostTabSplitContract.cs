@@ -37,10 +37,14 @@ internal static class DeviceHostTabSplitContract
                 connectionScript.Contains("Najpierw połącz z urządzeniem", StringComparison.Ordinal),
             "Overview must remain available while remote sections stay disabled until explicit connection.");
 
-        Require(connectionScript.Contains("s.explicit !== active(ws)", StringComparison.Ordinal) &&
-                connectionScript.Contains("s.explicit !== \"desktop\"", StringComparison.Ordinal) &&
-                connectionScript.Contains("sirkWorkspaceStarted", StringComparison.Ordinal),
-            "Programmatic Desktop activation must be rejected and Desktop streaming may start only after an explicit workspace connection and tab choice.");
+        Require(connectionScript.Contains("s.explicit !== \"desktop\"", StringComparison.Ordinal) &&
+                connectionScript.Contains("active(ws) !== \"desktop\"", StringComparison.Ordinal) &&
+                connectionScript.Contains("sirkWorkspaceStarted", StringComparison.Ordinal) &&
+                connectionScript.Contains("pointerdown", StringComparison.Ordinal) &&
+                !connectionScript.Contains("s.explicit = section;", StringComparison.Ordinal),
+            "Desktop streaming may start only after an explicit user tab choice, never from programmatic section synchronization.");
+        Require(!connectionScript.Contains("(!s.connected || s.explicit !== active(ws))) general(ws, s)", StringComparison.Ordinal),
+            "A stale explicit state must not force a connected workspace back to General.");
 
         Require(connectionScript.Contains(".sirk-device-tab-connection-actions{display:none!important}", StringComparison.Ordinal) &&
                 connectionScript.Contains(".sirk-device-host-tab.is-online", StringComparison.Ordinal) &&
