@@ -8,6 +8,7 @@ internal static class DeviceConnectionWorkspaceContract
         var tabsCss = File.ReadAllText(Path.Combine(root, "public", "portal", "standalone", "styles", "device-tabs.css"));
         var viewMode = File.ReadAllText(Path.Combine(root, "public", "portal", "standalone", "scripts", "view-mode.js"));
         var workspace = File.ReadAllText(Path.Combine(root, "public", "portal", "standalone", "scripts", "device-workspace.js"));
+        var workspaceConnection = File.ReadAllText(Path.Combine(root, "public", "portal", "standalone", "scripts", "workspace-connection.js"));
         var commandsCss = File.ReadAllText(Path.Combine(root, "public", "shared", "ui", "commands.css"));
 
         Require(workspace.Contains("function renderAgentTerminal(host, node)", StringComparison.Ordinal) &&
@@ -31,6 +32,13 @@ internal static class DeviceConnectionWorkspaceContract
             "Normal Desktop must require its standard manual Connect button.");
         Require(workspace.Contains("ensureCompactCommands(host)", StringComparison.Ordinal),
             "Normal Desktop must retain standard Quick Commands.");
+
+        Require(workspaceConnection.Contains("var section = active(ws);", StringComparison.Ordinal) &&
+                workspaceConnection.Contains("if (!s.connected) {", StringComparison.Ordinal) &&
+                workspaceConnection.Contains("s.explicit = section;", StringComparison.Ordinal),
+            "Connected workspace synchronization must adopt the actually active section.");
+        Require(!workspaceConnection.Contains("(!s.connected || s.explicit !== active(ws))) general(ws, s)", StringComparison.Ordinal),
+            "A stale explicit section must never force a connected workspace back to General.");
 
         Require(viewMode.Contains("function isDevicesView()", StringComparison.Ordinal) &&
                 viewMode.Contains("enabled === true && isDevicesView()", StringComparison.Ordinal) &&
