@@ -1,4 +1,0 @@
-interface:
-  display_name: "Check MyCompany Version"
-  short_description: "Verify all MyCompany version metadata"
-  default_prompt: "Use $check-mycompany-version to verify that MyCompany version files agree."
