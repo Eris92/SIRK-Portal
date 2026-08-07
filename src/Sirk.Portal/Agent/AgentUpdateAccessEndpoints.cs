@@ -27,7 +27,7 @@ internal static class AgentUpdateAccessEndpoints
         IHttpClientFactory httpClientFactory)
     {
         context.Response.Headers.CacheControl = "no-store";
-        var principal = authenticator.Authenticate(context.Request, ReadOnlySpan<byte>.Empty);
+        using var principal = authenticator.Authenticate(context.Request, ReadOnlySpan<byte>.Empty);
         if (principal is null)
         {
             context.Response.StatusCode = StatusCodes.Status401Unauthorized;
