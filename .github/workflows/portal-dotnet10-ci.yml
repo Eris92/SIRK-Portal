@@ -2,19 +2,13 @@ name: SIRK Portal .NET 10 CI
 
 on:
   workflow_dispatch:
-    inputs:
-      binary_only:
-        description: Build and publish only the verified Portal binary update package
-        required: true
-        type: boolean
-        default: true
   push:
-    branches: [main, develop, rewrite/dotnet10-node-free]
+    branches: [main]
   pull_request:
-    branches: [main, develop]
+    branches: [main]
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: portal-dotnet10-${{ github.workflow }}-${{ github.ref }}
@@ -22,7 +16,6 @@ concurrency:
 
 jobs:
   linux-build-api-ui:
-    if: github.event_name != 'workflow_dispatch' || inputs.binary_only != true
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -37,7 +30,6 @@ jobs:
         run: bash .github/scripts/validate-node-free-dotnet10.sh
 
   windows-clean-install:
-    if: github.event_name != 'workflow_dispatch' || inputs.binary_only != true
     runs-on: windows-latest
     timeout-minutes: 55
     steps:
@@ -85,7 +77,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) {
             throw "Connected installer validation failed with exit code $LASTEXITCODE."
           }
-      - name: Validate single-use ticket and IExpress EXE contracts
+      - name: Validate Portal protocol contracts
         shell: pwsh
         run: dotnet run --project tests/Sirk.Portal.ProtocolTests/Sirk.Portal.ProtocolTests.csproj --configuration Release
       - name: Install and verify from zero
@@ -93,166 +85,3 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: .\.github\scripts\Test-NodeFreeWindowsInstall.ps1 -Branch '${{ github.head_ref || github.ref_name }}'
-
-  binary-update-package:
-    if: >-
-      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
-      (github.event_name == 'push' && github.ref == 'refs/heads/main')
-    runs-on: windows-latest
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: 10.0.x
-          cache: true
-          cache-dependency-path: '**/*.csproj'
-
-      - name: Validate bootstrap syntax and binary update contract
-        shell: pwsh
-        run: |
-          $tokens = $null
-          $errors = $null
-          [void][System.Management.Automation.Language.Parser]::ParseFile(
-            (Resolve-Path .\install.ps1),
-            [ref]$tokens,
-            [ref]$errors)
-          if ($errors.Count -gt 0) {
-            $errors | ForEach-Object { Write-Error $_.Message }
-            throw 'install.ps1 contains PowerShell syntax errors.'
-          }
-          ./tests/binary-update-contract.ps1
-
-      - name: Run Portal protocol contracts
-        shell: pwsh
-        run: dotnet run --project tests/Sirk.Portal.ProtocolTests/Sirk.Portal.ProtocolTests.csproj --configuration Release
-
-      - name: Publish framework-dependent Portal
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-          $publish = Join-Path $PWD 'artifacts/publish'
-          dotnet publish src/Sirk.Portal/Sirk.Portal.csproj `
-            --configuration Release `
-            --runtime win-x64 `
-            --self-contained false `
-            --output $publish `
-            /p:PublishSingleFile=false `
-            /p:DebugType=None `
-            /p:DebugSymbols=false
-          if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed: $LASTEXITCODE" }
-
-          foreach ($required in @(
-            'Sirk.Portal.exe',
-            'Sirk.Portal.dll',
-            'Sirk.Portal.runtimeconfig.json',
-            'public/portal/standalone/index.html'
-          )) {
-            if (-not (Test-Path -LiteralPath (Join-Path $publish $required) -PathType Leaf)) {
-              throw "Published Portal payload is incomplete: $required"
-            }
-          }
-          if (Test-Path -LiteralPath (Join-Path $publish 'appsettings.Production.json')) {
-            throw 'Machine-specific appsettings.Production.json must not be published.'
-          }
-
-      - name: Create package and SHA-256 metadata
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-          $publish = Join-Path $PWD 'artifacts/publish'
-          $package = Join-Path $PWD 'artifacts/sirk-portal-win-x64.zip'
-          $metadata = Join-Path $PWD 'artifacts/portal-update.json'
-
-          [ordered]@{
-            schemaVersion = 1
-            applicationId = 'sirk-portal'
-            channel = 'main'
-            commit = '${{ github.sha }}'
-            architecture = 'win-x64'
-            deploymentMode = 'framework-dependent'
-            targetFramework = 'net10.0'
-            requiredRuntime = 'Microsoft.AspNetCore.App 10.0'
-            createdAtUtc = [DateTimeOffset]::UtcNow.ToString('O')
-          } | ConvertTo-Json -Depth 8 |
-            Set-Content -LiteralPath (Join-Path $publish 'release-manifest.json') -Encoding UTF8
-
-          Compress-Archive `
-            -Path (Join-Path $publish '*') `
-            -DestinationPath $package `
-            -CompressionLevel Optimal `
-            -Force
-
-          $file = Get-Item -LiteralPath $package
-          $sha256 = (Get-FileHash -LiteralPath $package -Algorithm SHA256).Hash
-          [ordered]@{
-            schemaVersion = 1
-            applicationId = 'sirk-portal'
-            channel = 'main'
-            commit = '${{ github.sha }}'
-            package = 'sirk-portal-win-x64.zip'
-            sha256 = $sha256
-            sizeBytes = $file.Length
-            architecture = 'win-x64'
-            deploymentMode = 'framework-dependent'
-            targetFramework = 'net10.0'
-            requiredRuntime = 'Microsoft.AspNetCore.App 10.0'
-            createdAtUtc = [DateTimeOffset]::UtcNow.ToString('O')
-          } | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $metadata -Encoding UTF8
-
-      - name: Publish moving main release without availability gap
-        shell: pwsh
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          $ErrorActionPreference = 'Stop'
-          $PSNativeCommandUseErrorActionPreference = $false
-          $tag = 'portal-main-latest'
-
-          gh release view $tag *> $null
-          if ($LASTEXITCODE -eq 0) {
-            # Keep the release and tag available while assets are replaced.
-            # Upload the package first and metadata last: readers holding old
-            # metadata either get a verified old pair or retry a transient
-            # mismatch; they never see a missing release.
-            gh release upload $tag artifacts/sirk-portal-win-x64.zip --clobber
-            if ($LASTEXITCODE -ne 0) { throw "Unable to replace binary package. ExitCode=$LASTEXITCODE" }
-            gh release upload $tag artifacts/portal-update.json --clobber
-            if ($LASTEXITCODE -ne 0) { throw "Unable to replace binary metadata. ExitCode=$LASTEXITCODE" }
-
-            gh api `
-              --method PATCH `
-              "repos/${{ github.repository }}/git/refs/tags/$tag" `
-              -f sha='${{ github.sha }}' `
-              -F force=true *> $null
-            if ($LASTEXITCODE -ne 0) { throw "Unable to move binary release tag. ExitCode=$LASTEXITCODE" }
-
-            gh release edit $tag `
-              --title 'SIRK Portal main binary update' `
-              --notes 'Automatically built, SHA-256 verified framework-dependent win-x64 update package.' `
-              --prerelease
-            if ($LASTEXITCODE -ne 0) { throw "Unable to update binary release metadata. ExitCode=$LASTEXITCODE" }
-          }
-          elseif ($LASTEXITCODE -eq 1) {
-            gh release create $tag `
-              artifacts/sirk-portal-win-x64.zip `
-              artifacts/portal-update.json `
-              --target '${{ github.sha }}' `
-              --title 'SIRK Portal main binary update' `
-              --notes 'Automatically built, SHA-256 verified framework-dependent win-x64 update package.' `
-              --prerelease
-            if ($LASTEXITCODE -ne 0) { throw "Unable to publish binary release. ExitCode=$LASTEXITCODE" }
-          }
-          else {
-            throw "Unable to query binary release. ExitCode=$LASTEXITCODE"
-          }
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: sirk-portal-win-x64-${{ github.sha }}
-          path: |
-            artifacts/sirk-portal-win-x64.zip
-            artifacts/portal-update.json
-          if-no-files-found: error
-          retention-days: 14
