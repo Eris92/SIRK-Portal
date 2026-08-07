@@ -3,13 +3,15 @@ name: SIRK Portal Linux .NET 10 CI
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
-  group: portal-linux-${{ github.ref }}
+  group: portal-linux-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -24,7 +26,7 @@ jobs:
           cache: true
           cache-dependency-path: '**/*.csproj'
 
-      - name: Validate Linux installers and protocol contracts
+      - name: Validate Linux bootstrap and protocol contracts
         shell: bash
         run: |
           set -euo pipefail
@@ -32,7 +34,7 @@ jobs:
           bash -n install-linux.sh
           dotnet run --project tests/Sirk.Portal.ProtocolTests/Sirk.Portal.ProtocolTests.csproj --configuration Release
 
-      - name: Publish framework-dependent linux-x64 Portal
+      - name: Publish framework-dependent linux-x64 Portal bootstrap fixture
         shell: bash
         run: |
           set -euo pipefail
@@ -45,99 +47,99 @@ jobs:
             /p:PublishSingleFile=false \
             /p:DebugType=None \
             /p:DebugSymbols=false
+          test -f "$publish/Sirk.Portal"
           test -f "$publish/Sirk.Portal.dll"
           test -f "$publish/Sirk.Portal.runtimeconfig.json"
           test -f "$publish/public/portal/standalone/index.html"
           test ! -f "$publish/appsettings.Production.json"
-          cp install-linux.sh "$publish/install-linux.sh"
-          chmod 0755 "$publish/install-linux.sh"
 
-      - name: Create linux-x64 package and SHA-256 metadata
-        shell: bash
-        run: |
-          set -euo pipefail
-          publish="$PWD/artifacts/publish-linux"
-          package="$PWD/artifacts/sirk-portal-linux-x64.zip"
-          metadata="$PWD/artifacts/portal-update-linux-x64.json"
           python3 - "$publish/release-manifest.json" <<'PY'
           import json, os, sys, datetime
-          path=sys.argv[1]
-          d={
-            'schemaVersion':1,
-            'applicationId':'sirk-portal',
-            'channel':'main',
-            'commit':os.environ['GITHUB_SHA'],
-            'architecture':'linux-x64',
-            'deploymentMode':'framework-dependent',
-            'targetFramework':'net10.0',
-            'requiredRuntime':'Microsoft.AspNetCore.App 10.0',
-            'createdAtUtc':datetime.datetime.now(datetime.timezone.utc).isoformat()
-          }
-          with open(path,'w',encoding='utf-8') as f: json.dump(d,f,indent=2)
-          PY
-          (cd "$publish" && zip -qr "$package" .)
-          sha="$(sha256sum "$package" | awk '{print toupper($1)}')"
-          size="$(stat -c %s "$package")"
-          SHA="$sha" SIZE="$size" python3 - "$metadata" <<'PY'
-          import json, os, sys, datetime
-          d={
-            'schemaVersion':1,
-            'applicationId':'sirk-portal',
-            'channel':'main',
-            'commit':os.environ['GITHUB_SHA'],
-            'package':'sirk-portal-linux-x64.zip',
-            'sha256':os.environ['SHA'],
-            'sizeBytes':int(os.environ['SIZE']),
-            'architecture':'linux-x64',
-            'deploymentMode':'framework-dependent',
-            'targetFramework':'net10.0',
-            'requiredRuntime':'Microsoft.AspNetCore.App 10.0',
-            'createdAtUtc':datetime.datetime.now(datetime.timezone.utc).isoformat()
-          }
-          with open(sys.argv[1],'w',encoding='utf-8') as f: json.dump(d,f,indent=2)
+          with open(sys.argv[1],'w',encoding='utf-8') as f:
+              json.dump({
+                  'schemaVersion':1,
+                  'applicationId':'sirk-portal',
+                  'channel':'main',
+                  'commit':os.environ['GITHUB_SHA'],
+                  'architecture':'linux-x64',
+                  'deploymentMode':'framework-dependent',
+                  'targetFramework':'net10.0',
+                  'requiredRuntime':'Microsoft.AspNetCore.App 10.0',
+                  'createdAtUtc':datetime.datetime.now(datetime.timezone.utc).isoformat()
+              },f,indent=2)
           PY
 
-      - name: Publish linux-x64 assets to moving main release
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          for attempt in $(seq 1 30); do
-            if gh release view portal-main-latest >/dev/null 2>&1; then break; fi
-            if [[ "$attempt" == 30 ]]; then echo 'portal-main-latest release not found' >&2; exit 1; fi
-            sleep 2
-          done
-          gh release upload portal-main-latest artifacts/sirk-portal-linux-x64.zip --clobber
-          gh release upload portal-main-latest artifacts/portal-update-linux-x64.json --clobber
+          package="$PWD/artifacts/sirk-portal-linux-x64.zip"
+          (cd "$publish" && zip -qr "$package" .)
+          sha="$(sha256sum "$package" | awk '{print tolower($1)}')"
+          size="$(stat -c %s "$package")"
+          SHA="$sha" SIZE="$size" python3 - "$PWD/artifacts/portal-update-linux-x64.json" <<'PY'
+          import json, os, sys, datetime
+          with open(sys.argv[1],'w',encoding='utf-8') as f:
+              json.dump({
+                  'schemaVersion':1,
+                  'applicationId':'sirk-portal',
+                  'channel':'main',
+                  'commit':os.environ['GITHUB_SHA'],
+                  'package':'sirk-portal-linux-x64.zip',
+                  'sha256':os.environ['SHA'],
+                  'sizeBytes':int(os.environ['SIZE']),
+                  'architecture':'linux-x64',
+                  'deploymentMode':'framework-dependent',
+                  'targetFramework':'net10.0',
+                  'requiredRuntime':'Microsoft.AspNetCore.App 10.0',
+                  'createdAtUtc':datetime.datetime.now(datetime.timezone.utc).isoformat()
+              },f,indent=2)
+          PY
 
       - uses: actions/upload-artifact@v4
         with:
-          name: sirk-portal-linux-x64-${{ github.sha }}
+          name: sirk-portal-linux-bootstrap-${{ github.sha }}
           path: |
             artifacts/sirk-portal-linux-x64.zip
             artifacts/portal-update-linux-x64.json
-          retention-days: 14
+          if-no-files-found: error
+          retention-days: 7
 
   linux-clean-install:
     needs: linux-binary-package
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
       SIRK_INSTALL_BREAKGLASS_PASSWORD: CI-Portal-BreakGlass-2026!
       SIRK_INSTALL_FQDN: portal-ci.sirk.local
       SIRK_INSTALL_HTTPS_PORT: '8443'
+      SIRK_PORTAL_RELEASE_BASE: http://127.0.0.1:18080
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: sirk-portal-linux-bootstrap-${{ github.sha }}
+          path: artifacts/bootstrap
 
-      - name: Clean install through public router
+      - name: Start isolated bootstrap fixture server
         shell: bash
         run: |
           set -euo pipefail
-          sudo --preserve-env=SIRK_INSTALL_BREAKGLASS_PASSWORD,SIRK_INSTALL_FQDN,SIRK_INSTALL_HTTPS_PORT \
-            bash ./install.sh --remove-data --non-interactive
+          cd artifacts/bootstrap
+          python3 -m http.server 18080 --bind 127.0.0.1 > /tmp/sirk-bootstrap-http.log 2>&1 &
+          echo $! > /tmp/sirk-bootstrap-http.pid
+          for attempt in $(seq 1 30); do
+            curl -fsS http://127.0.0.1:18080/portal-update-linux-x64.json >/dev/null && exit 0
+            sleep 1
+          done
+          cat /tmp/sirk-bootstrap-http.log >&2 || true
+          exit 1
 
-      - name: Verify Portal, Updater, systemd and release commit
+      - name: Clean install bootstrap fixture
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo --preserve-env=SIRK_INSTALL_BREAKGLASS_PASSWORD,SIRK_INSTALL_FQDN,SIRK_INSTALL_HTTPS_PORT,SIRK_PORTAL_RELEASE_BASE \
+            bash ./install-linux.sh --remove-data --non-interactive
+
+      - name: Verify Portal Updater and Central-only runtime contract
         shell: bash
         run: |
           set -euo pipefail
@@ -148,44 +150,51 @@ jobs:
           curl --fail --silent --show-error https://localhost:8443/readyz | grep -q ready
           test "$(python3 -c 'import json;print(json.load(open("/opt/sirk/portal/release-manifest.json"))["commit"])')" = "$GITHUB_SHA"
           sudo /opt/sirk/updater/SirkUpdater show sirk-portal | grep -q 'sirk-portal.service'
+          sudo /opt/sirk/updater/SirkUpdater show sirk-portal | grep -q 'sirk-central-cache'
+          sudo /opt/sirk/updater/SirkUpdater show sirk-portal | grep -qi 'signature'
           test -x /usr/lib/sirk-portal/update-helper
           test -x /usr/lib/sirk-portal/update-runner
           test -x /usr/lib/sirk-portal/restart-helper
+          ! grep -Fq -- '--update-only' /opt/sirk/portal/install-linux.sh
+          ! grep -Fq 'github.com/Eris92/SIRK-Portal' /usr/lib/sirk-portal/update-runner
+          ! grep -Fq 'raw.githubusercontent.com' /usr/lib/sirk-portal/update-runner
+
+      - name: Verify narrow privileged helpers
+        shell: bash
+        run: |
+          set -euo pipefail
           sudo -u sirkportal sudo -n /usr/lib/sirk-portal/restart-helper
           sleep 5
           sudo systemctl is-active --quiet sirk-portal.service
           curl --fail --silent --show-error https://localhost:8443/readyz | grep -q ready
 
-      - name: Verify transactional systemd updater
-        shell: bash
-        run: |
-          set -euo pipefail
-          curl -fsSL "https://github.com/Eris92/SIRK-Portal/releases/download/portal-main-latest/portal-update-linux-x64.json?ci=$RANDOM" -o /tmp/portal-update.json
-          curl -fsSL "https://github.com/Eris92/SIRK-Portal/releases/download/portal-main-latest/sirk-portal-linux-x64.zip?ci=$RANDOM" -o /tmp/portal.zip
-          sha="$(python3 -c 'import json;print(json.load(open("/tmp/portal-update.json"))["sha256"])')"
-          commit="$(python3 -c 'import json;print(json.load(open("/tmp/portal-update.json"))["commit"])')"
-          sudo /opt/sirk/updater/SirkUpdater update sirk-portal /tmp/portal.zip "$sha" "$commit"
-          sudo systemctl is-active --quiet sirk-portal.service
-          curl --fail --silent --show-error https://localhost:8443/readyz | grep -q ready
+          if sudo -u sirkportal sudo -n /usr/lib/sirk-portal/update-helper; then
+            echo 'Update helper accepted missing signed package arguments.' >&2
+            exit 1
+          fi
+          touch /tmp/not-from-central.zip
+          if sudo -u sirkportal sudo -n /usr/lib/sirk-portal/update-helper /tmp/not-from-central.zip "$(printf 'a%.0s' {1..64})" 0.1.1.999; then
+            echo 'Update helper accepted a package outside Portal Updates/Pending.' >&2
+            exit 1
+          fi
 
-      - name: Verify detached GUI update helper
+      - name: Verify unsigned runtime package is rejected fail-closed
         shell: bash
         run: |
           set -euo pipefail
+          sudo -u sirkportal cp artifacts/bootstrap/sirk-portal-linux-x64.zip /var/lib/sirk-portal/Updates/Pending/unsigned.zip
+          sha="$(sha256sum artifacts/bootstrap/sirk-portal-linux-x64.zip | awk '{print $1}')"
           sudo -u sirkportal sh -c 'printf test > /var/lib/sirk-portal/maintenance-update.lock'
-          sudo -u sirkportal sudo -n /usr/lib/sirk-portal/update-helper
-          for attempt in $(seq 1 90); do
-            if sudo test ! -e /var/lib/sirk-portal/maintenance-update.lock && \
-               sudo grep -q 'SIRK_PORTAL_LINUX_UPDATE_OK' /var/lib/sirk-portal/Logs/gui-update-linux.log; then
-              break
-            fi
-            if [[ "$attempt" == 90 ]]; then
-              echo 'Detached GUI update did not complete.' >&2
-              sudo cat /var/lib/sirk-portal/Logs/gui-update-linux.log >&2 || true
-              exit 1
-            fi
-            sleep 2
+          sudo -u sirkportal sudo -n /usr/lib/sirk-portal/update-helper /var/lib/sirk-portal/Updates/Pending/unsigned.zip "$sha" 0.1.1.999
+          for attempt in $(seq 1 60); do
+            if sudo test ! -e /var/lib/sirk-portal/maintenance-update.lock; then break; fi
+            sleep 1
           done
+          sudo test ! -e /var/lib/sirk-portal/maintenance-update.lock
+          if sudo grep -q 'SIRK_PORTAL_LINUX_UPDATE_OK' /var/lib/sirk-portal/Logs/gui-update-linux.log; then
+            echo 'Unsigned runtime update was accepted.' >&2
+            exit 1
+          fi
           sudo systemctl is-active --quiet sirk-portal.service
           curl --fail --silent --show-error https://localhost:8443/readyz | grep -q ready
 
@@ -198,5 +207,5 @@ jobs:
           sudo journalctl -u sirk-portal.service -n 120 --no-pager || true
           sudo journalctl -u sirk-updater.service -n 120 --no-pager || true
           sudo cat /var/lib/sirk-portal/Logs/gui-update-linux.log 2>/dev/null || true
-          echo '=== SIRK Updater transaction states ==='
           sudo find /var/lib/sirk-updater/operations/sirk-portal -type f -name state.json -print -exec cat {} \; 2>/dev/null || true
+          if [[ -f /tmp/sirk-bootstrap-http.pid ]]; then kill "$(cat /tmp/sirk-bootstrap-http.pid)" 2>/dev/null || true; fi
