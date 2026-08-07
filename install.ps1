@@ -35,10 +35,27 @@ $bootstrapRoot = Join-Path $commonDataRoot ('SIRK\Temp\InstallRouter-' + [guid]:
 $scriptPath = Join-Path $bootstrapRoot $scriptName
 $scriptUrl = 'https://raw.githubusercontent.com/Eris92/SIRK-Portal/main/' + $scriptName + '?nocache=' + [guid]::NewGuid()
 
+function Convert-InstallerAclToWellKnownSids {
+    param([Parameter(Mandatory)][string]$Path)
+
+    $source = Get-Content -LiteralPath $Path -Raw -Encoding UTF8
+    $replacements = [ordered]@{
+        "'SYSTEM:(OI)(CI)F'" = "'*S-1-5-18:(OI)(CI)F'"
+        "'Administrators:(OI)(CI)F'" = "'*S-1-5-32-544:(OI)(CI)F'"
+        "'SYSTEM:F'" = "'*S-1-5-18:F'"
+        "'Administrators:F'" = "'*S-1-5-32-544:F'"
+    }
+    foreach ($entry in $replacements.GetEnumerator()) {
+        $source = $source.Replace([string]$entry.Key, [string]$entry.Value)
+    }
+    Set-Content -LiteralPath $Path -Value $source -Encoding UTF8
+}
+
 try {
     New-Item -ItemType Directory -Path $bootstrapRoot -Force | Out-Null
     Write-Host ('=== SIRK Portal installer route: ' + $(if ($useBinaryInstaller) { 'verified binary clean install' } else { 'core installer/update' }) + ' ===') -ForegroundColor Cyan
     Invoke-WebRequest -UseBasicParsing -Uri $scriptUrl -OutFile $scriptPath
+    Convert-InstallerAclToWellKnownSids -Path $scriptPath
 
     $tokens = $null
     $errors = $null
