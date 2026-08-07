@@ -47,9 +47,21 @@ done
 [[ "${EUID:-$(id -u)}" -eq 0 ]] || die "Run as root."
 [[ "$(uname -s)" == "Linux" ]] || die "This installer is for Linux."
 [[ "$(uname -m)" == "x86_64" ]] || die "Only linux-x64 is supported."
-[[ "$HTTPS_PORT" =~ ^[0-9]+$ ]] && (( HTTPS_PORT >= 1 && HTTPS_PORT <= 65535 )) || die "Invalid HTTPS port."
 command -v systemctl >/dev/null 2>&1 || die "systemd/systemctl is required."
 command -v systemd-run >/dev/null 2>&1 || die "systemd-run is required."
+
+if (( UPDATE_ONLY == 1 )); then
+  installed_env="$CONFIG_ROOT/portal.env"
+  [[ -f "$installed_env" ]] || die "Existing Portal environment file was not found: $installed_env"
+  installed_https_url="$(sed -n 's/^Kestrel__Endpoints__Https__Url=//p' "$installed_env" | head -n1)"
+  if [[ "$installed_https_url" =~ :([0-9]+)$ ]]; then
+    HTTPS_PORT="${BASH_REMATCH[1]}"
+  else
+    die "Unable to resolve the installed Portal HTTPS port from $installed_env"
+  fi
+fi
+
+[[ "$HTTPS_PORT" =~ ^[0-9]+$ ]] && (( HTTPS_PORT >= 1 && HTTPS_PORT <= 65535 )) || die "Invalid HTTPS port."
 
 if [[ -r /etc/os-release ]]; then
   . /etc/os-release
