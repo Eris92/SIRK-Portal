@@ -5,9 +5,11 @@
         typeof window.fetch !== "function") return;
 
     var storageKey = "sirkPortal.maintenanceUpdateRestart";
-    var maximumWaitMilliseconds = 30 * 60 * 1000;
+    var maximumWaitMilliseconds = 5 * 60 * 1000;
     var originalFetch = window.fetch.bind(window);
     var state = readState();
+    var statusRequestRunning = false;
+    var reloadScheduled = false;
 
     function readState() {
         try {
@@ -41,6 +43,14 @@
         return "GET";
     }
 
+    function apiBase() {
+        return String(window.__SIRK_PLATFORM_API_BASE__ || "/api/v1").replace(/\/+$/, "");
+    }
+
+    function statusUrl() {
+        return apiBase() + "/admin/maintenance/status";
+    }
+
     function isUpdateRequest(url, requestMethod) {
         return requestMethod === "POST" &&
             /\/(?:connect\/[^/]+\/)?api\/v1\/admin\/maintenance\/update$/i.test(url.pathname);
@@ -50,12 +60,24 @@
         return requestMethod === "GET" && /\/readyz\/?$/i.test(url.pathname);
     }
 
+    function validCommit(value) {
+        return /^[0-9a-f]{40}$/i.test(String(value || "").trim());
+    }
+
+    function sameCommit(left, right) {
+        return validCommit(left) && validCommit(right) &&
+            String(left).toLowerCase() === String(right).toLowerCase();
+    }
+
     function beginUpdate(response) {
         state = {
             active: true,
             startedAt: Date.now(),
             sawUnavailable: false,
-            logPath: ""
+            initialCommit: "",
+            targetCommit: "",
+            logPath: "",
+            lastStatusError: ""
         };
         writeState();
         try {
@@ -63,10 +85,13 @@
                 var value = payload && payload.value || {};
                 if (!state || state.active !== true) return;
                 state.logPath = String(value.logPath || "");
+                if (validCommit(value.installedCommit)) state.initialCommit = String(value.installedCommit).toLowerCase();
+                if (validCommit(value.targetCommit)) state.targetCommit = String(value.targetCommit).toLowerCase();
                 writeState();
                 renderStatus();
             }).catch(function () {});
         } catch (error) {}
+        captureUpdateSnapshot();
         renderStatus();
     }
 
@@ -77,22 +102,54 @@
         renderStatus();
     }
 
-    function finishUpdate() {
+    function finishUpdate(reload) {
         state = null;
         writeState();
         removeStatus();
+        if (reload && !reloadScheduled) {
+            reloadScheduled = true;
+            setTimeout(function () { window.location.reload(); }, 250);
+        }
+    }
+
+    function failWait(message) {
+        if (!state) return;
+        var logPath = String(state.logPath || "");
+        state = null;
+        writeState();
+        removeStatus();
+        var host = document.querySelector(".sirk-column-details") ||
+            document.getElementById("sirkStandaloneContent");
+        if (!host) return;
+        var node = document.createElement("section");
+        node.className = "sirk-card sirk-maintenance-update-wait";
+        node.setAttribute("data-sirk-maintenance-update-wait", "1");
+        var title = document.createElement("h2");
+        title.textContent = "Aktualizacja SIRK Portal";
+        var text = document.createElement("p");
+        text.className = "sirk-error";
+        text.textContent = message;
+        node.appendChild(title);
+        node.appendChild(text);
+        if (logPath) {
+            var log = document.createElement("p");
+            log.className = "sirk-muted";
+            log.textContent = "Log: " + logPath;
+            node.appendChild(log);
+        }
+        host.appendChild(node);
     }
 
     function syntheticStartingResponse() {
         return new Response(JSON.stringify({
             status: "updating",
-            detail: "Waiting for the old SIRK Portal service to stop."
+            detail: "Waiting for the SIRK Portal binary update to complete."
         }), {
             status: 503,
             headers: {
                 "Content-Type": "application/json; charset=utf-8",
                 "Cache-Control": "no-store",
-                "X-SIRK-Update-Wait": "service-stop"
+                "X-SIRK-Update-Wait": "commit-change"
             }
         });
     }
@@ -103,10 +160,7 @@
     }
 
     function renderStatus() {
-        if (!state || state.active !== true) {
-            removeStatus();
-            return;
-        }
+        if (!state || state.active !== true) return;
         var host = document.querySelector(".sirk-column-details") ||
             document.getElementById("sirkStandaloneContent");
         if (!host) return;
@@ -119,8 +173,8 @@
         }
         var seconds = Math.max(0, Math.round((Date.now() - Number(state.startedAt || Date.now())) / 1000));
         var phase = state.sawUnavailable
-            ? "Usługa została zatrzymana. Oczekiwanie na uruchomienie nowej wersji…"
-            : "Aktualizacja działa w tle. Oczekiwanie na zatrzymanie starej usługi…";
+            ? "Usługa została zrestartowana. Weryfikacja nowej wersji…"
+            : "Aktualizacja działa w tle. Oczekiwanie na potwierdzenie nowego commita…";
         node.innerHTML = "";
         var title = document.createElement("h2");
         title.textContent = "Aktualizacja SIRK Portal";
@@ -132,12 +186,77 @@
         node.appendChild(title);
         node.appendChild(text);
         node.appendChild(elapsed);
+        if (validCommit(state.targetCommit)) {
+            var target = document.createElement("p");
+            target.className = "sirk-muted";
+            target.textContent = "Docelowy build: " + state.targetCommit.slice(0, 12);
+            node.appendChild(target);
+        }
         if (state.logPath) {
             var log = document.createElement("p");
             log.className = "sirk-muted";
             log.textContent = "Log: " + state.logPath;
             node.appendChild(log);
         }
+    }
+
+    function applySnapshot(payload, captureOnly) {
+        if (!state || state.active !== true) return false;
+        var snapshot = payload && payload.value || {};
+        var current = snapshot.current || {};
+        var remote = snapshot.remote || {};
+        var currentCommit = String(current.commit || "").trim().toLowerCase();
+        var remoteCommit = String(remote.commit || remote.remoteCommit || "").trim().toLowerCase();
+
+        if (!state.initialCommit && validCommit(currentCommit)) state.initialCommit = currentCommit;
+        if (!state.targetCommit && validCommit(remoteCommit)) state.targetCommit = remoteCommit;
+        state.lastStatusError = String(remote.error || "");
+        writeState();
+
+        if (captureOnly) return false;
+        if (validCommit(state.targetCommit) && sameCommit(currentCommit, state.targetCommit)) return true;
+        if (!remote.error && remote.updateAvailable === false && validCommit(currentCommit) &&
+            (!validCommit(remoteCommit) || sameCommit(currentCommit, remoteCommit))) return true;
+        return false;
+    }
+
+    function requestStatus(captureOnly) {
+        if (!state || state.active !== true || statusRequestRunning) return Promise.resolve(false);
+        statusRequestRunning = true;
+        return originalFetch(statusUrl(), {
+            method: "GET",
+            credentials: "same-origin",
+            cache: "no-store",
+            headers: { Accept: "application/json" }
+        }).then(function (response) {
+            if (!response.ok) throw new Error("HTTP " + response.status);
+            return response.json();
+        }).then(function (payload) {
+            return applySnapshot(payload, captureOnly === true);
+        }).catch(function () {
+            markUnavailable();
+            return false;
+        }).then(function (completed) {
+            statusRequestRunning = false;
+            return completed;
+        });
+    }
+
+    function captureUpdateSnapshot() {
+        requestStatus(true).then(renderStatus);
+    }
+
+    function pollCompletion() {
+        if (!state || state.active !== true) return;
+        var elapsed = Date.now() - Number(state.startedAt || 0);
+        if (elapsed >= maximumWaitMilliseconds) {
+            failWait("Aktualizacja nie została potwierdzona w ciągu 5 minut. Portal nie jest blokowany — sprawdź log aktualizacji.");
+            return;
+        }
+        requestStatus(false).then(function (completed) {
+            if (completed) finishUpdate(true);
+            else renderStatus();
+        });
     }
 
     window.fetch = function (input, init) {
@@ -160,13 +279,14 @@
                 markUnavailable();
                 return response;
             }
-            if (state.sawUnavailable === true ||
-                Date.now() - Number(state.startedAt || 0) >= maximumWaitMilliseconds) {
-                finishUpdate();
-                return response;
-            }
-            renderStatus();
-            return syntheticStartingResponse();
+            return requestStatus(false).then(function (completed) {
+                if (completed) {
+                    finishUpdate(false);
+                    return response;
+                }
+                renderStatus();
+                return syntheticStartingResponse();
+            });
         }).catch(function (error) {
             markUnavailable();
             throw error;
@@ -174,6 +294,8 @@
     };
 
     window.setInterval(renderStatus, 1000);
+    window.setInterval(pollCompletion, 1500);
     window.__sirkMaintenanceUpdateRestartGuard = true;
     renderStatus();
+    if (state && state.active === true) pollCompletion();
 }());
