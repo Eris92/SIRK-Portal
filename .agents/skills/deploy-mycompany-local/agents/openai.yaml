@@ -1,4 +1,0 @@
-interface:
-  display_name: "Deploy MyCompany Locally"
-  short_description: "Back up and deploy the local MyCompany plugin"
-  default_prompt: "Use $deploy-mycompany-local to test, back up, and deploy MyCompany to a local MeshCentral installation."
