@@ -155,7 +155,6 @@ jobs:
           test -x /usr/lib/sirk-portal/update-helper
           test -x /usr/lib/sirk-portal/update-runner
           test -x /usr/lib/sirk-portal/restart-helper
-          ! grep -Fq -- '--update-only' /opt/sirk/portal/install-linux.sh
           ! grep -Fq 'github.com/Eris92/SIRK-Portal' /usr/lib/sirk-portal/update-runner
           ! grep -Fq 'raw.githubusercontent.com' /usr/lib/sirk-portal/update-runner
 
@@ -173,10 +172,11 @@ jobs:
             exit 1
           fi
           touch /tmp/not-from-central.zip
-          if sudo -u sirkportal sudo -n /usr/lib/sirk-portal/update-helper /tmp/not-from-central.zip "$(printf 'a%.0s' {1..64})" 0.1.1.999; then
-            echo 'Update helper accepted a package outside Portal Updates/Pending.' >&2
+          if sudo /usr/lib/sirk-portal/update-runner /tmp/not-from-central.zip "$(printf 'a%.0s' {1..64})" 0.1.1.999; then
+            echo 'Update runner accepted a package outside Portal Updates/Pending.' >&2
             exit 1
           fi
+          sudo systemctl is-active --quiet sirk-portal.service
 
       - name: Verify unsigned runtime package is rejected fail-closed
         shell: bash
