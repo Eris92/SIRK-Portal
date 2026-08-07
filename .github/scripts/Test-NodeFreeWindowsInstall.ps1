@@ -87,16 +87,16 @@ try {
     $bundle = (Invoke-WebRequest "$baseUrl/assets/bundles/portal-devices.bundle.js" -UseBasicParsing).Content
     if ($bundle -notmatch '__sirkPlatformDeviceTabsV16Loaded') { throw 'Current device bundle marker is missing.' }
 
-    $shellIconCss = (Invoke-WebRequest "$baseUrl/portal/standalone/styles/shell-icons.css" -UseBasicParsing).Content
+    $moduleShellCss = (Invoke-WebRequest "$baseUrl/portal/standalone/styles/module-shell.css" -UseBasicParsing).Content
     foreach ($marker in @(
-        '[data-action="sidebar"] svg',
+        '.sirk-standalone-controls [data-action="sidebar"] svg',
         '.sirk-standalone-nav button[data-view] > span > svg',
         'stroke: currentColor !important',
         'visibility: visible !important',
         'svg :is(path,rect,circle,line,polyline,polygon,ellipse)'
     )) {
-        if ($shellIconCss -notmatch [regex]::Escape($marker)) {
-            throw "Loaded sidebar icon CSS marker missing: $marker"
+        if ($moduleShellCss -notmatch [regex]::Escape($marker)) {
+            throw "Loaded module-shell icon CSS marker missing: $marker"
         }
     }
 
