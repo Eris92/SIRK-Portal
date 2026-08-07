@@ -2,7 +2,7 @@
 $ErrorActionPreference = 'Stop'
 
 $bootstrap = Get-Content 'install.ps1' -Raw -Encoding UTF8
-$workflow = Get-Content '.github/workflows/portal-binary-release.yml' -Raw -Encoding UTF8
+$workflow = Get-Content '.github/workflows/portal-dotnet10-ci.yml' -Raw -Encoding UTF8
 
 foreach ($required in @(
     'Invoke-SirkPortalBinaryUpdate',
@@ -21,21 +21,26 @@ foreach ($required in @(
     }
 }
 
+$binaryStart = $bootstrap.IndexOf('function Invoke-SirkPortalBinaryUpdate', [StringComparison]::Ordinal)
+$binaryEnd = $bootstrap.IndexOf('$defaultFqdn =', $binaryStart, [StringComparison]::Ordinal)
+if ($binaryStart -lt 0 -or $binaryEnd -le $binaryStart) {
+    throw 'Unable to locate Portal binary update function boundaries.'
+}
+$binarySection = $bootstrap.Substring($binaryStart, $binaryEnd - $binaryStart)
+
 foreach ($forbidden in @(
     '& $dotnetExe publish',
     'New-SelfSignedCertificate',
     'New-NetFirewallRule',
     'Remove-ServiceCompletely'
 )) {
-    $binaryStart = $bootstrap.IndexOf('function Invoke-SirkPortalBinaryUpdate', [StringComparison]::Ordinal)
-    $binaryEnd = $bootstrap.IndexOf('$defaultFqdn =', $binaryStart, [StringComparison]::Ordinal)
-    $binarySection = $bootstrap.Substring($binaryStart, $binaryEnd - $binaryStart)
     if ($binarySection.Contains($forbidden, [StringComparison]::Ordinal)) {
         throw "Binary update path must not perform source-install work: $forbidden"
     }
 }
 
 foreach ($required in @(
+    'binary-update-package:',
     'dotnet publish src/Sirk.Portal/Sirk.Portal.csproj',
     '--self-contained false',
     'appsettings.Production.json must not be published',
@@ -44,7 +49,7 @@ foreach ($required in @(
     'portal-update.json'
 )) {
     if (-not $workflow.Contains($required, [StringComparison]::Ordinal)) {
-        throw "Binary release workflow is missing contract: $required"
+        throw "Canonical Portal CI is missing binary release contract: $required"
     }
 }
 
