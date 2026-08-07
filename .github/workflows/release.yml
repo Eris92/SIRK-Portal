@@ -1,0 +1,125 @@
+name: Signed Portal Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: Release channel
+        required: true
+        default: preview
+        type: choice
+        options: [preview, stable]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      VERSION: 0.1.1.${{ github.run_number }}
+      CHANNEL: ${{ inputs.channel }}
+      SIGNING_PRIVATE_KEY_PEM: ${{ secrets.SIRK_RELEASE_SIGNING_PRIVATE_KEY_PEM }}
+      SIGNING_KEY_ID: ${{ secrets.SIRK_RELEASE_SIGNING_KEY_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Require release signing root
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ -n "$SIGNING_PRIVATE_KEY_PEM" ]] || { echo 'SIRK_RELEASE_SIGNING_PRIVATE_KEY_PEM is required.' >&2; exit 1; }
+          [[ "$SIGNING_KEY_ID" =~ ^[A-Za-z0-9._-]{1,80}$ ]] || { echo 'SIRK_RELEASE_SIGNING_KEY_ID is invalid.' >&2; exit 1; }
+          printf '%s' "$SIGNING_PRIVATE_KEY_PEM" > "$RUNNER_TEMP/release-key.pem"
+          chmod 0600 "$RUNNER_TEMP/release-key.pem"
+          openssl pkey -in "$RUNNER_TEMP/release-key.pem" -pubout -out "$RUNNER_TEMP/release-public.pem"
+      - name: Build signed update packages
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/release
+          python3 - "$RUNNER_TEMP/release-public.pem" "$SIGNING_KEY_ID" artifacts/release/release-trusted-keys.json <<'PY'
+          import json,sys
+          pem=open(sys.argv[1],encoding='utf-8').read()
+          with open(sys.argv[3],'w',encoding='utf-8') as f:
+              json.dump({'keys':[{'keyId':sys.argv[2],'publicKeyPem':pem}]},f,separators=(',',':'))
+          PY
+          for runtime in linux-x64 win-x64; do
+            out="artifacts/$runtime"
+            rm -rf "$out"; mkdir -p "$out"
+            dotnet publish src/Sirk.Portal/Sirk.Portal.csproj -c Release -r "$runtime" --self-contained false -o "$out" \
+              /p:Version="$VERSION" /p:AssemblyVersion="$VERSION" /p:FileVersion="$VERSION"
+            cp artifacts/release/release-trusted-keys.json "$out/release-trusted-keys.json"
+            python3 - "$out/release-manifest.json" "$runtime" "$VERSION" "$GITHUB_SHA" <<'PY'
+          import json,sys
+          path,runtime,version,commit=sys.argv[1:]
+          with open(path,'w',encoding='utf-8') as f:
+              json.dump({'schemaVersion':1,'applicationId':'sirk-portal','product':'SIRK Portal','version':version,'runtime':runtime,'channel':'main','commit':commit},f,separators=(',',':'))
+          PY
+            python3 - "$out" "$VERSION" "$runtime" "$SIGNING_KEY_ID" "$RUNNER_TEMP/release-key.pem" <<'PY'
+          import base64,hashlib,json,os,subprocess,sys,tempfile
+          root,version,runtime,key_id,key_path=sys.argv[1:]
+          files=[]
+          for base,_,names in os.walk(root):
+              for name in names:
+                  p=os.path.join(base,name)
+                  rel=os.path.relpath(p,root).replace(os.sep,'/')
+                  if rel=='update-manifest.json': continue
+                  data=open(p,'rb').read()
+                  files.append({'path':rel,'size':len(data),'sha256':hashlib.sha256(data).hexdigest()})
+          files.sort(key=lambda x:x['path'])
+          obj={'schemaVersion':1,'applicationId':'sirk-portal','product':'SIRK Portal','version':version,'runtime':runtime,'files':files,'signature':{'algorithm':'ES256','keyId':key_id,'value':''}}
+          canonical=json.dumps({k:v for k,v in obj.items() if k!='signature'},sort_keys=True,separators=(',',':')).encode()
+          with tempfile.NamedTemporaryFile(delete=False) as f: f.write(canonical); data_path=f.name
+          der=data_path+'.sig'
+          subprocess.check_call(['openssl','dgst','-sha256','-sign',key_path,'-out',der,data_path])
+          sig=open(der,'rb').read()
+          def readlen(b,i):
+              n=b[i];i+=1
+              if n<128:return n,i
+              c=n&127;n=int.from_bytes(b[i:i+c],'big');return n,i+c
+          i=1;_,i=readlen(sig,i)
+          assert sig[i]==2;i+=1;n,i=readlen(sig,i);r=sig[i:i+n];i+=n
+          assert sig[i]==2;i+=1;n,i=readlen(sig,i);s=sig[i:i+n]
+          r=r.lstrip(b'\0').rjust(32,b'\0');s=s.lstrip(b'\0').rjust(32,b'\0')
+          p1363=r+s
+          obj['signature']['value']=base64.urlsafe_b64encode(p1363).decode().rstrip('=')
+          with open(os.path.join(root,'update-manifest.json'),'w',encoding='utf-8') as f: json.dump(obj,f,separators=(',',':'))
+          os.unlink(data_path);os.unlink(der)
+          PY
+            asset="artifacts/release/SIRK-Portal-${VERSION}-${runtime}.zip"
+            (cd "$out" && zip -q -r "$(realpath --relative-to="$out" "$GITHUB_WORKSPACE/$asset")" .)
+            python3 - "$asset" "$VERSION" "$runtime" "$CHANNEL" "$GITHUB_SHA" "$SIGNING_KEY_ID" "$RUNNER_TEMP/release-key.pem" "artifacts/release/SIRK-Portal-${VERSION}-${runtime}.update.json" <<'PY'
+          import base64,hashlib,json,os,subprocess,sys,tempfile,datetime
+          asset,version,runtime,channel,commit,key_id,key_path,out=sys.argv[1:]
+          data=open(asset,'rb').read()
+          obj={'schemaVersion':1,'applicationId':'sirk-portal','product':'SIRK Portal','version':version,'runtime':runtime,'channel':channel,'assetName':os.path.basename(asset),'size':len(data),'sha256':hashlib.sha256(data).hexdigest(),'commit':commit,'publishedAtUtc':datetime.datetime.now(datetime.timezone.utc).isoformat().replace('+00:00','Z'),'signature':{'algorithm':'ES256','keyId':key_id,'value':''}}
+          canonical=json.dumps({k:v for k,v in obj.items() if k!='signature'},sort_keys=True,separators=(',',':')).encode()
+          with tempfile.NamedTemporaryFile(delete=False) as f:f.write(canonical);p=f.name
+          der=p+'.sig';subprocess.check_call(['openssl','dgst','-sha256','-sign',key_path,'-out',der,p]);sig=open(der,'rb').read()
+          def rl(b,i):
+              n=b[i];i+=1
+              if n<128:return n,i
+              c=n&127;return int.from_bytes(b[i:i+c],'big'),i+c
+          i=1;_,i=rl(sig,i);i+=1;n,i=rl(sig,i);r=sig[i:i+n];i+=n;i+=1;n,i=rl(sig,i);s=sig[i:i+n]
+          obj['signature']['value']=base64.urlsafe_b64encode(r.lstrip(b'\0').rjust(32,b'\0')+s.lstrip(b'\0').rjust(32,b'\0')).decode().rstrip('=')
+          with open(out,'w',encoding='utf-8') as f:json.dump(obj,f,separators=(',',':'))
+          os.unlink(p);os.unlink(der)
+          PY
+          done
+      - name: Publish immutable GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          args=("v$VERSION" artifacts/release/SIRK-Portal-${VERSION}-*.zip artifacts/release/SIRK-Portal-${VERSION}-*.update.json)
+          if [[ "$CHANNEL" == preview ]]; then args+=(--prerelease); fi
+          gh release create "${args[@]}" --title "SIRK Portal $VERSION" --target "$GITHUB_SHA" --notes "Signed SIRK Portal $CHANNEL release. Runtime updates are distributed by SIRK Central."
+      - name: Remove private key
+        if: always()
+        shell: bash
+        run: rm -f "$RUNNER_TEMP/release-key.pem" "$RUNNER_TEMP/release-public.pem"
