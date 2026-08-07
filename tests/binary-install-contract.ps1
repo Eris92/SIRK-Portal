@@ -17,7 +17,7 @@ foreach ($required in @(
     'Ensure-SirkUpdater.ps1',
     'SIRK_PORTAL_BINARY_INSTALL_OK'
 )) {
-    if (-not $installer.Contains($required, [StringComparison]::Ordinal)) {
+    if ($installer.IndexOf($required, [StringComparison]::Ordinal) -lt 0) {
         throw "Binary clean installer is missing required contract: $required"
     }
 }
@@ -29,18 +29,18 @@ foreach ($forbidden in @(
     'codeload.github.com/Eris92/SIRK-Portal/zip',
     'Build Cache\\dotnet-sdk'
 )) {
-    if ($installer.Contains($forbidden, [StringComparison]::OrdinalIgnoreCase)) {
+    if ($installer.IndexOf($forbidden, [StringComparison]::OrdinalIgnoreCase) -ge 0) {
         throw "Binary clean installer must not perform source-build work: $forbidden"
     }
 }
 
-if (-not $installer.Contains("Public Portal release must not contain appsettings.Production.json.", [StringComparison]::Ordinal)) {
+if ($installer.IndexOf('Public Portal release must not contain appsettings.Production.json.', [StringComparison]::Ordinal) -lt 0) {
     throw 'Binary installer must reject machine-specific configuration in the public release.'
 }
-if (-not $installer.Contains("Portal package SHA-256 mismatch", [StringComparison]::Ordinal)) {
+if ($installer.IndexOf('Portal package SHA-256 mismatch', [StringComparison]::Ordinal) -lt 0) {
     throw 'Binary installer must verify release package SHA-256.'
 }
-if (-not $installer.Contains("Portal release manifest does not match release metadata.", [StringComparison]::Ordinal)) {
+if ($installer.IndexOf('Portal release manifest does not match release metadata.', [StringComparison]::Ordinal) -lt 0) {
     throw 'Binary installer must bind release manifest to release metadata.'
 }
 
