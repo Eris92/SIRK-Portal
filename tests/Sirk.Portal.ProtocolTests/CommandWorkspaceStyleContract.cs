@@ -8,6 +8,8 @@ internal static class CommandWorkspaceStyleContract
         var commandsCss = File.ReadAllText(Path.Combine(root, "public", "shared", "ui", "commands.css"));
         var deviceCss = File.ReadAllText(Path.Combine(root, "public", "portal", "standalone", "styles", "device-workspace.css"));
         var workspace = File.ReadAllText(Path.Combine(root, "public", "portal", "standalone", "scripts", "device-workspace.js"));
+        var quickCommandsApi = File.ReadAllText(Path.Combine(root, "public", "portal", "standalone", "scripts", "quick-commands-api-compat.js"));
+        var bundler = File.ReadAllText(Path.Combine(root, "src", "Sirk.Portal", "Ui", "PortalAssetBundler.cs"));
         var viewMode = File.ReadAllText(Path.Combine(root, "public", "portal", "standalone", "scripts", "view-mode.js"));
         var index = File.ReadAllText(Path.Combine(root, "public", "portal", "standalone", "index.html"));
 
@@ -40,6 +42,17 @@ internal static class CommandWorkspaceStyleContract
                  })
             Require(workspace.Contains(marker, StringComparison.Ordinal),
                 "Quick Commands shared configuration marker is missing: " + marker);
+
+        Require(workspace.Contains("core.api(\"commands\", \"scripts\")", StringComparison.Ordinal),
+            "Quick Commands must continue using the aggregate scripts contract exposed by the Devices bundle.");
+        Require(quickCommandsApi.Contains("moduleName !== \"commands\" || assetName !== \"scripts\"", StringComparison.Ordinal) &&
+                quickCommandsApi.Contains("nativeApi(\"commands\", \"tree\"", StringComparison.Ordinal) &&
+                quickCommandsApi.Contains("nativeApi(\"commands\", \"catalog\"", StringComparison.Ordinal),
+            "Quick Commands aggregate API must compose the canonical commands/tree and commands/catalog endpoints.");
+        var quickApi = bundler.IndexOf("quick-commands-api-compat.js", StringComparison.Ordinal);
+        var workspaceApi = bundler.IndexOf("device-workspace.js", StringComparison.Ordinal);
+        Require(quickApi >= 0 && workspaceApi > quickApi,
+            "Quick Commands API compatibility must load before device-workspace.js in portal-devices.bundle.js.");
 
         Require(viewMode.Contains("sirk-expanded-desktop-dock", StringComparison.Ordinal) &&
                 viewMode.Contains("width:min(560px", StringComparison.Ordinal) &&
