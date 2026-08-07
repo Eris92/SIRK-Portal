@@ -136,8 +136,13 @@ internal static partial class AgentInstallerPackageBuilder
         $GroupId = '{{EscapePowerShell(groupId)}}'
         $EnrollmentTicket = '{{EscapePowerShell(enrollmentTicket)}}'
         $Channel = '{{EscapePowerShell(channel)}}'
+        $LogRoot = Join-Path $env:ProgramData 'SIRK\Logs'
+        $LogPath = Join-Path $LogRoot ('Agent-Group-Installer-' + (Get-Date -Format 'yyyyMMdd-HHmmss') + '.log')
         $Installer = Join-Path $env:TEMP ('Install-SirkAgent-' + [guid]::NewGuid().ToString('N') + '.ps1')
+        New-Item -ItemType Directory -Path $LogRoot -Force | Out-Null
         try {
+            Start-Transcript -Path $LogPath -Force | Out-Null
+            Write-Host ('SIRK Agent group installer started. Group=' + $GroupId + ' Portal=' + $PortalUrl)
             Invoke-WebRequest -UseBasicParsing -Uri ($PortalUrl + '/api/v1/agent/install-script') -OutFile $Installer
             & powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File $Installer `
                 -PortalUrl $PortalUrl `
@@ -145,15 +150,31 @@ internal static partial class AgentInstallerPackageBuilder
                 -EnrollmentToken $EnrollmentTicket `
                 -Channel $Channel `
                 -Mode Silent
-            if ($LASTEXITCODE -ne 0) {
-                throw "SIRK Agent installer failed with exit code $LASTEXITCODE."
+            $ExitCode = $LASTEXITCODE
+            if ($ExitCode -ne 0) {
+                throw "SIRK Agent installer failed with exit code $ExitCode."
+            }
+            $RequiredCli = 'C:\Program Files\SIRK\Agent\sirkctl.exe'
+            if (-not (Test-Path -LiteralPath $RequiredCli -PathType Leaf)) {
+                throw "SIRK Agent installation returned success but the installed CLI is missing: $RequiredCli"
+            }
+            Get-Service SirkAgent,SirkAgentWatchdog,SirkUpdater -ErrorAction Stop | ForEach-Object {
+                if ($_.Status -ne 'Running') {
+                    throw "SIRK Agent service $($_.Name) is not running after installation."
+                }
             }
             Write-Host 'SIRK_AGENT_GROUP_INSTALLER_OK' -ForegroundColor Green
         }
+        catch {
+            Write-Error $_
+            exit 1
+        }
         finally {
+            Stop-Transcript -ErrorAction SilentlyContinue | Out-Null
             Remove-Item -LiteralPath $Installer -Force -ErrorAction SilentlyContinue
             Remove-Variable EnrollmentTicket -ErrorAction SilentlyContinue
         }
+        exit 0
         """;
 
     private static string BuildSed(
@@ -172,6 +193,17 @@ internal static partial class AgentInstallerPackageBuilder
         CAB_FixedSize=0
         CAB_ResvCodeSigning=0
         RebootMode=N
+        InstallPrompt=%InstallPrompt%
+        DisplayLicense=%DisplayLicense%
+        FinishMessage=%FinishMessage%
+        TargetName=%TargetName%
+        FriendlyName=%FriendlyName%
+        AppLaunched=%AppLaunched%
+        PostInstallCmd=%PostInstallCmd%
+        AdminQuietInstCmd=%AdminQuietInstCmd%
+        UserQuietInstCmd=%UserQuietInstCmd%
+        SourceFiles=SourceFiles
+        [Strings]
         InstallPrompt=
         DisplayLicense=
         FinishMessage=
@@ -179,15 +211,13 @@ internal static partial class AgentInstallerPackageBuilder
         FriendlyName=SIRK Agent installer - {{groupId}}
         AppLaunched=powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File Install.ps1
         PostInstallCmd=<None>
-        AdminQuietInstCmd=
-        UserQuietInstCmd=
-        SourceFiles=SourceFiles
+        AdminQuietInstCmd=powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File Install.ps1
+        UserQuietInstCmd=powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File Install.ps1
+        FILE0="Install.ps1"
         [SourceFiles]
         SourceFiles0={{sourceDirectory}}\
         [SourceFiles0]
         %FILE0%=
-        [Strings]
-        FILE0="Install.ps1"
         """;
 
     private static string EscapePowerShell(string value) =>
