@@ -34,11 +34,11 @@ internal static class DeviceConnectionWorkspaceContract
             "Normal Desktop must retain standard Quick Commands.");
 
         Require(workspaceConnection.Contains("var section = active(ws);", StringComparison.Ordinal) &&
-                workspaceConnection.Contains("if (!s.connected) {", StringComparison.Ordinal) &&
-                workspaceConnection.Contains("s.explicit = section;", StringComparison.Ordinal),
-            "Connected workspace synchronization must adopt the actually active section.");
-        Require(!workspaceConnection.Contains("(!s.connected || s.explicit !== active(ws))) general(ws, s)", StringComparison.Ordinal),
-            "A stale explicit section must never force a connected workspace back to General.");
+                workspaceConnection.Contains("if (!s.connected && section !== \"general\") general(ws, s);", StringComparison.Ordinal),
+            "Disconnected workspaces must return to General without overriding a connected active section.");
+        Require(!workspaceConnection.Contains("(!s.connected || s.explicit !== active(ws))) general(ws, s)", StringComparison.Ordinal) &&
+                !workspaceConnection.Contains("s.explicit = section;", StringComparison.Ordinal),
+            "Connected tab synchronization must neither fall back to General nor promote programmatic navigation to explicit user intent.");
 
         Require(viewMode.Contains("function isDevicesView()", StringComparison.Ordinal) &&
                 viewMode.Contains("enabled === true && isDevicesView()", StringComparison.Ordinal) &&
