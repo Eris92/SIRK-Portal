@@ -1,0 +1,88 @@
+name: SIRK Portal Binary Clean Install
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'install-binary.ps1'
+      - '.github/workflows/portal-binary-install-ci.yml'
+      - 'tools/installer/Ensure-SirkUpdater.ps1'
+      - 'tests/binary-install-contract.ps1'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: portal-binary-clean-install-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows-binary-clean-install:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate Windows PowerShell 5.1 syntax
+        shell: powershell
+        run: |
+          $tokens = $null
+          $errors = $null
+          [void][System.Management.Automation.Language.Parser]::ParseFile(
+            (Resolve-Path .\install-binary.ps1),
+            [ref]$tokens,
+            [ref]$errors)
+          if ($errors.Count -gt 0) {
+            $errors | ForEach-Object { Write-Error $_.Message }
+            throw 'install-binary.ps1 contains PowerShell syntax errors.'
+          }
+
+      - name: Run binary installer contract
+        shell: powershell
+        run: .\tests\binary-install-contract.ps1
+
+      - name: Clean install from verified release
+        shell: powershell
+        env:
+          SIRK_INSTALL_BREAKGLASS_PASSWORD: 'CI-Portal-BreakGlass-2026!'
+          SIRK_INSTALL_TRUST_CERTIFICATE: 'true'
+        run: |
+          $ErrorActionPreference = 'Stop'
+          .\install-binary.ps1 `
+            -PortalFqdn 'portal-ci.sir-k.local' `
+            -HttpsPort 443 `
+            -BootstrapUserName 'admin' `
+            -TrustCertificate `
+            -NonInteractive
+
+      - name: Verify installed Portal and updater
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $portal = Get-Service SirkPortal -ErrorAction Stop
+          $updater = Get-Service SirkUpdater -ErrorAction Stop
+          if ($portal.Status -ne 'Running' -or $portal.StartType -ne 'Automatic') {
+            throw "Invalid SirkPortal state: $($portal.Status) / $($portal.StartType)"
+          }
+          if ($updater.Status -ne 'Running') {
+            throw "Invalid SirkUpdater state: $($updater.Status)"
+          }
+
+          $health = Invoke-RestMethod -Uri 'https://portal-ci.sir-k.local/healthz'
+          $ready = Invoke-RestMethod -Uri 'https://portal-ci.sir-k.local/readyz'
+          if ($health.status -ne 'healthy') { throw 'healthz failed.' }
+          if ($ready.status -ne 'ready') { throw 'readyz failed.' }
+
+          $manifest = Get-Content 'C:\Program Files\SIRK\Portal\release-manifest.json' -Raw -Encoding UTF8 | ConvertFrom-Json
+          if ($manifest.applicationId -ne 'sirk-portal' -or $manifest.channel -ne 'main') {
+            throw 'Installed release manifest is invalid.'
+          }
+          if (-not (Test-Path 'C:\ProgramData\SIRK\Portal\identity.json')) {
+            throw 'Portal identity was not initialized.'
+          }
+          if (Test-Path 'C:\ProgramData\SIRK\Build Cache\dotnet-sdk') {
+            throw 'Binary clean installation must not download a build SDK.'
+          }
+
+          Write-Host ('Binary clean install verified. Commit=' + $manifest.commit) -ForegroundColor Green
