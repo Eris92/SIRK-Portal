@@ -1,12 +1,10 @@
 using System.Net.Http.Headers;
-using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Sirk.Portal.Central;
 
 namespace Sirk.Portal.Agent;
 
-internal sealed record AgentUpdateAccessRequest(string Runtime, string Channel, string CurrentVersion);
 internal sealed record CentralAgentUpdateTicketRequest(string DeviceId, string Runtime, string Channel, string CurrentVersion);
 
 internal static class AgentUpdateAccessEndpoints
@@ -29,7 +27,7 @@ internal static class AgentUpdateAccessEndpoints
         IHttpClientFactory httpClientFactory)
     {
         context.Response.Headers.CacheControl = "no-store";
-        using var principal = authenticator.Authenticate(context.Request, ReadOnlySpan<byte>.Empty);
+        var principal = authenticator.Authenticate(context.Request, ReadOnlySpan<byte>.Empty);
         if (principal is null)
         {
             context.Response.StatusCode = StatusCodes.Status401Unauthorized;
