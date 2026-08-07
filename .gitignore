@@ -8,3 +8,5 @@ TestResults/
 .DS_Store
 Thumbs.db
 .codex-local/
+**/__pycache__/
+*.py[cod]
