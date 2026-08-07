@@ -21,30 +21,33 @@ internal static class MaintenanceUpdateAvailabilityContract
             "updateAvailable = OperatingSystem.IsWindows(),",
             StringComparison.Ordinal),
             "Maintenance status must not report an update merely because Portal runs on Windows.");
-        Require(maintenance.Contains("PortalUpdateProbe.Probe()", StringComparison.Ordinal) &&
-                maintenance.Contains("PortalUpdateProbe.Probe(force: true)", StringComparison.Ordinal) &&
+        Require(maintenance.Contains("_updates.Probe()", StringComparison.Ordinal) &&
+                maintenance.Contains("_updates.Probe(force: true)", StringComparison.Ordinal) &&
                 maintenance.Contains("commit = update.InstalledCommit", StringComparison.Ordinal) &&
                 maintenance.Contains("commit = update.RemoteCommit", StringComparison.Ordinal),
-            "Maintenance status must compare installed and remote release commits and support force refresh.");
-        Require(maintenance.Contains(
-            "Portal jest już aktualny dla main/latest.",
-            StringComparison.Ordinal),
-            "Direct update calls must be rejected when the installed release is already current.");
+            "Maintenance status must compare installed and Central release commits and support force refresh.");
+        Require(maintenance.Contains("_updates.PrepareUpdate()", StringComparison.Ordinal) &&
+                maintenance.Contains("Portal is already current.", StringComparison.Ordinal) == false,
+            "Maintenance update must use the Central-backed PortalUpdateClient instead of a direct release path.");
 
         Require(probe.Contains("release-manifest.json", StringComparison.Ordinal) &&
-                probe.Contains("portal-update.json", StringComparison.Ordinal) &&
-                probe.Contains("remoteCommit", StringComparison.Ordinal) &&
-                probe.Contains("installedCommit", StringComparison.Ordinal) &&
-                probe.Contains("StringComparison.OrdinalIgnoreCase", StringComparison.Ordinal),
-            "Update probe must compare the installed release manifest commit with verified release metadata.");
+                probe.Contains("/api/portal/v1/update/products/sirk-portal/latest", StringComparison.Ordinal) &&
+                probe.Contains("RemoteCommit", StringComparison.Ordinal) &&
+                probe.Contains("InstalledCommit", StringComparison.Ordinal) &&
+                probe.Contains("VerifyDescriptorSignature", StringComparison.Ordinal) &&
+                probe.Contains("sirk-portal", StringComparison.Ordinal),
+            "Update client must compare installed state with a signed Central Portal offer.");
         Require(probe.Contains("CacheLifetime = TimeSpan.FromMinutes(1)", StringComparison.Ordinal) &&
-                probe.Contains("public static PortalUpdateProbeResult Probe(bool force = false)", StringComparison.Ordinal),
+                probe.Contains("public PortalUpdateProbeResult Probe(bool force = false)", StringComparison.Ordinal),
             "Update probing must be cached while allowing an explicit refresh.");
+        Require(!probe.Contains("api.github.com", StringComparison.OrdinalIgnoreCase) &&
+                !probe.Contains("github.com/Eris92/SIRK-Portal", StringComparison.OrdinalIgnoreCase) &&
+                !probe.Contains("portal-main-latest", StringComparison.OrdinalIgnoreCase),
+            "Installed Portal update probing must not access GitHub directly.");
 
-        Require(ui.Contains("Portal jest aktualny dla main/latest.", StringComparison.Ordinal) &&
-                ui.Contains("Nie udało się sprawdzić aktualizacji:", StringComparison.Ordinal) &&
+        Require(ui.Contains("Nie udało się sprawdzić aktualizacji:", StringComparison.Ordinal) &&
                 ui.Contains("updateButton.disabled", StringComparison.Ordinal),
-            "Update UI must distinguish current, available and check-error states.");
+            "Update UI must distinguish available and check-error states.");
         Require(bundler.Contains(
             "portal/standalone/scripts/update-availability-ui.js",
             StringComparison.Ordinal),
