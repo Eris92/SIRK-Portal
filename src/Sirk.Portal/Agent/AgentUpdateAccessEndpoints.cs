@@ -75,8 +75,8 @@ internal static class AgentUpdateAccessEndpoints
                 Content = new ByteArrayContent(body)
             };
             request.Content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
-            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", central.PortalToken);
-            request.Headers.TryAddWithoutValidation("X-SIRK-Portal-Id", central.PortalId);
+            var signed = PortalRequestSigner.Create(body, central.PortalId, central.PortalToken);
+            request.Headers.TryAddWithoutValidation("Authorization", signed.Authorization);
             var client = httpClientFactory.CreateClient("SirkCentral");
             using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, timeout.Token);
             if (!response.IsSuccessStatusCode)
