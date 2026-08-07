@@ -38,20 +38,23 @@ internal sealed class PortalMaintenanceStore
     private const int SchemaVersion = 1;
     private const string LinuxHelperRoot = "/usr/lib/sirk-portal";
     private static readonly HashSet<string> Channels =
-        new(StringComparer.Ordinal) { "stable", "beta", "dev" };
+        new(StringComparer.Ordinal) { "stable", "preview" };
 
     private readonly object _sync = new();
     private readonly PortalPaths _paths;
+    private readonly PortalUpdateClient _updates;
     private readonly string _stateFile;
     private readonly string _backupRoot;
     private PortalMaintenanceDocument _document;
 
-    public PortalMaintenanceStore(PortalPaths paths)
+    public PortalMaintenanceStore(PortalPaths paths, PortalUpdateClient updates)
     {
         _paths = paths;
+        _updates = updates;
         _stateFile = Path.Combine(paths.DataRoot, "maintenance.json");
         var sirkRoot = Path.GetDirectoryName(paths.DataRoot)
-                       ?? throw new InvalidOperationException("Portal data root has no parent directory.");
+                       ?? throw new InvalidOperationException(
+                           "Portal data root has no parent directory.");
         _backupRoot = OperatingSystem.IsWindows()
             ? Path.Combine(sirkRoot, "Portal Backups")
             : Path.Combine(paths.DataRoot, "Backups");
@@ -69,7 +72,7 @@ internal sealed class PortalMaintenanceStore
 
     public object Snapshot()
     {
-        var update = PortalUpdateProbe.Probe();
+        var update = _updates.Probe();
         lock (_sync)
         {
             CleanupMissingFiles();
@@ -122,14 +125,14 @@ internal sealed class PortalMaintenanceStore
 
     public object Check()
     {
-        var update = PortalUpdateProbe.Probe(force: true);
+        var update = _updates.Probe(force: true);
         lock (_sync)
         {
             var message = update.Error is not null
-                ? "Sprawdzenie kanału aktualizacji main/latest nie powiodło się."
+                ? "Sprawdzenie aktualizacji przez SIRK Central nie powiodło się."
                 : update.UpdateAvailable
-                    ? "Dostępna jest nowsza paczka main/latest."
-                    : "Portal jest aktualny dla main/latest.";
+                    ? "SIRK Central udostępnia nowszą podpisaną paczkę Portalu."
+                    : "Portal jest aktualny.";
             AppendHistory("check", message, update.Error);
             Save();
             return Snapshot();
@@ -140,7 +143,7 @@ internal sealed class PortalMaintenanceStore
     {
         var normalized = (channel ?? string.Empty).Trim().ToLowerInvariant();
         if (!Channels.Contains(normalized))
-            throw new InvalidDataException("Update channel must be stable, beta or dev.");
+            throw new InvalidDataException("Update channel must be stable or preview.");
         lock (_sync)
         {
             _document = _document with
@@ -193,10 +196,10 @@ internal sealed class PortalMaintenanceStore
                 Save();
                 return Snapshot();
             }
-            catch (Exception exception)
+            catch (Exception error)
             {
                 File.Delete(temporary);
-                AppendHistory("backup", "Tworzenie backupu nie powiodło się.", exception.Message);
+                AppendHistory("backup", "Tworzenie backupu nie powiodło się.", error.Message);
                 Save();
                 throw;
             }
@@ -224,8 +227,7 @@ internal sealed class PortalMaintenanceStore
                      SearchOption.AllDirectories))
         {
             var fullPath = Path.GetFullPath(file);
-            if (fullPath.StartsWith(backupPrefix, StringComparison.Ordinal))
-                continue;
+            if (fullPath.StartsWith(backupPrefix, StringComparison.Ordinal)) continue;
             var relative = Path.GetRelativePath(_paths.DataRoot, fullPath)
                 .Replace(Path.DirectorySeparatorChar, '/');
             archive.CreateEntryFromFile(fullPath, relative, CompressionLevel.Optimal);
@@ -256,12 +258,11 @@ internal sealed class PortalMaintenanceStore
         {
             StartHelperScript(
                 "restart",
-                "Start-Sleep -Seconds 2\r\n" +
-                "Restart-Service -Name 'SirkPortal' -Force\r\n");
+                "Start-Sleep -Seconds 2\r\nRestart-Service -Name 'SirkPortal' -Force\r\n");
         }
         else if (OperatingSystem.IsLinux())
         {
-            RunLinuxMaintenanceHelper("restart-helper");
+            RunLinuxMaintenanceHelper("restart-helper", []);
         }
         else
         {
@@ -271,12 +272,7 @@ internal sealed class PortalMaintenanceStore
 
         lock (_sync)
         {
-            AppendHistory(
-                "restart",
-                OperatingSystem.IsLinux()
-                    ? "Zaplanowano restart usługi sirk-portal.service."
-                    : "Zaplanowano restart usługi SirkPortal.",
-                null);
+            AppendHistory("restart", "Zaplanowano restart usługi SIRK Portal.", null);
             Save();
         }
         return new { accepted = true, action = "restart" };
@@ -288,12 +284,7 @@ internal sealed class PortalMaintenanceStore
             throw new PlatformNotSupportedException(
                 "Aktualizacja Portalu jest dostępna tylko na Windows i Linux systemd.");
 
-        var update = PortalUpdateProbe.Probe(force: true);
-        if (update.Error is not null)
-            throw new InvalidOperationException("Nie można potwierdzić dostępności aktualizacji: " + update.Error);
-        if (!update.UpdateAvailable)
-            throw new InvalidOperationException("Portal jest już aktualny dla main/latest.");
-
+        var prepared = _updates.PrepareUpdate();
         var lockPath = Path.Combine(_paths.DataRoot, "maintenance-update.lock");
         lock (_sync)
         {
@@ -310,89 +301,34 @@ internal sealed class PortalMaintenanceStore
             AtomicJsonFile.SecureFile(lockPath);
         }
 
-        var logRoot = Path.Combine(_paths.DataRoot, "Logs");
-        Directory.CreateDirectory(logRoot);
-        AtomicJsonFile.SecureDirectory(logRoot);
-
-        if (OperatingSystem.IsLinux())
-        {
-            var linuxLogPath = Path.Combine(logRoot, "gui-update-linux.log");
-            try
-            {
-                RunLinuxMaintenanceHelper("update-helper");
-            }
-            catch
-            {
-                File.Delete(lockPath);
-                throw;
-            }
-
-            lock (_sync)
-            {
-                AppendHistory(
-                    "update",
-                    "Uruchomiono aktualizację Portalu z main/latest przez systemd. Log: " + linuxLogPath,
-                    null);
-                Save();
-            }
-            return new
-            {
-                accepted = true,
-                action = "update",
-                channel = "main",
-                logPath = linuxLogPath
-            };
-        }
-
-        var installRoot = AppContext.BaseDirectory.TrimEnd(
-            Path.DirectorySeparatorChar,
-            Path.AltDirectorySeparatorChar);
-        var settingsPath = Path.Combine(installRoot, "appsettings.Production.json");
-        if (!File.Exists(settingsPath))
-        {
-            File.Delete(lockPath);
-            throw new InvalidOperationException(
-                "Brak appsettings.Production.json wymaganych do aktualizacji.");
-        }
-
-        var logPath = Path.Combine(
-            logRoot,
-            "gui-update-" + DateTimeOffset.UtcNow.ToString("yyyyMMdd-HHmmss") + ".log");
-
-        var script = $$"""
-Start-Sleep -Seconds 2
-$installRoot={{QuotePs(installRoot)}}
-$dataRoot={{QuotePs(_paths.DataRoot)}}
-$settingsPath={{QuotePs(settingsPath)}}
-$lockPath={{QuotePs(lockPath)}}
-$logPath={{QuotePs(logPath)}}
-$bootstrap=Join-Path ([IO.Path]::GetTempPath()) ('SIRK-Portal-Gui-Update-' + [guid]::NewGuid().ToString('N') + '.ps1')
-try {
-    ('Start GUI update: ' + [DateTimeOffset]::UtcNow.ToString('O')) | Set-Content -LiteralPath $logPath -Encoding UTF8
-    $settings=Get-Content -LiteralPath $settingsPath -Raw -Encoding UTF8 | ConvertFrom-Json
-    $httpsEndpoint=[uri][string]$settings.Kestrel.Endpoints.Https.Url
-    $publicUri=[uri][string]$settings.Sirk.Central.PublicUrl
-    $portalFqdn=[string]$publicUri.DnsSafeHost
-    $httpsPort=[int]$httpsEndpoint.Port
-    if([string]::IsNullOrWhiteSpace($portalFqdn)){throw 'Nie można ustalić FQDN Portalu z konfiguracji.'}
-    if($httpsPort -lt 1 -or $httpsPort -gt 65535){throw 'Nie można ustalić portu HTTPS Portalu z konfiguracji.'}
-    Invoke-WebRequest -UseBasicParsing -Uri ('https://raw.githubusercontent.com/Eris92/SIRK-Portal/main/install.ps1?nocache=' + [guid]::NewGuid()) -OutFile $bootstrap
-    & $bootstrap -Branch 'main' -InstallRoot $installRoot -DataRoot $dataRoot -HttpsPort $httpsPort -PortalFqdn $portalFqdn -TrustCertificate -NonInteractive -KeepBuildSdk *>> $logPath
-    if(-not $?){throw 'Instalator SIRK Portal zakończył się błędem.'}
-}
-catch {
-    ($_ | Out-String) | Add-Content -LiteralPath $logPath -Encoding UTF8
-    throw
-}
-finally {
-    Remove-Item -LiteralPath $bootstrap -Force -ErrorAction SilentlyContinue
-    Remove-Item -LiteralPath $lockPath -Force -ErrorAction SilentlyContinue
-}
-""";
-
         try
         {
-            StartHelperScript("update", script);
+            if (OperatingSystem.IsLinux())
+            {
+                RunLinuxMaintenanceHelper(
+                    "update-helper",
+                    [prepared.PackagePath, prepared.Sha256, prepared.Version]);
+            }
+            else
+            {
+                var updater = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+                    "SIRK",
+                    "Updater",
+                    "SirkUpdater.exe");
+                if (!File.Exists(updater))
+                    throw new FileNotFoundException("SIRK Updater is missing.", updater);
+                var script =
+                    "Start-Sleep -Seconds 2\r\n" +
+                    "$updater=" + QuotePs(updater) + "\r\n" +
+                    "$lock=" + QuotePs(lockPath) + "\r\n" +
+                    "try {\r\n" +
+                    "  & $updater 'update' 'sirk-portal' " + QuotePs(prepared.PackagePath) + " " +
+                    QuotePs(prepared.Sha256) + " " + QuotePs(prepared.Version) + "\r\n" +
+                    "  if($LASTEXITCODE -ne 0){throw ('SIRK Updater exit code: ' + $LASTEXITCODE)}\r\n" +
+                    "} finally { Remove-Item -LiteralPath $lock -Force -ErrorAction SilentlyContinue }\r\n";
+                StartHelperScript("update", script);
+            }
         }
         catch
         {
@@ -404,7 +340,7 @@ finally {
         {
             AppendHistory(
                 "update",
-                "Uruchomiono aktualizację Portalu z main/latest. Log: " + logPath,
+                "Przekazano podpisaną paczkę " + prepared.Version + " z cache SIRK Central do SIRK Updater.",
                 null);
             Save();
         }
@@ -412,21 +348,20 @@ finally {
         {
             accepted = true,
             action = "update",
-            channel = "main",
-            logPath
+            channel = _document.Channel,
+            version = prepared.Version,
+            commit = prepared.Commit
         };
     }
 
     public object ScheduleRestore(string? id)
     {
         if (!OperatingSystem.IsWindows())
-            throw new PlatformNotSupportedException("Przywracanie backupu jest dostępne tylko na Windows.");
+            throw new PlatformNotSupportedException(
+                "Przywracanie backupu jest dostępne tylko na Windows.");
         var normalized = RequiredId(id);
         PortalBackupRecord backup;
-        lock (_sync)
-        {
-            backup = FindBackup(normalized);
-        }
+        lock (_sync) backup = FindBackup(normalized);
         var archive = Path.Combine(_backupRoot, backup.FileName);
         var rollback = Path.Combine(
             Path.GetDirectoryName(_paths.DataRoot)!,
@@ -451,18 +386,19 @@ finally {
         return new { accepted = true, action = "restore", id = normalized };
     }
 
-    private static void RunLinuxMaintenanceHelper(string helperName)
+    private void RunLinuxMaintenanceHelper(string helperName, IReadOnlyList<string> arguments)
     {
         if (!OperatingSystem.IsLinux())
-            throw new PlatformNotSupportedException("Linux maintenance helper is unavailable on this platform.");
+            throw new PlatformNotSupportedException(
+                "Linux maintenance helper is unavailable on this platform.");
         if (helperName.Any(character =>
                 !char.IsAsciiLetterOrDigit(character) && character is not '-' and not '_'))
             throw new InvalidDataException("Linux maintenance helper name is invalid.");
-
+        if (arguments.Count > 4 || arguments.Any(value => value.Length > 1024 || value.Contains('\0')))
+            throw new InvalidDataException("Linux maintenance helper arguments are invalid.");
         var helper = Path.Combine(LinuxHelperRoot, helperName);
         if (!File.Exists(helper))
             throw new InvalidOperationException("Brak Linux maintenance helper: " + helper);
-
         var sudo = File.Exists("/usr/bin/sudo") ? "/usr/bin/sudo" : "/bin/sudo";
         if (!File.Exists(sudo))
             throw new InvalidOperationException("sudo nie jest dostępne na tym systemie Linux.");
@@ -477,15 +413,17 @@ finally {
         };
         start.ArgumentList.Add("-n");
         start.ArgumentList.Add(helper);
-
+        foreach (var argument in arguments) start.ArgumentList.Add(argument);
         using var process = Process.Start(start)
-                            ?? throw new InvalidOperationException("Nie można uruchomić Linux maintenance helper.");
+                            ?? throw new InvalidOperationException(
+                                "Nie można uruchomić Linux maintenance helper.");
         var stdout = process.StandardOutput.ReadToEnd();
         var stderr = process.StandardError.ReadToEnd();
         if (!process.WaitForExit(15000))
         {
             try { process.Kill(entireProcessTree: true); } catch { }
-            throw new TimeoutException("Linux maintenance helper nie zakończył etapu planowania w ciągu 15 sekund.");
+            throw new TimeoutException(
+                "Linux maintenance helper nie zakończył etapu planowania w ciągu 15 sekund.");
         }
         if (process.ExitCode != 0)
         {
@@ -518,7 +456,8 @@ finally {
         start.ArgumentList.Add("-File");
         start.ArgumentList.Add(path);
         _ = Process.Start(start)
-            ?? throw new InvalidOperationException("Nie można uruchomić pomocniczego procesu maintenance.");
+            ?? throw new InvalidOperationException(
+                "Nie można uruchomić pomocniczego procesu maintenance.");
     }
 
     private PortalBackupRecord FindBackup(string id)
@@ -547,18 +486,17 @@ finally {
 
     private void AppendHistory(string type, string message, string? error)
     {
-        var next = _document.History
-            .Append(new PortalMaintenanceHistory(
-                type,
-                DateTimeOffset.UtcNow,
-                VersionInfo.Current,
-                message,
-                error))
-            .TakeLast(1000)
-            .ToArray();
         _document = _document with
         {
-            History = next,
+            History = _document.History
+                .Append(new PortalMaintenanceHistory(
+                    type,
+                    DateTimeOffset.UtcNow,
+                    VersionInfo.Current,
+                    message,
+                    error))
+                .TakeLast(1000)
+                .ToArray(),
             UpdatedAtUtc = DateTimeOffset.UtcNow
         };
     }
@@ -569,10 +507,15 @@ finally {
     {
         if (value.SchemaVersion != SchemaVersion)
             throw new InvalidDataException("Portal maintenance schema is unsupported.");
-        if (!Channels.Contains(value.Channel))
-            throw new InvalidDataException("Portal maintenance channel is invalid.");
+        var channel = value.Channel switch
+        {
+            "stable" => "stable",
+            "preview" or "beta" or "dev" => "preview",
+            _ => throw new InvalidDataException("Portal maintenance channel is invalid.")
+        };
         return value with
         {
+            Channel = channel,
             Backups = value.Backups ?? [],
             History = value.History ?? []
         };
@@ -580,7 +523,7 @@ finally {
 
     private static PortalMaintenanceDocument NewDocument() => new(
         SchemaVersion,
-        "dev",
+        "preview",
         [],
         [],
         DateTimeOffset.UtcNow);
@@ -591,9 +534,7 @@ finally {
         if (normalized.Length is < 1 or > 128 ||
             normalized.Any(character =>
                 !char.IsAsciiLetterOrDigit(character) && character is not '-' and not '_'))
-        {
             throw new InvalidDataException("Backup ID is invalid.");
-        }
         return normalized;
     }
 
@@ -603,8 +544,7 @@ finally {
 
 internal static class PortalMaintenanceEndpoints
 {
-    public static IEndpointRouteBuilder MapPortalMaintenance(
-        this IEndpointRouteBuilder endpoints)
+    public static IEndpointRouteBuilder MapPortalMaintenance(this IEndpointRouteBuilder endpoints)
     {
         var group = endpoints
             .MapGroup("/api/v1/admin/maintenance")
@@ -626,59 +566,53 @@ internal static class PortalMaintenanceEndpoints
         IAntiforgery antiforgery,
         PortalMaintenanceStore store,
         PortalAuditLog audit) =>
-        MutateAsync(context, antiforgery, audit, "maintenance.check", "check", () => store.Check());
+        MutateAsync(context, antiforgery, audit, "maintenance.check", "check", store.Check);
 
-    private static async Task<IResult> BackupAsync(
+    private static Task<IResult> BackupAsync(
         PortalMaintenanceMutation request,
         HttpContext context,
         IAntiforgery antiforgery,
         PortalMaintenanceStore store,
         PortalAuditLog audit) =>
-        await MutateAsync(context, antiforgery, audit, "maintenance.backup", "backup", () => store.CreateBackup(request.Reason));
+        MutateAsync(context, antiforgery, audit, "maintenance.backup", "backup", () => store.CreateBackup(request.Reason));
 
-    private static async Task<IResult> ChannelAsync(
+    private static Task<IResult> ChannelAsync(
         PortalMaintenanceMutation request,
         HttpContext context,
         IAntiforgery antiforgery,
         PortalMaintenanceStore store,
         PortalAuditLog audit) =>
-        await MutateAsync(context, antiforgery, audit, "maintenance.channel", "channel", () => store.SetChannel(request.Channel));
+        MutateAsync(context, antiforgery, audit, "maintenance.channel", "channel", () => store.SetChannel(request.Channel));
 
-    private static async Task<IResult> DeleteBackupAsync(
+    private static Task<IResult> DeleteBackupAsync(
         PortalMaintenanceMutation request,
         HttpContext context,
         IAntiforgery antiforgery,
         PortalMaintenanceStore store,
         PortalAuditLog audit) =>
-        await MutateAsync(context, antiforgery, audit, "maintenance.delete-backup", request.Id ?? string.Empty, () => store.DeleteBackup(request.Id));
+        MutateAsync(context, antiforgery, audit, "maintenance.delete-backup", request.Id ?? string.Empty, () => store.DeleteBackup(request.Id));
 
-    private static async Task<IResult> RestartAsync(
+    private static Task<IResult> RestartAsync(
         HttpContext context,
         IAntiforgery antiforgery,
         PortalMaintenanceStore store,
         PortalAuditLog audit) =>
-        await MutateAsync(context, antiforgery, audit, "maintenance.restart", "SirkPortal", store.ScheduleRestart);
+        MutateAsync(context, antiforgery, audit, "maintenance.restart", "SirkPortal", store.ScheduleRestart);
 
-    private static async Task<IResult> UpdateAsync(
+    private static Task<IResult> UpdateAsync(
         HttpContext context,
         IAntiforgery antiforgery,
         PortalMaintenanceStore store,
         PortalAuditLog audit) =>
-        await MutateAsync(
-            context,
-            antiforgery,
-            audit,
-            "maintenance.update",
-            "main/latest",
-            store.ScheduleUpdate);
+        MutateAsync(context, antiforgery, audit, "maintenance.update", "sirk-central-cache", store.ScheduleUpdate);
 
-    private static async Task<IResult> RestoreAsync(
+    private static Task<IResult> RestoreAsync(
         PortalMaintenanceMutation request,
         HttpContext context,
         IAntiforgery antiforgery,
         PortalMaintenanceStore store,
         PortalAuditLog audit) =>
-        await MutateAsync(context, antiforgery, audit, "maintenance.restore", request.Id ?? string.Empty, () => store.ScheduleRestore(request.Id));
+        MutateAsync(context, antiforgery, audit, "maintenance.restore", request.Id ?? string.Empty, () => store.ScheduleRestore(request.Id));
 
     private static async Task<IResult> MutateAsync(
         HttpContext context,
@@ -699,23 +633,29 @@ internal static class PortalMaintenanceEndpoints
                 operation,
                 "maintenance",
                 target,
-                true,
-                PortalAuthenticationEndpoints.RemoteAddress(context),
-                context.TraceIdentifier));
+                "success",
+                null,
+                context.Connection.RemoteIpAddress?.ToString(),
+                context.Request.Headers.UserAgent.ToString(),
+                DateTimeOffset.UtcNow));
             return Results.Ok(new { ok = true, value });
         }
-        catch (KeyNotFoundException exception)
+        catch (Exception error) when (
+            error is InvalidDataException or InvalidOperationException or KeyNotFoundException or
+            IOException or UnauthorizedAccessException or PlatformNotSupportedException)
         {
-            return PortalAuthenticationEndpoints.Error(404, "BACKUP_NOT_FOUND", exception.Message);
-        }
-        catch (PlatformNotSupportedException exception)
-        {
-            return PortalAuthenticationEndpoints.Error(409, "MAINTENANCE_PLATFORM_UNSUPPORTED", exception.Message);
-        }
-        catch (Exception exception) when (
-            exception is InvalidDataException or InvalidOperationException or IOException or UnauthorizedAccessException)
-        {
-            return PortalAuthenticationEndpoints.Error(400, "MAINTENANCE_FAILED", exception.Message);
+            audit.Write(new PortalAuditEvent(
+                PortalAuthenticationEndpoints.ActorId(context),
+                PortalAuthenticationEndpoints.ActorName(context),
+                operation,
+                "maintenance",
+                target,
+                "rejected",
+                error.Message,
+                context.Connection.RemoteIpAddress?.ToString(),
+                context.Request.Headers.UserAgent.ToString(),
+                DateTimeOffset.UtcNow));
+            return Results.Conflict(new { ok = false, error = error.Message });
         }
     }
 }
