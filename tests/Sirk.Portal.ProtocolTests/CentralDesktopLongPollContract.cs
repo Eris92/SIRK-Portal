@@ -27,17 +27,27 @@ internal static class CentralDesktopLongPollContract
 
         Require(
             guard.Contains("maximumWaitMilliseconds = 15000", StringComparison.Ordinal) &&
-            guard.Contains("/api\/v1\/desktop\/frame", StringComparison.Ordinal) &&
+            guard.Contains(@"/api\/v1\/desktop\/frame", StringComparison.Ordinal) &&
             guard.Contains("response.status === 504", StringComparison.Ordinal) &&
             guard.Contains("status: 204", StringComparison.Ordinal) &&
             guard.Contains("gatewayRetryMilliseconds", StringComparison.Ordinal),
             "Central desktop frame polling must stay below the Central relay timeout and retry transient gateway failures with backoff.");
 
+        var transportIndex = bundler.IndexOf(
+            "\"portal/standalone/scripts/central-tunnel-transport.js\"",
+            StringComparison.Ordinal);
+        var longPollIndex = bundler.IndexOf(
+            "\"portal/standalone/scripts/central-desktop-longpoll.js\"",
+            StringComparison.Ordinal);
+        var workspaceIndex = bundler.IndexOf(
+            "\"portal/standalone/scripts/device-workspace.js\"",
+            StringComparison.Ordinal);
+
         Require(
-            bundler.Contains(
-                "portal/standalone/scripts/central-tunnel-transport.js\",\n                \"portal/standalone/scripts/central-desktop-longpoll.js\",\n                \"portal/standalone/scripts/device-workspace.js",
-                StringComparison.Ordinal),
-            "The Central desktop long-poll guard must load before the device workspace starts frame polling.");
+            transportIndex >= 0 &&
+            longPollIndex > transportIndex &&
+            workspaceIndex > longPollIndex,
+            "The Central desktop long-poll guard must load after the tunnel transport and before the device workspace starts frame polling.");
     }
 
     private static string FindRepositoryRoot()
