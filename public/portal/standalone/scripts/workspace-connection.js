@@ -96,11 +96,7 @@
         paintToggle(toggle(ws, s), s.connected, isOnline);
         gate(ws, s, isOnline);
         var section = active(ws);
-        if (!s.connected) {
-            if (section !== "general") general(ws, s);
-        } else if (section !== s.explicit) {
-            s.explicit = section;
-        }
+        if (!s.connected && section !== "general") general(ws, s);
         desktopStart(ws, s);
     }
     function sync() {
