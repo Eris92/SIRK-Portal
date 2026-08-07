@@ -69,7 +69,25 @@ try {
     if ($expected -notmatch '^[0-9a-fA-F]{64}$') {
         throw 'Agent Setup SHA-256 file is invalid.'
     }
-    $actual = (Get-FileHash -LiteralPath $setup -Algorithm SHA256).Hash
+
+    # Do not depend on Microsoft.PowerShell.Utility auto-loading here. IExpress
+    # launches Windows PowerShell in a deliberately minimal process where
+    # Get-FileHash may not be available. SHA256 from the BCL is present on every
+    # supported Windows PowerShell 5.1 system and gives the same verification.
+    $stream = [IO.File]::OpenRead($setup)
+    try {
+        $sha256 = [Security.Cryptography.SHA256]::Create()
+        try {
+            $hashBytes = $sha256.ComputeHash($stream)
+            $actual = -join @($hashBytes | ForEach-Object { $_.ToString('x2') })
+        }
+        finally {
+            $sha256.Dispose()
+        }
+    }
+    finally {
+        $stream.Dispose()
+    }
     if (-not $actual.Equals($expected, [StringComparison]::OrdinalIgnoreCase)) {
         throw "Agent Setup SHA-256 mismatch. Expected=$expected Actual=$actual"
     }
