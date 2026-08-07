@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Public GitHub access in this script is bootstrap-only. Installed runtime updates
+# are prepared by SIRK Portal from the SIRK Central verified cache and handed to
+# the root-owned helper below.
 RELEASE_BASE="${SIRK_PORTAL_RELEASE_BASE:-https://github.com/Eris92/SIRK-Portal/releases/download/portal-main-latest}"
 INSTALL_ROOT="${SIRK_PORTAL_INSTALL_ROOT:-/opt/sirk/portal}"
 DATA_ROOT="${SIRK_PORTAL_DATA_ROOT:-/var/lib/sirk-portal}"
@@ -14,7 +17,6 @@ PORTAL_FQDN="${SIRK_INSTALL_FQDN:-}"
 HTTPS_PORT="${SIRK_INSTALL_HTTPS_PORT:-443}"
 REMOVE_DATA=0
 NON_INTERACTIVE=0
-UPDATE_ONLY=0
 
 log()  { printf '[INFO] %s\n' "$*"; }
 ok()   { printf '[OK] %s\n' "$*"; }
@@ -28,7 +30,10 @@ Usage: sudo bash install-linux.sh [options]
   --port PORT        HTTPS port (default 443)
   --remove-data      Delete existing Portal data and create a fresh identity
   --non-interactive  Do not prompt; clean install requires SIRK_INSTALL_BREAKGLASS_PASSWORD
-  --update-only      Transactionally update an existing Linux Portal
+
+Installed Portal updates are not performed by this bootstrap installer.
+Use Portal maintenance; it obtains a signed package from SIRK Central and hands
+it to SIRK Updater transactionally.
 EOF
 }
 
@@ -38,7 +43,6 @@ while [[ $# -gt 0 ]]; do
     --port) [[ $# -ge 2 ]] || die "--port requires a value"; HTTPS_PORT="$2"; shift 2 ;;
     --remove-data) REMOVE_DATA=1; shift ;;
     --non-interactive) NON_INTERACTIVE=1; shift ;;
-    --update-only) UPDATE_ONLY=1; NON_INTERACTIVE=1; shift ;;
     -h|--help) usage; exit 0 ;;
     *) die "Unknown argument: $1" ;;
   esac
@@ -49,18 +53,6 @@ done
 [[ "$(uname -m)" == "x86_64" ]] || die "Only linux-x64 is supported."
 command -v systemctl >/dev/null 2>&1 || die "systemd/systemctl is required."
 command -v systemd-run >/dev/null 2>&1 || die "systemd-run is required."
-
-if (( UPDATE_ONLY == 1 )); then
-  installed_env="$CONFIG_ROOT/portal.env"
-  [[ -f "$installed_env" ]] || die "Existing Portal environment file was not found: $installed_env"
-  installed_https_url="$(sed -n 's/^Kestrel__Endpoints__Https__Url=//p' "$installed_env" | head -n1)"
-  if [[ "$installed_https_url" =~ :([0-9]+)$ ]]; then
-    HTTPS_PORT="${BASH_REMATCH[1]}"
-  else
-    die "Unable to resolve the installed Portal HTTPS port from $installed_env"
-  fi
-fi
-
 [[ "$HTTPS_PORT" =~ ^[0-9]+$ ]] && (( HTTPS_PORT >= 1 && HTTPS_PORT <= 65535 )) || die "Invalid HTTPS port."
 
 if [[ -r /etc/os-release ]]; then
@@ -72,7 +64,7 @@ else
 fi
 
 missing=()
-for cmd in curl unzip openssl python3 sudo sha256sum sha512sum; do
+for cmd in curl unzip openssl python3 sudo sha256sum sha512sum readlink; do
   command -v "$cmd" >/dev/null 2>&1 || missing+=("$cmd")
 done
 if (( ${#missing[@]} > 0 )); then
@@ -113,10 +105,7 @@ for key in ('runtime','aspnetcore-runtime'):
     c=r.get(key) or {}
     a=next((x for x in c.get('files',[]) if x.get('rid')=='linux-x64' and (x.get('name') or '').endswith('.tar.gz')),None)
     if not a: raise SystemExit(f'linux-x64 {key} archive not found.')
-    print(key)
-    print(c.get('version') or latest)
-    print(a['url'])
-    print((a.get('hash') or '').lower())
+    print(key); print(c.get('version') or latest); print(a['url']); print((a.get('hash') or '').lower())
 PY
 )
   [[ "${#assets[@]}" -eq 8 ]] || die "Unable to resolve Microsoft .NET 10 linux-x64 runtime assets."
@@ -129,7 +118,6 @@ PY
     url="${assets[$((offset+2))]}"
     expected="${assets[$((offset+3))]}"
     archive="$WORK_ROOT/$key-$version.tar.gz"
-    log "Downloading $key $version..."
     curl --fail --silent --show-error --location --retry 4 --retry-delay 2 --retry-all-errors "$url" -o "$archive"
     actual="$(sha512sum "$archive" | awk '{print tolower($1)}')"
     [[ -z "$expected" || "$actual" == "$expected" ]] || die "Invalid SHA-512 for $key $version."
@@ -147,8 +135,10 @@ PY
 
 install_dotnet10_runtime_set
 
-download_portal_release() {
-  step "Downloading verified Portal linux-x64 release"
+# Bootstrap package. This path is used only before Portal is installed and has a
+# protected SIRK Central connection.
+download_portal_bootstrap_release() {
+  step "Downloading Portal linux-x64 bootstrap release"
   local metadata="$WORK_ROOT/portal-update-linux-x64.json"
   local package="$WORK_ROOT/sirk-portal-linux-x64.zip"
 
@@ -156,62 +146,53 @@ download_portal_release() {
     "$RELEASE_BASE/portal-update-linux-x64.json?nocache=$(date +%s%N)" -o "$metadata"
 
   readarray -t fields < <(python3 - "$metadata" <<'PY'
-import json, re, sys
-with open(sys.argv[1], encoding='utf-8-sig') as f: d=json.load(f)
-expected={
- 'schemaVersion':1,'applicationId':'sirk-portal','channel':'main',
- 'package':'sirk-portal-linux-x64.zip','architecture':'linux-x64',
- 'deploymentMode':'framework-dependent','targetFramework':'net10.0'}
+import json,re,sys
+with open(sys.argv[1],encoding='utf-8-sig') as f:d=json.load(f)
+expected={'schemaVersion':1,'applicationId':'sirk-portal','channel':'main','package':'sirk-portal-linux-x64.zip','architecture':'linux-x64','deploymentMode':'framework-dependent','targetFramework':'net10.0'}
 for k,v in expected.items():
-    if d.get(k)!=v: raise SystemExit(f'Invalid Portal release metadata: {k}')
-commit=str(d.get('commit') or '').lower()
-sha=str(d.get('sha256') or '').lower()
-size=int(d.get('sizeBytes') or 0)
-if not re.fullmatch(r'[0-9a-f]{40}',commit): raise SystemExit('Invalid Portal release commit.')
-if not re.fullmatch(r'[0-9a-f]{64}',sha): raise SystemExit('Invalid Portal package SHA-256.')
-if not 1024 <= size <= 268435456: raise SystemExit('Invalid Portal package size.')
-print(commit); print(sha); print(size)
+    if d.get(k)!=v:raise SystemExit(f'Invalid Portal bootstrap metadata: {k}')
+commit=str(d.get('commit') or '').lower();sha=str(d.get('sha256') or '').lower();size=int(d.get('sizeBytes') or 0)
+if not re.fullmatch(r'[0-9a-f]{40}',commit):raise SystemExit('Invalid Portal bootstrap commit.')
+if not re.fullmatch(r'[0-9a-f]{64}',sha):raise SystemExit('Invalid Portal bootstrap SHA-256.')
+if not 1024 <= size <= 268435456:raise SystemExit('Invalid Portal bootstrap package size.')
+print(commit);print(sha);print(size)
 PY
 )
-  [[ "${#fields[@]}" -eq 3 ]] || die "Invalid Portal release metadata."
+  [[ "${#fields[@]}" -eq 3 ]] || die "Invalid Portal bootstrap metadata."
   RELEASE_COMMIT="${fields[0]}"
   RELEASE_SHA="${fields[1]}"
   RELEASE_SIZE="${fields[2]}"
 
   curl --fail --silent --show-error --location --retry 6 --retry-delay 2 --retry-all-errors \
     "$RELEASE_BASE/sirk-portal-linux-x64.zip?nocache=$(date +%s%N)" -o "$package"
-  [[ "$(stat -c %s "$package")" == "$RELEASE_SIZE" ]] || die "Portal package size mismatch."
+  [[ "$(stat -c %s "$package")" == "$RELEASE_SIZE" ]] || die "Portal bootstrap package size mismatch."
   actual="$(sha256sum "$package" | awk '{print tolower($1)}')"
-  [[ "$actual" == "$RELEASE_SHA" ]] || die "Portal package SHA-256 mismatch."
-  ok "Portal SHA-256 verified: $actual"
+  [[ "$actual" == "$RELEASE_SHA" ]] || die "Portal bootstrap package SHA-256 mismatch."
 
   PAYLOAD_ROOT="$WORK_ROOT/payload"
   mkdir -p "$PAYLOAD_ROOT"
   unzip -q "$package" -d "$PAYLOAD_ROOT"
-  for required in \
-    Sirk.Portal.dll Sirk.Portal.runtimeconfig.json release-manifest.json install-linux.sh \
-    public/portal/standalone/index.html public/portal/standalone/login.html; do
-    [[ -f "$PAYLOAD_ROOT/$required" ]] || die "Portal release payload is incomplete: $required"
+  for required in Sirk.Portal Sirk.Portal.dll Sirk.Portal.runtimeconfig.json release-manifest.json public/portal/standalone/index.html public/portal/standalone/login.html; do
+    [[ -f "$PAYLOAD_ROOT/$required" ]] || die "Portal bootstrap payload is incomplete: $required"
   done
   [[ ! -f "$PAYLOAD_ROOT/appsettings.Production.json" ]] || die "Public Portal package contains machine configuration."
   python3 - "$PAYLOAD_ROOT/release-manifest.json" "$RELEASE_COMMIT" <<'PY'
-import json, sys
-with open(sys.argv[1], encoding='utf-8-sig') as f: d=json.load(f)
+import json,sys
+with open(sys.argv[1],encoding='utf-8-sig') as f:d=json.load(f)
 if d.get('applicationId')!='sirk-portal' or d.get('channel')!='main' or d.get('commit')!=sys.argv[2] or d.get('architecture')!='linux-x64' or d.get('targetFramework')!='net10.0':
-    raise SystemExit('Portal release manifest does not match release metadata.')
+    raise SystemExit('Portal bootstrap manifest does not match release metadata.')
 PY
-  PORTAL_PACKAGE="$package"
 }
 
-download_portal_release
+download_portal_bootstrap_release
 
-ensure_updater() {
+ensure_updater_bootstrap() {
   if [[ -x /opt/sirk/updater/SirkUpdater ]] && systemctl is-active --quiet "$UPDATER_SERVICE"; then
     ok "SIRK Updater is already installed."
     return
   fi
 
-  step "Installing SIRK Updater for Linux"
+  step "Installing SIRK Updater bootstrap for Linux"
   local bootstrap="$WORK_ROOT/install-updater.sh"
   curl --fail --silent --show-error --location --retry 5 --retry-delay 2 --retry-all-errors \
     "https://raw.githubusercontent.com/Eris92/SIRK-Updater/main/install-release-v2.sh?nocache=$(date +%s%N)" -o "$bootstrap"
@@ -232,33 +213,24 @@ register_updater_manifest() {
   "installRoot": "$INSTALL_ROOT",
   "dataRoot": "$DATA_ROOT",
   "healthUrl": "https://127.0.0.1:$HTTPS_PORT/readyz",
-  "channel": "dev",
-  "updateSource": "https://github.com/Eris92/SIRK-Portal",
+  "channel": "preview",
+  "updateSource": "sirk-central-cache",
   "packageSha256Url": null,
-  "signatureRequired": false,
-  "signatureVerifierPath": null,
-  "signatureVerifierArguments": []
+  "signatureRequired": true,
+  "signatureVerifierPath": "$INSTALL_ROOT/Sirk.Portal",
+  "signatureVerifierArguments": [
+    "--verify-update-payload",
+    "{payload}",
+    "--trusted-keys",
+    "$INSTALL_ROOT/release-trusted-keys.json"
+  ]
 }
 JSON
   /opt/sirk/updater/SirkUpdater register "$manifest" >/dev/null
 }
 
-if (( UPDATE_ONLY == 1 )); then
-  [[ -f "$DATA_ROOT/identity.json" ]] || die "Existing Portal identity was not found."
-  [[ -d "$INSTALL_ROOT" ]] || die "Existing Portal installation was not found."
-  ensure_updater
-  register_updater_manifest
-  step "Applying transactional Portal update"
-  /opt/sirk/updater/SirkUpdater update sirk-portal "$PORTAL_PACKAGE" "$RELEASE_SHA" "$RELEASE_COMMIT"
-  systemctl is-active --quiet "$SERVICE_NAME" || die "Portal service is not running after update."
-  curl --fail --silent --show-error --max-time 15 "https://127.0.0.1:$HTTPS_PORT/readyz" | grep -q 'ready' || die "Portal readiness check failed after update."
-  printf 'SIRK_PORTAL_LINUX_UPDATE_OK\n'
-  printf 'Release commit: %s\n' "$RELEASE_COMMIT"
-  exit 0
-fi
-
 if [[ -f "$DATA_ROOT/identity.json" && "$REMOVE_DATA" -ne 1 ]]; then
-  die "Existing Portal data detected. Use --update-only or --remove-data."
+  die "Existing Portal data detected. Installed Portal must be updated through SIRK Central. Use --remove-data only for a clean reinstall."
 fi
 
 if [[ -z "$PORTAL_FQDN" ]]; then
@@ -288,11 +260,10 @@ systemctl daemon-reload
 rm -rf "$INSTALL_ROOT"
 mkdir -p "$INSTALL_ROOT" "$DATA_ROOT" "$CONFIG_ROOT" "$HELPER_ROOT"
 cp -a "$PAYLOAD_ROOT/." "$INSTALL_ROOT/"
-chmod 0755 "$INSTALL_ROOT/install-linux.sh"
+chmod 0755 "$INSTALL_ROOT/Sirk.Portal"
 
 getent group "$PORTAL_GROUP" >/dev/null || groupadd --system "$PORTAL_GROUP"
-id "$PORTAL_USER" >/dev/null 2>&1 || \
-  useradd --system --gid "$PORTAL_GROUP" --home-dir "$DATA_ROOT" --shell /usr/sbin/nologin "$PORTAL_USER"
+id "$PORTAL_USER" >/dev/null 2>&1 || useradd --system --gid "$PORTAL_GROUP" --home-dir "$DATA_ROOT" --shell /usr/sbin/nologin "$PORTAL_USER"
 
 step "Creating Break-Glass bootstrap credentials"
 security_root="$DATA_ROOT/security"
@@ -315,18 +286,11 @@ print(secrets.token_urlsafe(48))
 PY
 )"
 host_short="$(hostname -s | tr '[:upper:]' '[:lower:]')"
-openssl req -x509 -newkey rsa:3072 -sha256 -nodes -days 1095 \
-  -keyout "$tls_root/portal.key" -out "$tls_root/portal.crt" \
-  -subj "/CN=$PORTAL_FQDN" \
-  -addext "subjectAltName=DNS:$PORTAL_FQDN,DNS:$host_short,DNS:localhost,IP:127.0.0.1,IP:::1" \
-  -addext "extendedKeyUsage=serverAuth" >/dev/null 2>&1
-openssl pkcs12 -export -out "$tls_root/portal.pfx" \
-  -inkey "$tls_root/portal.key" -in "$tls_root/portal.crt" \
-  -passout "pass:$pfx_password" >/dev/null 2>&1
+openssl req -x509 -newkey rsa:3072 -sha256 -nodes -days 1095 -keyout "$tls_root/portal.key" -out "$tls_root/portal.crt" -subj "/CN=$PORTAL_FQDN" -addext "subjectAltName=DNS:$PORTAL_FQDN,DNS:$host_short,DNS:localhost,IP:127.0.0.1,IP:::1" -addext "extendedKeyUsage=serverAuth" >/dev/null 2>&1
+openssl pkcs12 -export -out "$tls_root/portal.pfx" -inkey "$tls_root/portal.key" -in "$tls_root/portal.crt" -passout "pass:$pfx_password" >/dev/null 2>&1
 rm -f "$tls_root/portal.key"
 cp "$tls_root/portal.crt" /usr/local/share/ca-certificates/sirk-portal.crt
 update-ca-certificates >/dev/null
-
 if ! grep -Fq " $PORTAL_FQDN" /etc/hosts; then
   printf '\n127.0.0.1\t%s\t# SIRK Portal local health\n' "$PORTAL_FQDN" >>/etc/hosts
 fi
@@ -353,7 +317,7 @@ Sirk__Security__BootstrapPasswordFile=$DATA_ROOT/security/break-glass-password.b
 Sirk__Security__BootstrapAccessCodeFile=$DATA_ROOT/security/break-glass-access-code.txt
 Sirk__Central__Enabled=false
 Sirk__Central__PublicUrl=$public_url
-Sirk__Central__UpdateChannel=dev
+Sirk__Central__UpdateChannel=preview
 Sirk__Central__HeartbeatIntervalSeconds=60
 Sirk__Central__RequestTimeoutSeconds=15
 Sirk__Central__ConnectionFile=$DATA_ROOT/central-connection.json
@@ -417,44 +381,55 @@ curl --fail --silent --show-error --max-time 10 "https://127.0.0.1:$HTTPS_PORT/l
 [[ -f "$DATA_ROOT/identity.json" ]] || die "Break-Glass identity was not initialized."
 rm -f "$security_root/break-glass-password.bootstrap"
 
-ensure_updater
+ensure_updater_bootstrap
 register_updater_manifest
 
 step "Installing narrow Linux maintenance helpers"
 systemctl_path="$(command -v systemctl)"
 systemd_run_path="$(command -v systemd-run)"
-bash_path="$(command -v bash)"
-mkdir -p "$DATA_ROOT/Logs"
-chown "$PORTAL_USER:$PORTAL_GROUP" "$DATA_ROOT/Logs"
-chmod 0700 "$DATA_ROOT/Logs"
+mkdir -p "$DATA_ROOT/Logs" "$DATA_ROOT/Updates/Pending"
+chown -R "$PORTAL_USER:$PORTAL_GROUP" "$DATA_ROOT/Logs" "$DATA_ROOT/Updates"
+chmod 0700 "$DATA_ROOT/Logs" "$DATA_ROOT/Updates" "$DATA_ROOT/Updates/Pending"
 
 cat >"$HELPER_ROOT/update-runner" <<RUNNER
 #!/bin/sh
 set -eu
 lock='$DATA_ROOT/maintenance-update.lock'
 log='$DATA_ROOT/Logs/gui-update-linux.log'
+pending='$DATA_ROOT/Updates/Pending/'
 cleanup() { rm -f "\$lock"; }
 trap cleanup EXIT INT TERM
+if [ "\$#" -ne 3 ]; then echo 'Usage: update-runner <package.zip> <sha256> <0.1.1.X>' >&2; exit 64; fi
+package="\$1"; sha="\$2"; version="\$3"
+resolved="\$(readlink -f -- "\$package")" || { echo 'Invalid package path.' >&2; exit 65; }
+case "\$resolved" in "\$pending"*) ;; *) echo 'Update package must be staged below Portal Updates/Pending.' >&2; exit 65 ;; esac
+[ -f "\$resolved" ] || { echo 'Update package is missing.' >&2; exit 66; }
+[ "\${#sha}" -eq 64 ] || { echo 'Invalid SHA-256 length.' >&2; exit 65; }
+case "\$sha" in *[!0-9A-Fa-f]*) echo 'Invalid SHA-256.' >&2; exit 65 ;; esac
+printf '%s\n' "\$version" | grep -Eq '^0\.1\.1\.[0-9]+$' || { echo 'Invalid pre-1.0 update version.' >&2; exit 65; }
 sleep 2
-printf '\nStart Linux GUI update: %s\n' "\$(date -u +%Y-%m-%dT%H:%M:%SZ)" >>"\$log"
-if ! $bash_path '$INSTALL_ROOT/install-linux.sh' --update-only --non-interactive >>"\$log" 2>&1; then
+printf '\nStart Central-cached Linux update: %s version=%s\n' "\$(date -u +%Y-%m-%dT%H:%M:%SZ)" "\$version" >>"\$log"
+if ! /opt/sirk/updater/SirkUpdater update sirk-portal "\$resolved" "\$sha" "\$version" >>"\$log" 2>&1; then
   printf '\nLatest SIRK Updater state after failure:\n' >>"\$log"
   latest_state="\$(find /var/lib/sirk-updater/operations/sirk-portal -type f -name state.json -printf '%T@ %p\n' 2>/dev/null | sort -nr | head -n1 | cut -d' ' -f2-)"
   if [ -n "\$latest_state" ] && [ -f "\$latest_state" ]; then cat "\$latest_state" >>"\$log"; fi
   exit 1
 fi
+printf 'SIRK_PORTAL_LINUX_UPDATE_OK version=%s\n' "\$version" >>"\$log"
 RUNNER
 
 cat >"$HELPER_ROOT/update-helper" <<HELPER
 #!/bin/sh
 set -eu
+[ "\$#" -eq 3 ] || { echo 'Usage: update-helper <package.zip> <sha256> <0.1.1.X>' >&2; exit 64; }
 unit="sirk-portal-update-\$(date +%s%N)"
-exec '$systemd_run_path' --quiet --collect --no-block --unit="\$unit" '$HELPER_ROOT/update-runner'
+exec '$systemd_run_path' --quiet --collect --no-block --unit="\$unit" '$HELPER_ROOT/update-runner' "\$1" "\$2" "\$3"
 HELPER
 
 cat >"$HELPER_ROOT/restart-helper" <<HELPER
 #!/bin/sh
 set -eu
+[ "\$#" -eq 0 ] || exit 64
 unit="sirk-portal-restart-\$(date +%s%N)"
 exec '$systemd_run_path' --quiet --collect --no-block --unit="\$unit" /bin/sh -c "sleep 2; exec '$systemctl_path' restart '$SERVICE_NAME'"
 HELPER
