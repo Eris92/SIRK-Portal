@@ -63,6 +63,7 @@ internal sealed class PortalMaintenanceStore
 
     public object Snapshot()
     {
+        var update = PortalUpdateProbe.Probe();
         lock (_sync)
         {
             CleanupMissingFiles();
@@ -72,13 +73,16 @@ internal sealed class PortalMaintenanceStore
                 {
                     version = VersionInfo.Current,
                     channel = _document.Channel,
-                    branch = "main"
+                    branch = "main",
+                    commit = update.InstalledCommit
                 },
                 remote = new
                 {
-                    availableVersion = "main/latest",
-                    updateAvailable = OperatingSystem.IsWindows(),
-                    error = (string?)null
+                    availableVersion = update.AvailableVersion,
+                    commit = update.RemoteCommit,
+                    updateAvailable = OperatingSystem.IsWindows() && update.UpdateAvailable,
+                    error = update.Error,
+                    checkedAtUtc = update.CheckedAtUtc
                 },
                 jobs = new Dictionary<string, object>(),
                 backups = _document.Backups
@@ -112,9 +116,16 @@ internal sealed class PortalMaintenanceStore
 
     public object Check()
     {
+        var update = PortalUpdateProbe.Probe(force: true);
         lock (_sync)
         {
-            AppendHistory("check", "Sprawdzono kanał aktualizacji main/latest.", null);
+            var message = update.Error is not null
+                ? "Sprawdzenie kanału aktualizacji main/latest nie powiodło się."
+                : update.UpdateAvailable
+                    ? "Dostępna jest nowsza paczka main/latest."
+                    : "Portal jest aktualny dla main/latest.";
+            AppendHistory("check", message, update.Error);
+            Save();
             return Snapshot();
         }
     }
@@ -226,6 +237,12 @@ internal sealed class PortalMaintenanceStore
     {
         if (!OperatingSystem.IsWindows())
             throw new PlatformNotSupportedException("Aktualizacja Portalu jest dostępna tylko na Windows.");
+
+        var update = PortalUpdateProbe.Probe(force: true);
+        if (update.Error is not null)
+            throw new InvalidOperationException("Nie można potwierdzić dostępności aktualizacji: " + update.Error);
+        if (!update.UpdateAvailable)
+            throw new InvalidOperationException("Portal jest już aktualny dla main/latest.");
 
         var lockPath = Path.Combine(_paths.DataRoot, "maintenance-update.lock");
         lock (_sync)
