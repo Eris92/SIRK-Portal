@@ -36,6 +36,7 @@ internal sealed record PortalMaintenanceDocument(
 internal sealed class PortalMaintenanceStore
 {
     private const int SchemaVersion = 1;
+    private const string LinuxHelperRoot = "/usr/lib/sirk-portal";
     private static readonly HashSet<string> Channels =
         new(StringComparer.Ordinal) { "stable", "beta", "dev" };
 
@@ -61,6 +62,9 @@ internal sealed class PortalMaintenanceStore
         Save();
     }
 
+    private static bool SupportsServiceMaintenance =>
+        OperatingSystem.IsWindows() || OperatingSystem.IsLinux();
+
     public object Snapshot()
     {
         var update = PortalUpdateProbe.Probe();
@@ -80,7 +84,7 @@ internal sealed class PortalMaintenanceStore
                 {
                     availableVersion = update.AvailableVersion,
                     commit = update.RemoteCommit,
-                    updateAvailable = OperatingSystem.IsWindows() && update.UpdateAvailable,
+                    updateAvailable = SupportsServiceMaintenance && update.UpdateAvailable,
                     error = update.Error,
                     checkedAtUtc = update.CheckedAtUtc
                 },
@@ -106,9 +110,9 @@ internal sealed class PortalMaintenanceStore
                     backup = true,
                     deleteBackup = true,
                     channel = true,
-                    restart = OperatingSystem.IsWindows(),
+                    restart = SupportsServiceMaintenance,
                     restore = OperatingSystem.IsWindows(),
-                    update = OperatingSystem.IsWindows()
+                    update = SupportsServiceMaintenance
                 }
             };
         }
@@ -219,15 +223,31 @@ internal sealed class PortalMaintenanceStore
 
     public object ScheduleRestart()
     {
-        if (!OperatingSystem.IsWindows())
-            throw new PlatformNotSupportedException("Restart usługi jest dostępny tylko na Windows.");
-        StartHelperScript(
-            "restart",
-            "Start-Sleep -Seconds 2\r\n" +
-            "Restart-Service -Name 'SirkPortal' -Force\r\n");
+        if (OperatingSystem.IsWindows())
+        {
+            StartHelperScript(
+                "restart",
+                "Start-Sleep -Seconds 2\r\n" +
+                "Restart-Service -Name 'SirkPortal' -Force\r\n");
+        }
+        else if (OperatingSystem.IsLinux())
+        {
+            RunLinuxMaintenanceHelper("restart-helper");
+        }
+        else
+        {
+            throw new PlatformNotSupportedException(
+                "Restart usługi jest dostępny tylko na Windows i Linux systemd.");
+        }
+
         lock (_sync)
         {
-            AppendHistory("restart", "Zaplanowano restart usługi SirkPortal.", null);
+            AppendHistory(
+                "restart",
+                OperatingSystem.IsLinux()
+                    ? "Zaplanowano restart usługi sirk-portal.service."
+                    : "Zaplanowano restart usługi SirkPortal.",
+                null);
             Save();
         }
         return new { accepted = true, action = "restart" };
@@ -235,8 +255,9 @@ internal sealed class PortalMaintenanceStore
 
     public object ScheduleUpdate()
     {
-        if (!OperatingSystem.IsWindows())
-            throw new PlatformNotSupportedException("Aktualizacja Portalu jest dostępna tylko na Windows.");
+        if (!SupportsServiceMaintenance)
+            throw new PlatformNotSupportedException(
+                "Aktualizacja Portalu jest dostępna tylko na Windows i Linux systemd.");
 
         var update = PortalUpdateProbe.Probe(force: true);
         if (update.Error is not null)
@@ -260,6 +281,40 @@ internal sealed class PortalMaintenanceStore
             AtomicJsonFile.SecureFile(lockPath);
         }
 
+        var logRoot = Path.Combine(_paths.DataRoot, "Logs");
+        Directory.CreateDirectory(logRoot);
+        AtomicJsonFile.SecureDirectory(logRoot);
+
+        if (OperatingSystem.IsLinux())
+        {
+            var linuxLogPath = Path.Combine(logRoot, "gui-update-linux.log");
+            try
+            {
+                RunLinuxMaintenanceHelper("update-helper");
+            }
+            catch
+            {
+                File.Delete(lockPath);
+                throw;
+            }
+
+            lock (_sync)
+            {
+                AppendHistory(
+                    "update",
+                    "Uruchomiono aktualizację Portalu z main/latest przez systemd. Log: " + linuxLogPath,
+                    null);
+                Save();
+            }
+            return new
+            {
+                accepted = true,
+                action = "update",
+                channel = "main",
+                logPath = linuxLogPath
+            };
+        }
+
         var installRoot = AppContext.BaseDirectory.TrimEnd(
             Path.DirectorySeparatorChar,
             Path.AltDirectorySeparatorChar);
@@ -271,9 +326,6 @@ internal sealed class PortalMaintenanceStore
                 "Brak appsettings.Production.json wymaganych do aktualizacji.");
         }
 
-        var logRoot = Path.Combine(_paths.DataRoot, "Logs");
-        Directory.CreateDirectory(logRoot);
-        AtomicJsonFile.SecureDirectory(logRoot);
         var logPath = Path.Combine(
             logRoot,
             "gui-update-" + DateTimeOffset.UtcNow.ToString("yyyyMMdd-HHmmss") + ".log");
@@ -368,6 +420,50 @@ finally {
             Save();
         }
         return new { accepted = true, action = "restore", id = normalized };
+    }
+
+    private static void RunLinuxMaintenanceHelper(string helperName)
+    {
+        if (!OperatingSystem.IsLinux())
+            throw new PlatformNotSupportedException("Linux maintenance helper is unavailable on this platform.");
+        if (helperName.Any(character =>
+                !char.IsAsciiLetterOrDigit(character) && character is not '-' and not '_'))
+            throw new InvalidDataException("Linux maintenance helper name is invalid.");
+
+        var helper = Path.Combine(LinuxHelperRoot, helperName);
+        if (!File.Exists(helper))
+            throw new InvalidOperationException("Brak Linux maintenance helper: " + helper);
+
+        var sudo = File.Exists("/usr/bin/sudo") ? "/usr/bin/sudo" : "/bin/sudo";
+        if (!File.Exists(sudo))
+            throw new InvalidOperationException("sudo nie jest dostępne na tym systemie Linux.");
+
+        var start = new ProcessStartInfo
+        {
+            FileName = sudo,
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            CreateNoWindow = true
+        };
+        start.ArgumentList.Add("-n");
+        start.ArgumentList.Add(helper);
+
+        using var process = Process.Start(start)
+                            ?? throw new InvalidOperationException("Nie można uruchomić Linux maintenance helper.");
+        var stdout = process.StandardOutput.ReadToEnd();
+        var stderr = process.StandardError.ReadToEnd();
+        if (!process.WaitForExit(15000))
+        {
+            try { process.Kill(entireProcessTree: true); } catch { }
+            throw new TimeoutException("Linux maintenance helper nie zakończył etapu planowania w ciągu 15 sekund.");
+        }
+        if (process.ExitCode != 0)
+        {
+            var output = (stdout + Environment.NewLine + stderr).Trim();
+            throw new InvalidOperationException(
+                "Linux maintenance helper zakończył się błędem " + process.ExitCode + ": " + output);
+        }
     }
 
     private void StartHelperScript(string action, string scriptBody)
