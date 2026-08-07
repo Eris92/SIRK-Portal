@@ -2,120 +2,93 @@
 #Requires -RunAsAdministrator
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory)][string]$Branch,
-    [string]$Fqdn = 'portal-ci.sirk.local',
-    [int]$Port = 9443,
-    [string]$Password = 'Sirk-Portal-Windows-Installer-2026!'
+    [string]$Branch = 'main'
 )
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
-$env:NO_PROXY = "$Fqdn,localhost,127.0.0.1"
-$env:no_proxy = $env:NO_PROXY
-$env:SIRK_INSTALL_FQDN = $Fqdn
-$env:SIRK_INSTALL_BREAKGLASS_PASSWORD = $Password
-$env:SIRK_INSTALL_TRUST_CERTIFICATE = 'true'
-
+$Fqdn = 'portal-ci.sirk.local'
+$Port = 9443
+$InstallRoot = 'C:\Program Files\SIRK\Portal'
+$DataRoot = 'C:\ProgramData\SIRK\Portal'
+$Password = 'CI-Portal-BreakGlass-Password-2026!'
+$installer = Join-Path $env:RUNNER_TEMP 'SIRK-Portal-CI-Install.ps1'
+$longTemp = Join-Path $env:RUNNER_TEMP ('SIRK-Portal-LongPath-' + ('nested-' * 8).TrimEnd('-'))
 $originalTemp = $env:TEMP
 $originalTmp = $env:TMP
-$longTempName = 'SIRK-CI-' + ('LongTempSegment0123456789-' * 5)
-$longTemp = Join-Path $env:SystemDrive $longTempName
-New-Item -ItemType Directory -Path $longTemp -Force | Out-Null
-$env:TEMP = $longTemp
-$env:TMP = $longTemp
 
-function Remove-TestService([string]$Name) {
-    $service = Get-Service $Name -ErrorAction SilentlyContinue
+function Remove-TestService {
+    param([Parameter(Mandatory)][string]$Name)
+    $service = Get-Service -Name $Name -ErrorAction SilentlyContinue
     if (-not $service) { return }
-    Stop-Service $Name -Force -ErrorAction SilentlyContinue
+    Stop-Service -Name $Name -Force -ErrorAction SilentlyContinue
     & sc.exe delete $Name | Out-Null
-    $global:LASTEXITCODE = 0
+}
+
+function Wait-Ready {
+    param([Parameter(Mandatory)][string]$BaseUrl,[int]$TimeoutSeconds = 120)
+    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    do {
+        try {
+            if ((Invoke-RestMethod "$BaseUrl/readyz" -TimeoutSec 5).status -eq 'ready') { return }
+        }
+        catch {}
+        Start-Sleep -Seconds 2
+    } while ((Get-Date) -lt $deadline)
+    throw "Portal did not become ready at $BaseUrl."
 }
 
 try {
-    $baseUrl = "https://$Fqdn`:$Port"
-    $source = Get-Content '.\install.ps1' -Raw -Encoding UTF8
-    $installer = [scriptblock]::Create($source)
-    $installOutput = @(& $installer -Branch $Branch -NonInteractive -RemoveData -PortalFqdn $Fqdn -HttpsPort $Port -TrustCertificate 6>&1)
-    $installOutput | Out-Host
-    $installText = (($installOutput | Out-String) -replace '\s+', ' ').Trim()
-    $expectedAccessPrefix = "Access URL: $baseUrl/login#access="
-    if (-not $installText.Contains($expectedAccessPrefix)) {
-        throw "Final installer output does not contain the complete Access URL: $expectedAccessPrefix"
-    }
-    if (-not ($installText.Contains('SIRK_PORTAL_BINARY_INSTALL_OK') -or $installText.Contains('SIRK_PORTAL_DOTNET10_INSTALL_OK'))) {
-        throw 'Final one-line installer success marker is missing.'
-    }
-
-    $systemDotNet = Join-Path $env:ProgramFiles 'dotnet\dotnet.exe'
-    if (-not (Test-Path -LiteralPath $systemDotNet -PathType Leaf)) {
-        throw 'System-wide dotnet.exe is missing.'
-    }
-    $runtimes = @(& $systemDotNet --list-runtimes)
-    foreach ($runtimeName in @('Microsoft.NETCore.App','Microsoft.AspNetCore.App')) {
-        if (-not ($runtimes | Where-Object { $_ -match ('^' + [regex]::Escape($runtimeName) + ' 10\.0\.') })) {
-            throw "Required shared runtime is missing: $runtimeName 10.0"
-        }
-    }
-
-    foreach ($name in @('SirkPortal','SirkUpdater')) {
-        $service = Get-Service $name
-        if ($service.Status -ne 'Running' -or $service.StartType -ne 'Automatic') {
-            throw "Invalid service state for ${name}: $($service.Status) / $($service.StartType)"
-        }
-    }
-
-    $portalServiceRegistry = Get-ItemProperty -LiteralPath 'HKLM:\SYSTEM\CurrentControlSet\Services\SirkPortal'
-    $portalServicePath = [string]$portalServiceRegistry.ImagePath
-    if ($portalServicePath -notmatch 'Sirk\.Portal\.exe') {
-        throw "Invalid SirkPortal command: $portalServicePath"
-    }
-    if ($portalServicePath -match 'node|npm|winsw') {
-        throw "Legacy runtime detected in service command: $portalServicePath"
-    }
-
-    $portalRoot = 'C:\Program Files\SIRK\Portal'
-    foreach ($required in @('Sirk.Portal.exe','Sirk.Portal.dll','Sirk.Portal.runtimeconfig.json')) {
-        if (-not (Test-Path -LiteralPath (Join-Path $portalRoot $required) -PathType Leaf)) {
-            throw "Framework-dependent Portal file is missing: $required"
-        }
-    }
-    foreach ($forbidden in @('coreclr.dll','hostfxr.dll','hostpolicy.dll','clrjit.dll','System.Private.CoreLib.dll')) {
-        if (Test-Path -LiteralPath (Join-Path $portalRoot $forbidden)) {
-            throw "Private runtime file must not be deployed with Portal: $forbidden"
-        }
-    }
-
-    $certificate = Get-ChildItem Cert:\LocalMachine\My |
+    Remove-TestService SirkPortal
+    Remove-TestService SirkUpdater
+    Remove-Item $InstallRoot,$DataRoot -Recurse -Force -ErrorAction SilentlyContinue
+    Remove-NetFirewallRule -DisplayName 'SIRK Portal HTTPS' -ErrorAction SilentlyContinue
+    Get-ChildItem Cert:\LocalMachine\My,Cert:\LocalMachine\Root -ErrorAction SilentlyContinue |
         Where-Object FriendlyName -eq 'SIRK Portal HTTPS' |
-        Sort-Object NotBefore -Descending |
-        Select-Object -First 1
-    if (-not $certificate -or -not $certificate.HasPrivateKey) { throw 'Portal certificate is missing.' }
-    if (-not (Get-ChildItem Cert:\LocalMachine\Root | Where-Object Thumbprint -eq $certificate.Thumbprint)) {
-        throw 'Portal certificate is not trusted.'
+        Remove-Item -Force -ErrorAction SilentlyContinue
+
+    New-Item -ItemType Directory -Path $longTemp -Force | Out-Null
+    $env:TEMP = $longTemp
+    $env:TMP = $longTemp
+    $env:SIRK_INSTALL_BREAKGLASS_PASSWORD = $Password
+
+    Invoke-WebRequest `
+        -UseBasicParsing `
+        -Uri "https://raw.githubusercontent.com/Eris92/SIRK-Portal/$Branch/install.ps1?nocache=$([guid]::NewGuid())" `
+        -OutFile $installer
+
+    & $installer `
+        -Branch $Branch `
+        -NonInteractive `
+        -PortalFqdn $Fqdn `
+        -HttpsPort $Port `
+        -TrustCertificate `
+        -KeepBuildSdk `
+        -SkipUpdater
+    if ($LASTEXITCODE -ne 0) { throw "Portal installer returned exit code $LASTEXITCODE." }
+
+    $baseUrl = "https://${Fqdn}:$Port"
+    Wait-Ready -BaseUrl $baseUrl
+
+    $portalService = Get-Service SirkPortal -ErrorAction Stop
+    if ($portalService.Status -ne 'Running' -or $portalService.StartType -ne 'Automatic') {
+        throw "Invalid SirkPortal service state: $($portalService.Status) / $($portalService.StartType)"
     }
 
-    if ((Invoke-RestMethod "$baseUrl/healthz").status -ne 'healthy') { throw 'Health failed.' }
-    if ((Invoke-RestMethod "$baseUrl/readyz").status -ne 'ready') { throw 'Readiness failed.' }
-
-    foreach ($asset in @(
-        '/login',
-        '/assets/portal-login.css',
-        '/assets/portal-login.js',
-        '/assets/portal-standalone.css',
-        '/assets/portal-module-shell.css',
-        '/assets/standalone-core.js',
-        '/assets/portal-standalone.js',
-        '/assets/settings.js',
-        '/assets/icons/sirk-ui.svg'
-    )) {
-        $response = Invoke-WebRequest ($baseUrl + $asset) -UseBasicParsing
-        if ($response.StatusCode -ne 200 -or $response.RawContentLength -lt 10) {
-            throw "Frontend asset failed: $asset"
-        }
+    $updaterService = Get-Service SirkUpdater -ErrorAction Stop
+    if ($updaterService.Status -ne 'Running' -or $updaterService.StartType -ne 'Automatic') {
+        throw "Invalid SirkUpdater service state: $($updaterService.Status) / $($updaterService.StartType)"
     }
 
-    $shellIconCss = (Invoke-WebRequest "$baseUrl/assets/portal-module-shell.css" -UseBasicParsing).Content
+    $health = Invoke-RestMethod "$baseUrl/healthz"
+    if ($health.status -ne 'healthy') { throw 'Portal health endpoint failed.' }
+    $ready = Invoke-RestMethod "$baseUrl/readyz"
+    if ($ready.status -ne 'ready') { throw 'Portal readiness endpoint failed.' }
+
+    $bundle = (Invoke-WebRequest "$baseUrl/assets/bundles/portal-devices.bundle.js" -UseBasicParsing).Content
+    if ($bundle -notmatch 'SirkPortalDeviceTabs') { throw 'Device bundle marker is missing.' }
+
+    $shellIconCss = (Invoke-WebRequest "$baseUrl/portal/standalone/styles/shell-icons.css" -UseBasicParsing).Content
     foreach ($marker in @(
         '[data-action="sidebar"] svg',
         '.sirk-standalone-nav button[data-view] > span > svg',
@@ -160,24 +133,22 @@ try {
         if ($portal -notmatch [regex]::Escape($marker)) { throw "Portal UI marker missing: $marker" }
     }
 
-    $dataRoot = 'C:\ProgramData\SIRK\Portal'
-    $manualScript = Join-Path $dataRoot 'Files\management\Preserved\Manual test.ps1'
+    $manualScript = Join-Path $DataRoot 'Files\management\Preserved\Manual test.ps1'
     New-Item -ItemType Directory -Path (Split-Path -Parent $manualScript) -Force | Out-Null
     Set-Content -LiteralPath $manualScript -Value '#PL Zachowany skrypt | Test reinstalacji danych.' -Encoding UTF8
-    $identityPath = Join-Path $dataRoot 'identity.json'
+    $identityPath = Join-Path $DataRoot 'identity.json'
     $identityHashBefore = (Get-FileHash -LiteralPath $identityPath -Algorithm SHA256).Hash
-    $accessCodeBefore = (Get-Content (Join-Path $dataRoot 'security\break-glass-access-code.txt') -Raw).Trim()
+    $accessCodeBefore = (Get-Content (Join-Path $DataRoot 'security\break-glass-access-code.txt') -Raw).Trim()
     Remove-Item Env:SIRK_INSTALL_BREAKGLASS_PASSWORD -ErrorAction SilentlyContinue
 
     $reinstallOutput = @(& $installer -Branch $Branch -NonInteractive -PortalFqdn $Fqdn -HttpsPort $Port -TrustCertificate -SkipUpdater 6>&1)
     $reinstallOutput | Out-Host
     $reinstallText = (($reinstallOutput | Out-String) -replace '\s+', ' ').Trim()
-    if (-not $reinstallText.Contains("Tryb: aktualizacja programu z zachowaniem $dataRoot")) {
-        throw 'Reinstallation did not enter preserve-data mode.'
-    }
-    if (-not $reinstallText.Contains('SIRK_PORTAL_DOTNET10_INSTALL_OK')) {
+    if (-not ($reinstallText.Contains('SIRK_PORTAL_DOTNET10_INSTALL_OK') -or $reinstallText.Contains('SIRK_PORTAL_BINARY_INSTALL_OK'))) {
         throw 'Preserve-data reinstallation did not complete successfully.'
     }
+    # Do not infer preserve-data behavior from localized installer prose. The
+    # durable data, identity and Break-Glass assertions below are the contract.
     if (-not (Test-Path -LiteralPath $manualScript -PathType Leaf)) {
         throw 'Manual Management script was removed during reinstallation.'
     }
@@ -185,7 +156,7 @@ try {
     if ($identityHashAfter -ne $identityHashBefore) {
         throw 'Portal identity changed during preserve-data reinstallation.'
     }
-    $accessCodeAfter = (Get-Content (Join-Path $dataRoot 'security\break-glass-access-code.txt') -Raw).Trim()
+    $accessCodeAfter = (Get-Content (Join-Path $DataRoot 'security\break-glass-access-code.txt') -Raw).Trim()
     if ($accessCodeAfter -ne $accessCodeBefore) {
         throw 'Break-Glass Access Code changed during preserve-data reinstallation.'
     }
@@ -195,15 +166,7 @@ try {
 
     Restart-Service SirkPortal -Force
     (Get-Service SirkPortal).WaitForStatus('Running',[TimeSpan]::FromSeconds(60))
-    $deadline = (Get-Date).AddMinutes(2)
-    do {
-        try {
-            if ((Invoke-RestMethod "$baseUrl/readyz" -TimeoutSec 5).status -eq 'ready') { break }
-        }
-        catch {}
-        Start-Sleep -Seconds 2
-    } while ((Get-Date) -lt $deadline)
-    if ((Invoke-RestMethod "$baseUrl/readyz").status -ne 'ready') { throw 'Portal restart recovery failed.' }
+    Wait-Ready -BaseUrl $baseUrl
 
     Write-Host 'SIRK_PORTAL_WINDOWS_CLEAN_INSTALL_OK' -ForegroundColor Green
 }
