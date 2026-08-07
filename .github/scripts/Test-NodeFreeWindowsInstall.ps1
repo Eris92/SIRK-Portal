@@ -43,7 +43,7 @@ try {
     if (-not $installText.Contains($expectedAccessPrefix)) {
         throw "Final installer output does not contain the complete Access URL: $expectedAccessPrefix"
     }
-    if (-not $installText.Contains('SIRK_PORTAL_DOTNET10_INSTALL_OK')) {
+    if (-not ($installText.Contains('SIRK_PORTAL_BINARY_INSTALL_OK') -or $installText.Contains('SIRK_PORTAL_DOTNET10_INSTALL_OK'))) {
         throw 'Final one-line installer success marker is missing.'
     }
 
