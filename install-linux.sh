@@ -219,7 +219,7 @@ register_updater_manifest() {
   "watchdogServiceName": null,
   "installRoot": "$INSTALL_ROOT",
   "dataRoot": "$DATA_ROOT",
-  "healthUrl": "https://localhost:$HTTPS_PORT/readyz",
+  "healthUrl": "https://127.0.0.1:$HTTPS_PORT/readyz",
   "channel": "dev",
   "updateSource": "https://github.com/Eris92/SIRK-Portal",
   "packageSha256Url": null,
@@ -239,7 +239,7 @@ if (( UPDATE_ONLY == 1 )); then
   step "Applying transactional Portal update"
   /opt/sirk/updater/SirkUpdater update sirk-portal "$PORTAL_PACKAGE" "$RELEASE_SHA" "$RELEASE_COMMIT"
   systemctl is-active --quiet "$SERVICE_NAME" || die "Portal service is not running after update."
-  curl --fail --silent --show-error --max-time 15 "https://localhost:$HTTPS_PORT/readyz" | grep -q 'ready' || die "Portal readiness check failed after update."
+  curl --fail --silent --show-error --max-time 15 "https://127.0.0.1:$HTTPS_PORT/readyz" | grep -q 'ready' || die "Portal readiness check failed after update."
   printf 'SIRK_PORTAL_LINUX_UPDATE_OK\n'
   printf 'Release commit: %s\n' "$RELEASE_COMMIT"
   exit 0
@@ -393,15 +393,15 @@ systemctl enable --now "$SERVICE_NAME"
 
 step "Validating Portal health and frontend"
 deadline=$((SECONDS + 120))
-until curl --fail --silent --show-error --max-time 5 "https://localhost:$HTTPS_PORT/healthz" | grep -q 'healthy'; do
+until curl --fail --silent --show-error --max-time 5 "https://127.0.0.1:$HTTPS_PORT/healthz" | grep -q 'healthy'; do
   (( SECONDS < deadline )) || {
     journalctl -u "$SERVICE_NAME" -n 120 --no-pager >&2 || true
     die "Portal did not pass health check."
   }
   sleep 2
 done
-curl --fail --silent --show-error --max-time 10 "https://localhost:$HTTPS_PORT/readyz" | grep -q 'ready' || die "Portal did not pass readiness check."
-curl --fail --silent --show-error --max-time 10 "https://localhost:$HTTPS_PORT/login" | grep -q 'sirk-login-page' || die "Portal login frontend is incomplete."
+curl --fail --silent --show-error --max-time 10 "https://127.0.0.1:$HTTPS_PORT/readyz" | grep -q 'ready' || die "Portal did not pass readiness check."
+curl --fail --silent --show-error --max-time 10 "https://127.0.0.1:$HTTPS_PORT/login" | grep -q 'sirk-login-page' || die "Portal login frontend is incomplete."
 [[ -f "$DATA_ROOT/identity.json" ]] || die "Break-Glass identity was not initialized."
 rm -f "$security_root/break-glass-password.bootstrap"
 
@@ -423,22 +423,28 @@ lock='$DATA_ROOT/maintenance-update.lock'
 log='$DATA_ROOT/Logs/gui-update-linux.log'
 cleanup() { rm -f "\$lock"; }
 trap cleanup EXIT INT TERM
+sleep 2
 printf '\nStart Linux GUI update: %s\n' "\$(date -u +%Y-%m-%dT%H:%M:%SZ)" >>"\$log"
-$bash_path '$INSTALL_ROOT/install-linux.sh' --update-only --non-interactive >>"\$log" 2>&1
+if ! $bash_path '$INSTALL_ROOT/install-linux.sh' --update-only --non-interactive >>"\$log" 2>&1; then
+  printf '\nLatest SIRK Updater state after failure:\n' >>"\$log"
+  latest_state="\$(find /var/lib/sirk-updater/operations/sirk-portal -type f -name state.json -printf '%T@ %p\n' 2>/dev/null | sort -nr | head -n1 | cut -d' ' -f2-)"
+  if [ -n "\$latest_state" ] && [ -f "\$latest_state" ]; then cat "\$latest_state" >>"\$log"; fi
+  exit 1
+fi
 RUNNER
 
 cat >"$HELPER_ROOT/update-helper" <<HELPER
 #!/bin/sh
 set -eu
 unit="sirk-portal-update-\$(date +%s%N)"
-exec '$systemd_run_path' --quiet --collect --unit="\$unit" --on-active=2s '$HELPER_ROOT/update-runner'
+exec '$systemd_run_path' --quiet --collect --no-block --unit="\$unit" '$HELPER_ROOT/update-runner'
 HELPER
 
 cat >"$HELPER_ROOT/restart-helper" <<HELPER
 #!/bin/sh
 set -eu
 unit="sirk-portal-restart-\$(date +%s%N)"
-exec '$systemd_run_path' --quiet --collect --unit="\$unit" --on-active=2s '$systemctl_path' restart '$SERVICE_NAME'
+exec '$systemd_run_path' --quiet --collect --no-block --unit="\$unit" /bin/sh -c "sleep 2; exec '$systemctl_path' restart '$SERVICE_NAME'"
 HELPER
 
 chmod 0755 "$HELPER_ROOT/update-runner" "$HELPER_ROOT/update-helper" "$HELPER_ROOT/restart-helper"
