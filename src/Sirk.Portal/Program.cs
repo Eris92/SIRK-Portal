@@ -31,6 +31,12 @@ if (PortalAssetBundler.IsRequested(args))
     return;
 }
 
+if (PortalUpdatePackageVerifier.IsRequested(args))
+{
+    Environment.ExitCode = await PortalUpdatePackageVerifier.RunAsync(args);
+    return;
+}
+
 var builder = WebApplication.CreateBuilder(new WebApplicationOptions
 {
     Args = args,
@@ -77,6 +83,7 @@ builder.Services.AddSingleton<WorkflowExecutionService>();
 
 builder.Services.AddSingleton<CentralConnectionState>();
 builder.Services.AddSingleton<CentralConnectionResolver>();
+builder.Services.AddSingleton<PortalUpdateClient>();
 builder.Services.AddSingleton<InternalTunnelCredential>();
 builder.Services.Configure<CentralConnectionOptions>(
     builder.Configuration.GetSection(CentralConnectionOptions.SectionName));
