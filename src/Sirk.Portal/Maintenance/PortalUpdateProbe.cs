@@ -14,9 +14,8 @@ internal static class PortalUpdateProbe
 {
     private const string ApplicationId = "sirk-portal";
     private const string Channel = "main";
-    private const string PackageName = "sirk-portal-win-x64.zip";
-    private const string MetadataUrl =
-        "https://github.com/Eris92/SIRK-Portal/releases/download/portal-main-latest/portal-update.json";
+    private const string ReleaseBase =
+        "https://github.com/Eris92/SIRK-Portal/releases/download/portal-main-latest/";
 
     private static readonly object Sync = new();
     private static readonly TimeSpan CacheLifetime = TimeSpan.FromMinutes(1);
@@ -48,20 +47,21 @@ internal static class PortalUpdateProbe
     private static PortalUpdateProbeResult ProbeCore()
     {
         var installedCommit = ReadInstalledCommit();
-        if (!OperatingSystem.IsWindows())
+        var target = PlatformTarget();
+        if (target is null)
         {
             return new PortalUpdateProbeResult(
                 "main/latest",
                 installedCommit,
                 null,
                 false,
-                null,
+                "Aktualizacje main/latest są obsługiwane tylko na Windows x64 i Linux x64.",
                 DateTimeOffset.UtcNow);
         }
 
         try
         {
-            var metadataUrl = MetadataUrl + "?nocache=" + Guid.NewGuid().ToString("N");
+            var metadataUrl = ReleaseBase + target.Value.Metadata + "?nocache=" + Guid.NewGuid().ToString("N");
             var json = Client.GetStringAsync(metadataUrl).GetAwaiter().GetResult();
             using var document = JsonDocument.Parse(json);
             var root = document.RootElement;
@@ -69,12 +69,14 @@ internal static class PortalUpdateProbe
             var applicationId = RequiredString(root, "applicationId");
             var channel = RequiredString(root, "channel");
             var package = RequiredString(root, "package");
+            var architecture = RequiredString(root, "architecture");
             var remoteCommit = RequiredCommit(root, "commit");
             var sha256 = RequiredString(root, "sha256");
 
             if (!string.Equals(applicationId, ApplicationId, StringComparison.Ordinal) ||
                 !string.Equals(channel, Channel, StringComparison.Ordinal) ||
-                !string.Equals(package, PackageName, StringComparison.Ordinal) ||
+                !string.Equals(package, target.Value.Package, StringComparison.Ordinal) ||
+                !string.Equals(architecture, target.Value.Architecture, StringComparison.Ordinal) ||
                 sha256.Length != 64 || !sha256.All(Uri.IsHexDigit))
             {
                 throw new InvalidDataException("Portal release metadata is invalid.");
@@ -106,6 +108,15 @@ internal static class PortalUpdateProbe
                 exception.Message,
                 DateTimeOffset.UtcNow);
         }
+    }
+
+    private static (string Metadata, string Package, string Architecture)? PlatformTarget()
+    {
+        if (OperatingSystem.IsWindows() && Environment.Is64BitOperatingSystem)
+            return ("portal-update.json", "sirk-portal-win-x64.zip", "win-x64");
+        if (OperatingSystem.IsLinux() && Environment.Is64BitOperatingSystem)
+            return ("portal-update-linux-x64.json", "sirk-portal-linux-x64.zip", "linux-x64");
+        return null;
     }
 
     internal static string? ReadInstalledCommit()
