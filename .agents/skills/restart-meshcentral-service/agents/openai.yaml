@@ -1,4 +1,0 @@
-interface:
-  display_name: "Restart MeshCentral Service"
-  short_description: "Restart and verify the MeshCentral service"
-  default_prompt: "Use $restart-meshcentral-service to restart a named MeshCentral Windows service and verify its state."
