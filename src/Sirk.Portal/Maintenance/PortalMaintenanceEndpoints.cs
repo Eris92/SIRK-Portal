@@ -52,7 +52,9 @@ internal sealed class PortalMaintenanceStore
         _stateFile = Path.Combine(paths.DataRoot, "maintenance.json");
         var sirkRoot = Path.GetDirectoryName(paths.DataRoot)
                        ?? throw new InvalidOperationException("Portal data root has no parent directory.");
-        _backupRoot = Path.Combine(sirkRoot, "Portal Backups");
+        _backupRoot = OperatingSystem.IsWindows()
+            ? Path.Combine(sirkRoot, "Portal Backups")
+            : Path.Combine(paths.DataRoot, "Backups");
         Directory.CreateDirectory(_backupRoot);
         AtomicJsonFile.SecureDirectory(_backupRoot);
         _document = File.Exists(_stateFile)
@@ -167,14 +169,12 @@ internal sealed class PortalMaintenanceStore
                      Guid.NewGuid().ToString("N")[..8];
             var fileName = id + ".zip";
             var destination = Path.Combine(_backupRoot, fileName);
-            var temporary = destination + ".tmp-" + Environment.ProcessId;
+            var temporary = OperatingSystem.IsWindows()
+                ? destination + ".tmp-" + Environment.ProcessId
+                : Path.Combine(Path.GetTempPath(), fileName + ".tmp-" + Environment.ProcessId);
             try
             {
-                ZipFile.CreateFromDirectory(
-                    _paths.DataRoot,
-                    temporary,
-                    CompressionLevel.Optimal,
-                    includeBaseDirectory: false);
+                CreateBackupArchive(temporary);
                 File.Move(temporary, destination, overwrite: true);
                 AtomicJsonFile.SecureFile(destination);
                 var record = new PortalBackupRecord(
@@ -200,6 +200,35 @@ internal sealed class PortalMaintenanceStore
                 Save();
                 throw;
             }
+        }
+    }
+
+    private void CreateBackupArchive(string destination)
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            ZipFile.CreateFromDirectory(
+                _paths.DataRoot,
+                destination,
+                CompressionLevel.Optimal,
+                includeBaseDirectory: false);
+            return;
+        }
+
+        var backupPrefix = Path.GetFullPath(_backupRoot)
+            .TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
+        using var archive = ZipFile.Open(destination, ZipArchiveMode.Create);
+        foreach (var file in Directory.EnumerateFiles(
+                     _paths.DataRoot,
+                     "*",
+                     SearchOption.AllDirectories))
+        {
+            var fullPath = Path.GetFullPath(file);
+            if (fullPath.StartsWith(backupPrefix, StringComparison.Ordinal))
+                continue;
+            var relative = Path.GetRelativePath(_paths.DataRoot, fullPath)
+                .Replace(Path.DirectorySeparatorChar, '/');
+            archive.CreateEntryFromFile(fullPath, relative, CompressionLevel.Optimal);
         }
     }
 
