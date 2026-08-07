@@ -11,6 +11,7 @@ using Sirk.Portal.Administration;
 using Sirk.Portal.Agent;
 using Sirk.Portal.Automation;
 using Sirk.Portal.Central;
+using Sirk.Portal.Demo;
 using Sirk.Portal.Maintenance;
 using Sirk.Portal.Modules;
 using Sirk.Portal.Security;
@@ -48,6 +49,7 @@ var securityOptions = builder.Configuration
     .GetSection(PortalSecurityOptions.SectionName)
     .Get<PortalSecurityOptions>() ?? new PortalSecurityOptions();
 var secureCookies = !builder.Environment.IsDevelopment();
+var demoMode = builder.Configuration.GetValue<bool>("Sirk:Demo:Enabled");
 
 builder.Services.AddProblemDetails();
 builder.Services.AddSingleton(portalPaths);
@@ -92,10 +94,11 @@ builder.Services.AddHttpClient("SirkCentral")
 
 builder.Services.AddAuthentication(options =>
 {
-    options.DefaultAuthenticateScheme = PortalAuthenticationSchemes.Session;
-    options.DefaultChallengeScheme = PortalAuthenticationSchemes.Session;
-    options.DefaultForbidScheme = PortalAuthenticationSchemes.Session;
-    options.DefaultSignInScheme = PortalAuthenticationSchemes.Session;
+    var defaultScheme = demoMode ? DemoAuthentication.Scheme : PortalAuthenticationSchemes.Session;
+    options.DefaultAuthenticateScheme = defaultScheme;
+    options.DefaultChallengeScheme = defaultScheme;
+    options.DefaultForbidScheme = defaultScheme;
+    options.DefaultSignInScheme = demoMode ? PortalAuthenticationSchemes.Session : defaultScheme;
     options.DefaultSignOutScheme = PortalAuthenticationSchemes.Session;
 }).AddCookie(PortalAuthenticationSchemes.Session, options =>
 {
@@ -143,7 +146,9 @@ builder.Services.AddAuthentication(options =>
             }
         }
     };
-});
+}).AddScheme<AuthenticationSchemeOptions, DemoAuthenticationHandler>(
+    DemoAuthentication.Scheme,
+    _ => { });
 
 builder.Services.AddAuthorizationBuilder()
     .AddPolicy(
@@ -210,8 +215,11 @@ builder.Services.AddRateLimiter(options =>
 });
 
 builder.Services.AddHostedService<PortalLifecycleService>();
-builder.Services.AddHostedService<CentralHeartbeatService>();
-builder.Services.AddHostedService<CentralTunnelService>();
+if (!demoMode)
+{
+    builder.Services.AddHostedService<CentralHeartbeatService>();
+    builder.Services.AddHostedService<CentralTunnelService>();
+}
 builder.Services.Configure<HostOptions>(options =>
 {
     options.ShutdownTimeout = TimeSpan.FromSeconds(30);
@@ -245,6 +253,10 @@ _ = app.Services.GetRequiredService<AgentPolicySigner>();
 _ = app.Services.GetRequiredService<ScriptStore>();
 _ = app.Services.GetRequiredService<ApprovalStore>();
 _ = app.Services.GetRequiredService<PortalAuditLog>();
+if (demoMode)
+{
+    DemoProfileSeeder.Seed(app.Services.GetRequiredService<AgentStore>());
+}
 
 app.UseForwardedHeaders();
 app.UseExceptionHandler();
@@ -279,6 +291,7 @@ app.UseWebSockets(new WebSocketOptions
     KeepAliveInterval = TimeSpan.FromSeconds(20)
 });
 app.UseAuthentication();
+if (demoMode) app.UseMiddleware<DemoWriteGuardMiddleware>();
 app.UseMiddleware<InternalTunnelAuthenticationMiddleware>();
 app.UseAuthorization();
 app.UseStaticFiles();
@@ -313,6 +326,7 @@ app.MapGet("/api/v1/portal/status", () => Results.Ok(new
     framework = AppContext.TargetFrameworkName,
     version = VersionInfo.Current,
     environment = app.Environment.EnvironmentName,
+    demo = demoMode,
     ready = runtimeState.IsReady,
     startedAtUtc = runtimeState.StartedAtUtc,
     central = centralConnectionState.Snapshot()
