@@ -1,7 +1,10 @@
+using System.Runtime.CompilerServices;
+
 namespace Sirk.Portal.ProtocolTests;
 
 internal static class MaintenanceUpdateCompletionContract
 {
+    [ModuleInitializer]
     public static void Run()
     {
         var root = FindRepositoryRoot();
