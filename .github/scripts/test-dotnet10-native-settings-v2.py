@@ -267,10 +267,10 @@ def main() -> int:
                 raise RuntimeError("Computer group was not deleted.")
 
             maintenance = browser.json("GET", "/api/v1/admin/maintenance/status")["value"]
-            if maintenance["current"].get("channel") != "dev":
+            if maintenance["current"].get("channel") != "preview":
                 raise RuntimeError("Initial maintenance channel is invalid.")
-            maintenance = browser.json("POST", "/api/v1/admin/maintenance/channel", {"channel": "beta"})["value"]
-            if maintenance["current"].get("channel") != "beta":
+            maintenance = browser.json("POST", "/api/v1/admin/maintenance/channel", {"channel": "stable"})["value"]
+            if maintenance["current"].get("channel") != "stable":
                 raise RuntimeError("Maintenance channel was not persisted.")
 
             maintenance = browser.json("POST", "/api/v1/admin/maintenance/backup", {"reason": "settings-e2e"})["value"]
