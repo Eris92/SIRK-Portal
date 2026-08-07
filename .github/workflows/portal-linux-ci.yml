@@ -175,8 +175,8 @@ jobs:
           sudo -u sirkportal sh -c 'printf test > /var/lib/sirk-portal/maintenance-update.lock'
           sudo -u sirkportal sudo -n /usr/lib/sirk-portal/update-helper
           for attempt in $(seq 1 90); do
-            if [[ ! -e /var/lib/sirk-portal/maintenance-update.lock ]] && \
-               grep -q 'SIRK_PORTAL_LINUX_UPDATE_OK' /var/lib/sirk-portal/Logs/gui-update-linux.log 2>/dev/null; then
+            if sudo test ! -e /var/lib/sirk-portal/maintenance-update.lock && \
+               sudo grep -q 'SIRK_PORTAL_LINUX_UPDATE_OK' /var/lib/sirk-portal/Logs/gui-update-linux.log; then
               break
             fi
             if [[ "$attempt" == 90 ]]; then
