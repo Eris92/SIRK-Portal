@@ -32,20 +32,31 @@ internal static class MaintenanceAndCentralPreviewContract
             "src",
             "Sirk.Portal",
             "Program.cs"));
+        var linuxInstaller = File.ReadAllText(Path.Combine(root, "install-linux.sh"));
 
         Require(
             maintenance.Contains("group.MapPost(\"/update\", UpdateAsync);", StringComparison.Ordinal) &&
             maintenance.Contains("public object ScheduleUpdate()", StringComparison.Ordinal) &&
-            maintenance.Contains("update = OperatingSystem.IsWindows()", StringComparison.Ordinal) &&
-            maintenance.Contains("updateAvailable = OperatingSystem.IsWindows()", StringComparison.Ordinal),
-            "Portal maintenance must expose and advertise the GUI update endpoint on Windows.");
+            maintenance.Contains("SupportsServiceMaintenance", StringComparison.Ordinal) &&
+            maintenance.Contains("OperatingSystem.IsWindows() || OperatingSystem.IsLinux()", StringComparison.Ordinal) &&
+            maintenance.Contains("RunLinuxMaintenanceHelper(\"update-helper\")", StringComparison.Ordinal) &&
+            maintenance.Contains("RunLinuxMaintenanceHelper(\"restart-helper\")", StringComparison.Ordinal),
+            "Portal maintenance must expose GUI update and restart on Windows and Linux systemd.");
 
         Require(
             maintenance.Contains("-TrustCertificate -NonInteractive -KeepBuildSdk", StringComparison.Ordinal) &&
             !maintenance.Contains("-RemoveData *>> $logPath", StringComparison.Ordinal) &&
             maintenance.Contains("maintenance-update.lock", StringComparison.Ordinal) &&
             maintenance.Contains("gui-update-", StringComparison.Ordinal),
-            "GUI updates must preserve Portal data, trust the certificate, retain the isolated SDK cache and serialize execution.");
+            "Windows GUI updates must preserve Portal data, trust the certificate, retain the isolated SDK cache and serialize execution.");
+
+        Require(
+            linuxInstaller.Contains("systemd-run", StringComparison.Ordinal) &&
+            linuxInstaller.Contains("update-runner", StringComparison.Ordinal) &&
+            linuxInstaller.Contains("--update-only --non-interactive", StringComparison.Ordinal) &&
+            linuxInstaller.Contains("SIRK_PORTAL_LINUX_UPDATE_OK", StringComparison.Ordinal) &&
+            linuxInstaller.Contains("Type=simple", StringComparison.Ordinal),
+            "Linux maintenance must detach update/restart work from the Portal cgroup and retain transactional updates.");
 
         Require(
             settings.Contains("maintenance(\"update\", {}, true)", StringComparison.Ordinal),
