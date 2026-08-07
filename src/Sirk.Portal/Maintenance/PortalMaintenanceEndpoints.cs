@@ -633,11 +633,9 @@ internal static class PortalMaintenanceEndpoints
                 operation,
                 "maintenance",
                 target,
-                "success",
-                null,
-                context.Connection.RemoteIpAddress?.ToString(),
-                context.Request.Headers.UserAgent.ToString(),
-                DateTimeOffset.UtcNow));
+                true,
+                context.Connection.RemoteIpAddress?.ToString() ?? string.Empty,
+                context.TraceIdentifier));
             return Results.Ok(new { ok = true, value });
         }
         catch (Exception error) when (
@@ -650,11 +648,13 @@ internal static class PortalMaintenanceEndpoints
                 operation,
                 "maintenance",
                 target,
-                "rejected",
-                error.Message,
-                context.Connection.RemoteIpAddress?.ToString(),
-                context.Request.Headers.UserAgent.ToString(),
-                DateTimeOffset.UtcNow));
+                false,
+                context.Connection.RemoteIpAddress?.ToString() ?? string.Empty,
+                context.TraceIdentifier,
+                new Dictionary<string, string>(StringComparer.Ordinal)
+                {
+                    ["error"] = error.Message
+                }));
             return Results.Conflict(new { ok = false, error = error.Message });
         }
     }
