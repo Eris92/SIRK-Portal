@@ -63,8 +63,7 @@ try {
         -PortalFqdn $Fqdn `
         -HttpsPort $Port `
         -TrustCertificate `
-        -KeepBuildSdk `
-        -SkipUpdater
+        -KeepBuildSdk
     if ($LASTEXITCODE -ne 0) { throw "Portal installer returned exit code $LASTEXITCODE." }
 
     $baseUrl = "https://${Fqdn}:$Port"
