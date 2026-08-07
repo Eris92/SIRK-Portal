@@ -70,7 +70,7 @@ Na Windows aktualizacja używa Windows Service. Na Linux ten sam silnik używa `
 - aplikacja jest framework-dependent i nie zawiera prywatnej kopii runtime,
 - Windows korzysta ze współdzielonego Microsoft .NET 10,
 - Linux korzysta ze współdzielonego .NET 10 (`/opt/dotnet` tylko gdy wymagany runtime nie jest już dostępny),
-- health-check SIRK Updatera dla lokalnej aplikacji nie korzysta z proxy i ma ograniczony czas pojedynczego probe,
+- lokalny health-check SIRK Updatera na Linux używa zweryfikowanego `curl --max-time` bez shella; Windows i pozostałe cele używają ograniczonego `HttpClient` bez proxy,
 - Kestrel używa HTTPS,
 - dane aplikacji są oddzielone od wymienialnych plików programu.
 
