@@ -1,4 +1,0 @@
-interface:
-  display_name: "Read MeshCentral Log"
-  short_description: "Read a bounded MeshCentral log tail safely"
-  default_prompt: "Use $read-meshcentral-log to inspect a bounded tail of a local MeshCentral log."
