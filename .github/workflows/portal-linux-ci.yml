@@ -31,6 +31,7 @@ jobs:
           set -euo pipefail
           bash -n install.sh
           bash -n install-linux.sh
+          bash -n .github/scripts/test-signed-portal-updater-linux-e2e.sh
           ! grep -Fq 'portal-main-latest' install-linux.sh
           ! grep -Fq 'portal-update-linux-x64.json' install-linux.sh
           ! grep -Fq 'sirk-portal-linux-x64.zip' install-linux.sh
@@ -137,6 +138,11 @@ jobs:
           fi
           sudo systemctl is-active --quiet sirk-portal.service
           curl --fail --silent --show-error https://localhost:8443/readyz | grep -q ready
+      - name: Verify real signed Linux update and rollback through Updater
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        shell: bash
+        run: bash .github/scripts/test-signed-portal-updater-linux-e2e.sh
       - name: Diagnostics
         if: always()
         shell: bash
