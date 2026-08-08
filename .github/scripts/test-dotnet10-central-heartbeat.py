@@ -19,6 +19,7 @@ PORTAL_ID = "portal-test"
 PORTAL_TOKEN = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 CENTRAL_URL = "http://127.0.0.1:19090"
 PORTAL_URL = "http://127.0.0.1:18081"
+EXPECTED_VERSION = "0.1.1.0"
 HEARTBEAT_RECEIVED = threading.Event()
 HEARTBEAT_ERROR: list[str] = []
 
@@ -58,7 +59,7 @@ def validate_heartbeat(handler: BaseHTTPRequestHandler, body: bytes) -> None:
     payload = json.loads(body.decode("utf-8"))
     if payload.get("protocolVersion") != 1:
         raise ValueError("Portal protocol version is invalid.")
-    if payload.get("portalVersion") != "3.0.0-dev.1":
+    if payload.get("portalVersion") != EXPECTED_VERSION:
         raise ValueError("Portal version is invalid.")
     capabilities = payload.get("capabilities", [])
     if "signed-heartbeat" not in capabilities:
