@@ -95,8 +95,8 @@ jobs:
           with open(os.path.join(root,'update-manifest.json'),'w',encoding='utf-8') as f: json.dump(obj,f,separators=(',',':'))
           os.unlink(data_path);os.unlink(der)
           PY
-            asset="artifacts/release/SIRK-Portal-${VERSION}-${runtime}.zip"
-            (cd "$out" && zip -q -r "$(realpath --relative-to="$out" "$GITHUB_WORKSPACE/$asset")" .)
+            asset="$GITHUB_WORKSPACE/artifacts/release/SIRK-Portal-${VERSION}-${runtime}.zip"
+            (cd "$out" && zip -q -r "$asset" .)
             python3 - "$asset" "$VERSION" "$runtime" "$CHANNEL" "$GITHUB_SHA" "$SIGNING_KEY_ID" "$RUNNER_TEMP/release-key.pem" "artifacts/release/SIRK-Portal-${VERSION}-${runtime}.update.json" <<'PY'
           import base64,datetime,hashlib,json,os,subprocess,sys,tempfile
           asset,version,runtime,channel,commit,key_id,key_path,out=sys.argv[1:]
@@ -127,7 +127,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          args=("v$VERSION" artifacts/release/SIRK-Portal-${VERSION}-*.zip artifacts/release/SIRK-Portal-${VERSION}-*.update.json)
+          args=("v$VERSION" artifacts/release/SIRK-Portal-${VERSION}-*.zip artifacts/release/SIRK-Portal-${VERSION}-*.update.json artifacts/release/release-trusted-keys.json)
           if [[ "$CHANNEL" == preview ]]; then args+=(--prerelease); fi
           gh release create "${args[@]}" --title "SIRK Portal $VERSION" --target "$GITHUB_SHA" --notes "Signed SIRK Portal $CHANNEL release. Runtime updates are distributed by SIRK Central."
       - name: Remove private key
