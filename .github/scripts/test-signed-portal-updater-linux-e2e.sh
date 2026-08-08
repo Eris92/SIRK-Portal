@@ -165,7 +165,7 @@ set -e
 latest_state="$(sudo find /var/lib/sirk-updater/operations/sirk-portal -type f -name state.json -printf '%T@ %p\n' | sort -nr | head -n1 | cut -d' ' -f2-)"
 [[ -n "$latest_state" ]] || { echo 'Linux Portal rollback state is missing.' >&2; exit 8; }
 sudo jq -e '
-  .phase == "failed" and
+  .phase == "Failed" and
   (.message | test("rollback was attempted";"i")) and
   (.error | test("health check timed out|Health endpoint returned HTTP 503";"i"))
 ' "$latest_state" >/dev/null
