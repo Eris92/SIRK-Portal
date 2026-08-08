@@ -31,6 +31,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          [[ "$VERSION" =~ ^0\.1\.1\.[0-9]+$ ]] || { echo "Invalid pre-1.0 Portal version: $VERSION" >&2; exit 1; }
           [[ -n "$SIGNING_PRIVATE_KEY_PEM" ]] || { echo 'SIRK_RELEASE_SIGNING_PRIVATE_KEY_PEM is required.' >&2; exit 1; }
           [[ "$SIGNING_KEY_ID" =~ ^[A-Za-z0-9._-]{1,80}$ ]] || { echo 'SIRK_RELEASE_SIGNING_KEY_ID is invalid.' >&2; exit 1; }
           printf '%s' "$SIGNING_PRIVATE_KEY_PEM" > "$RUNNER_TEMP/release-key.pem"
@@ -51,13 +52,14 @@ jobs:
             out="artifacts/$runtime"
             rm -rf "$out"; mkdir -p "$out"
             dotnet publish src/Sirk.Portal/Sirk.Portal.csproj -c Release -r "$runtime" --self-contained false -o "$out" \
+              /p:DebugType=None /p:DebugSymbols=false \
               /p:Version="$VERSION" /p:AssemblyVersion="$VERSION" /p:FileVersion="$VERSION"
             cp artifacts/release/release-trusted-keys.json "$out/release-trusted-keys.json"
-            python3 - "$out/release-manifest.json" "$runtime" "$VERSION" "$GITHUB_SHA" <<'PY'
+            python3 - "$out/release-manifest.json" "$runtime" "$VERSION" "$GITHUB_SHA" "$CHANNEL" <<'PY'
           import json,sys
-          path,runtime,version,commit=sys.argv[1:]
+          path,runtime,version,commit,channel=sys.argv[1:]
           with open(path,'w',encoding='utf-8') as f:
-              json.dump({'schemaVersion':1,'applicationId':'sirk-portal','product':'SIRK Portal','version':version,'runtime':runtime,'channel':'main','commit':commit},f,separators=(',',':'))
+              json.dump({'schemaVersion':1,'applicationId':'sirk-portal','product':'SIRK Portal','version':version,'runtime':runtime,'channel':channel,'commit':commit},f,separators=(',',':'))
           PY
             python3 - "$out" "$VERSION" "$runtime" "$SIGNING_KEY_ID" "$RUNNER_TEMP/release-key.pem" <<'PY'
           import base64,hashlib,json,os,subprocess,sys,tempfile
@@ -90,8 +92,7 @@ jobs:
           assert sig[i]==2;i+=1;n,i=readlen(sig,i);r=sig[i:i+n];i+=n
           assert sig[i]==2;i+=1;n,i=readlen(sig,i);s=sig[i:i+n]
           r=r.lstrip(b'\0').rjust(32,b'\0');s=s.lstrip(b'\0').rjust(32,b'\0')
-          p1363=r+s
-          obj['signature']['value']=base64.urlsafe_b64encode(p1363).decode().rstrip('=')
+          obj['signature']['value']=base64.urlsafe_b64encode(r+s).decode().rstrip('=')
           with open(os.path.join(root,'update-manifest.json'),'w',encoding='utf-8') as f: json.dump(obj,f,separators=(',',':'))
           os.unlink(data_path);os.unlink(der)
           PY
