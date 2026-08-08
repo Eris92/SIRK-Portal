@@ -16,7 +16,7 @@ internal sealed class CentralConnectionOptions
 
     public string PublicUrl { get; set; } = string.Empty;
 
-    public string UpdateChannel { get; set; } = "dev";
+    public string UpdateChannel { get; set; } = "preview";
 
     public int HeartbeatIntervalSeconds { get; set; } = 60;
 
