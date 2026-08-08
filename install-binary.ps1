@@ -163,8 +163,18 @@ function Get-PemSha256 {
 function Resolve-SignedPortalRelease {
     param([Parameter(Mandatory)][string]$ReleaseChannel)
     $headers = @{ Accept = 'application/vnd.github+json'; 'User-Agent' = 'SIRK-Portal-Bootstrap' }
-    $releases = @(Invoke-RestMethod -UseBasicParsing -Headers $headers -Uri "https://api.github.com/repos/$PortalReleaseRepository/releases?per_page=50")
-    $candidates = foreach ($release in $releases) {
+    $response = Invoke-WebRequest -UseBasicParsing -Headers $headers -Uri "https://api.github.com/repos/$PortalReleaseRepository/releases?per_page=50"
+    $parsed = ConvertFrom-Json -InputObject $response.Content
+    $releases = @()
+    if ($parsed -is [System.Array]) {
+        foreach ($item in $parsed) { $releases += $item }
+    }
+    else {
+        $releases += $parsed
+    }
+
+    $candidates = @()
+    foreach ($release in $releases) {
         if ($release.draft) { continue }
         if ($ReleaseChannel -eq 'preview' -and -not $release.prerelease) { continue }
         if ($ReleaseChannel -eq 'stable' -and $release.prerelease) { continue }
@@ -175,7 +185,13 @@ function Resolve-SignedPortalRelease {
         $packageName = "SIRK-Portal-$versionText-win-x64.zip"
         $names = @($release.assets | ForEach-Object { [string]$_.name })
         if (-not ($names -contains $descriptorName) -or -not ($names -contains $packageName) -or -not ($names -contains 'release-trusted-keys.json')) { continue }
-        [pscustomobject]@{ Release = $release; Version = [version]$versionText; VersionText = $versionText; DescriptorName = $descriptorName; PackageName = $packageName }
+        $candidates += [pscustomobject]@{
+            Release = $release
+            Version = [version]$versionText
+            VersionText = $versionText
+            DescriptorName = $descriptorName
+            PackageName = $packageName
+        }
     }
     $selected = @($candidates | Sort-Object Version -Descending | Select-Object -First 1)
     if ($selected.Count -ne 1) { throw "No immutable signed Portal $ReleaseChannel release was found." }
