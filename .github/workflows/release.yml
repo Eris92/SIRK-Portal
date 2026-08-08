@@ -96,7 +96,8 @@ jobs:
           import base64,hashlib,json,os,subprocess,sys,tempfile,datetime
           asset,version,runtime,channel,commit,key_id,key_path,out=sys.argv[1:]
           data=open(asset,'rb').read()
-          obj={'schemaVersion':1,'applicationId':'sirk-portal','product':'SIRK Portal','version':version,'runtime':runtime,'channel':channel,'assetName':os.path.basename(asset),'size':len(data),'sha256':hashlib.sha256(data).hexdigest(),'commit':commit,'publishedAtUtc':datetime.datetime.now(datetime.timezone.utc).isoformat().replace('+00:00','Z'),'signature':{'algorithm':'ES256','keyId':key_id,'value':''}}
+          published=datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat()
+          obj={'schemaVersion':1,'applicationId':'sirk-portal','product':'SIRK Portal','version':version,'runtime':runtime,'channel':channel,'assetName':os.path.basename(asset),'size':len(data),'sha256':hashlib.sha256(data).hexdigest(),'commit':commit,'publishedAtUtc':published,'signature':{'algorithm':'ES256','keyId':key_id,'value':''}}
           canonical=json.dumps({k:v for k,v in obj.items() if k!='signature'},sort_keys=True,separators=(',',':')).encode()
           with tempfile.NamedTemporaryFile(delete=False) as f:f.write(canonical);p=f.name
           der=p+'.sig';subprocess.check_call(['openssl','dgst','-sha256','-sign',key_path,'-out',der,p]);sig=open(der,'rb').read()
