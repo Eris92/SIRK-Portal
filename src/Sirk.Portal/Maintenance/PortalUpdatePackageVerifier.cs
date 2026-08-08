@@ -109,6 +109,16 @@ internal static class PortalUpdatePackageVerifier
                 throw new CryptographicException("Portal signed update file hash mismatch: " + relative);
         }
 
+        foreach (var actualPath in Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories))
+        {
+            var relative = NormalizeRelativePath(Path.GetRelativePath(root, actualPath));
+            if (string.Equals(relative, "update-manifest.json", StringComparison.OrdinalIgnoreCase))
+                continue;
+            if (!seen.Contains(relative))
+                throw new InvalidDataException(
+                    "Portal update payload contains an unlisted file: " + relative);
+        }
+
         foreach (var required in RequiredFiles(expectedRuntime))
             if (!seen.Contains(required))
                 throw new InvalidDataException(
