@@ -19,7 +19,7 @@ param(
     [Parameter(Mandatory)][string]$PortalUrl,
     [Parameter(Mandatory)][string]$GroupId,
     [Parameter(Mandatory)][string]$EnrollmentToken,
-    [ValidateSet('stable','dev')][string]$Channel = 'stable',
+    [ValidateSet('stable','preview')][string]$Channel = 'stable',
     [ValidateSet('Silent','Interactive')][string]$Mode = 'Silent'
 )
 
