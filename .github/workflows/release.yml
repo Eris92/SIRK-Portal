@@ -62,6 +62,11 @@ jobs:
             python3 - "$out" "$VERSION" "$runtime" "$SIGNING_KEY_ID" "$RUNNER_TEMP/release-key.pem" <<'PY'
           import base64,hashlib,json,os,subprocess,sys,tempfile
           root,version,runtime,key_id,key_path=sys.argv[1:]
+          def canonical_bytes(value):
+              text=json.dumps(value,sort_keys=True,separators=(',',':'),ensure_ascii=True)
+              for raw,escaped in (('+','\\u002B'),('&','\\u0026'),('<','\\u003C'),('>','\\u003E'),("'",'\\u0027')):
+                  text=text.replace(raw,escaped)
+              return text.encode()
           files=[]
           for base,_,names in os.walk(root):
               for name in names:
@@ -72,7 +77,7 @@ jobs:
                   files.append({'path':rel,'size':len(data),'sha256':hashlib.sha256(data).hexdigest()})
           files.sort(key=lambda x:x['path'])
           obj={'schemaVersion':1,'applicationId':'sirk-portal','product':'SIRK Portal','version':version,'runtime':runtime,'files':files,'signature':{'algorithm':'ES256','keyId':key_id,'value':''}}
-          canonical=json.dumps({k:v for k,v in obj.items() if k!='signature'},sort_keys=True,separators=(',',':')).encode()
+          canonical=canonical_bytes({k:v for k,v in obj.items() if k!='signature'})
           with tempfile.NamedTemporaryFile(delete=False) as f: f.write(canonical); data_path=f.name
           der=data_path+'.sig'
           subprocess.check_call(['openssl','dgst','-sha256','-sign',key_path,'-out',der,data_path])
@@ -93,12 +98,17 @@ jobs:
             asset="artifacts/release/SIRK-Portal-${VERSION}-${runtime}.zip"
             (cd "$out" && zip -q -r "$(realpath --relative-to="$out" "$GITHUB_WORKSPACE/$asset")" .)
             python3 - "$asset" "$VERSION" "$runtime" "$CHANNEL" "$GITHUB_SHA" "$SIGNING_KEY_ID" "$RUNNER_TEMP/release-key.pem" "artifacts/release/SIRK-Portal-${VERSION}-${runtime}.update.json" <<'PY'
-          import base64,hashlib,json,os,subprocess,sys,tempfile,datetime
+          import base64,datetime,hashlib,json,os,subprocess,sys,tempfile
           asset,version,runtime,channel,commit,key_id,key_path,out=sys.argv[1:]
+          def canonical_bytes(value):
+              text=json.dumps(value,sort_keys=True,separators=(',',':'),ensure_ascii=True)
+              for raw,escaped in (('+','\\u002B'),('&','\\u0026'),('<','\\u003C'),('>','\\u003E'),("'",'\\u0027')):
+                  text=text.replace(raw,escaped)
+              return text.encode()
           data=open(asset,'rb').read()
-          published=datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat().replace('+00:00','Z')
+          published=datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat()
           obj={'schemaVersion':1,'applicationId':'sirk-portal','product':'SIRK Portal','version':version,'runtime':runtime,'channel':channel,'assetName':os.path.basename(asset),'size':len(data),'sha256':hashlib.sha256(data).hexdigest(),'commit':commit,'publishedAtUtc':published,'signature':{'algorithm':'ES256','keyId':key_id,'value':''}}
-          canonical=json.dumps({k:v for k,v in obj.items() if k!='signature'},sort_keys=True,separators=(',',':')).encode()
+          canonical=canonical_bytes({k:v for k,v in obj.items() if k!='signature'})
           with tempfile.NamedTemporaryFile(delete=False) as f:f.write(canonical);p=f.name
           der=p+'.sig';subprocess.check_call(['openssl','dgst','-sha256','-sign',key_path,'-out',der,p]);sig=open(der,'rb').read()
           def rl(b,i):
