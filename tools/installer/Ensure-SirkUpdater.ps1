@@ -127,6 +127,7 @@ try {
         signatureRequired = $true
         signatureVerifierPath = $portalVerifier
         signatureVerifierArguments = @('--verify-update-payload','{payload}','--trusted-keys',$trustedKeys)
+        preserveFiles = @('appsettings.Production.json')
     } | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $manifestPath -Encoding UTF8
 
     & $updaterCli register $manifestPath
