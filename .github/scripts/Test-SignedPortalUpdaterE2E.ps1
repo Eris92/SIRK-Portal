@@ -192,10 +192,20 @@ try {
         'X-GitHub-Api-Version' = '2022-11-28'
         'User-Agent' = 'SIRK-Portal-Signed-Update-E2E'
     }
-    $releases = @(Invoke-RestMethod `
+    $response = Invoke-WebRequest `
+        -UseBasicParsing `
         -Headers $headers `
         -Uri 'https://api.github.com/repos/Eris92/SIRK-Portal/releases?per_page=30' `
-        -TimeoutSec 30)
+        -TimeoutSec 30
+    $parsed = ConvertFrom-Json -InputObject $response.Content
+    $releases = @()
+    if ($parsed -is [System.Array]) {
+        foreach ($release in $parsed) { $releases += $release }
+    }
+    else {
+        $releases += $parsed
+    }
+
     $candidates = @()
     foreach ($release in $releases) {
         $tag = [string]$release.tag_name
