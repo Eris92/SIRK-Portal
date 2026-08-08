@@ -60,7 +60,7 @@ jobs:
             $releases += $parsed
           }
           Write-Host "release-count=$($releases.Count) parsed-type=$($parsed.GetType().FullName)"
-          $matches = @()
+          $matchedTags = @()
           foreach ($release in $releases) {
             $tag = [string]$release.tag_name
             $assetNames = @($release.assets | ForEach-Object { [string]$_.name })
@@ -70,10 +70,10 @@ jobs:
             $package = if ($versionText) { "SIRK-Portal-$versionText-win-x64.zip" } else { '' }
             $assetOk = $versionText -and ($assetNames -contains $descriptor) -and ($assetNames -contains $package) -and ($assetNames -contains 'release-trusted-keys.json')
             Write-Host "tag=$tag draft=$($release.draft) prerelease=$($release.prerelease) tagOk=$tagOk assetsOk=$assetOk"
-            if (-not $release.draft -and $release.prerelease -and $tagOk -and $assetOk) { $matches += $tag }
+            if (-not $release.draft -and $release.prerelease -and $tagOk -and $assetOk) { $matchedTags += $tag }
           }
-          if ($matches.Count -lt 1) { throw 'Windows PowerShell could not discover any immutable signed preview Portal release.' }
-          Write-Host ('SIRK_PORTAL_WINDOWS_RELEASE_DISCOVERY_OK ' + ($matches -join ',')) -ForegroundColor Green
+          if ($matchedTags.Count -lt 1) { throw 'Windows PowerShell could not discover any immutable signed preview Portal release.' }
+          Write-Host ('SIRK_PORTAL_WINDOWS_RELEASE_DISCOVERY_OK ' + ($matchedTags -join ',')) -ForegroundColor Green
 
       - name: Clean install through canonical router
         shell: powershell
