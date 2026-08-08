@@ -39,6 +39,7 @@ if ([string]::IsNullOrWhiteSpace($commonDataRoot)) {
 }
 $bootstrapRoot = Join-Path $commonDataRoot ('SIRK\Temp\InstallRouter-' + [guid]::NewGuid().ToString('N'))
 $scriptPath = Join-Path $bootstrapRoot $scriptName
+$localScriptPath = Join-Path $PSScriptRoot $scriptName
 $scriptUrl = 'https://raw.githubusercontent.com/Eris92/SIRK-Portal/main/' + $scriptName + '?nocache=' + [guid]::NewGuid()
 
 function Convert-InstallerAclToWellKnownSids {
@@ -61,8 +62,14 @@ try {
     New-Item -ItemType Directory -Path $bootstrapRoot -Force | Out-Null
     $route = if ($useBinaryInstaller) { 'immutable signed binary bootstrap' } else { 'explicit source recovery' }
     Write-Host ('=== SIRK Portal installer route: ' + $route + ' ===') -ForegroundColor Cyan
-    # Public GitHub access is bootstrap/recovery only. Installed runtime updates do not use this router.
-    Invoke-WebRequest -UseBasicParsing -Uri $scriptUrl -OutFile $scriptPath
+
+    if (Test-Path -LiteralPath $localScriptPath -PathType Leaf) {
+        Copy-Item -LiteralPath $localScriptPath -Destination $scriptPath -Force
+    }
+    else {
+        # Public GitHub access is bootstrap/recovery only. Installed runtime updates do not use this router.
+        Invoke-WebRequest -UseBasicParsing -Uri $scriptUrl -OutFile $scriptPath
+    }
     Convert-InstallerAclToWellKnownSids -Path $scriptPath
 
     $tokens = $null
