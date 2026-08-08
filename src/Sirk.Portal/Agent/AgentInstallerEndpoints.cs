@@ -38,12 +38,12 @@ internal static class AgentInstallerEndpoints
             5,
             7 * 24 * 60);
         var channel = (request.Channel ?? "stable").Trim().ToLowerInvariant();
-        if (channel is not ("stable" or "dev"))
+        if (channel is not ("stable" or "preview"))
         {
             return PortalAuthenticationEndpoints.Error(
                 400,
                 "AGENT_INSTALLER_CHANNEL_INVALID",
-                "Agent installer channel must be stable or dev.");
+                "Agent installer channel must be stable or preview.");
         }
 
         AgentInstallerTicketIssue issue;
