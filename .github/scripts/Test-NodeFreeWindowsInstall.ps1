@@ -81,8 +81,11 @@ try {
     }
 
     $updaterManifest = Get-Content 'C:\ProgramData\SIRK\Updater\applications\sirk-portal.json' -Raw -Encoding UTF8 | ConvertFrom-Json
-    if ($updaterManifest.updateSource -ne 'sirk-central-cache' -or $updaterManifest.signatureRequired -ne $true) {
-        throw 'Installed Portal updater manifest is not Central-only and fail-closed.'
+    $preservedFiles = @($updaterManifest.preserveFiles | ForEach-Object { [string]$_ })
+    if ($updaterManifest.updateSource -ne 'sirk-central-cache' -or
+        $updaterManifest.signatureRequired -ne $true -or
+        -not ($preservedFiles -contains 'appsettings.Production.json')) {
+        throw 'Installed Portal updater manifest is not Central-only, fail-closed, and configuration-preserving.'
     }
 
     $health = Invoke-RestMethod "$baseUrl/healthz"
@@ -137,6 +140,11 @@ try {
     foreach ($marker in @('sirkStandaloneRoot','data-view="devices"','data-view="settings"','portal-module-shell.css')) {
         if ($portal -notmatch [regex]::Escape($marker)) { throw "Portal UI marker missing: $marker" }
     }
+
+    & (Join-Path $PSScriptRoot 'Test-SignedPortalUpdaterE2E.ps1') `
+        -BaseUrl $baseUrl `
+        -InstallRoot $InstallRoot `
+        -DataRoot $DataRoot
 
     # Existing installations are no longer updated by re-running a public/bootstrap
     # installer. Prove that the installer refuses that path and leaves durable data
