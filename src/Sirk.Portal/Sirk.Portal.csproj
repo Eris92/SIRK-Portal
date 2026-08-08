@@ -22,6 +22,10 @@
              Link="public/%(RecursiveDir)%(Filename)%(Extension)"
              CopyToOutputDirectory="PreserveNewest"
              CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="../../release-trusted-keys.json"
+             Link="release-trusted-keys.json"
+             CopyToOutputDirectory="PreserveNewest"
+             CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
   <PropertyGroup>
     <PortalPublicSource>$(MSBuildProjectDirectory)/../../public</PortalPublicSource>
