@@ -46,6 +46,35 @@ jobs:
         shell: powershell
         run: .\tests\binary-install-contract.ps1
 
+      - name: Verify immutable preview release discovery on Windows PowerShell
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $headers = @{ Accept = 'application/vnd.github+json'; 'User-Agent' = 'SIRK-Portal-Bootstrap-CI' }
+          $response = Invoke-WebRequest -UseBasicParsing -Headers $headers -Uri 'https://api.github.com/repos/Eris92/SIRK-Portal/releases?per_page=50'
+          $parsed = ConvertFrom-Json -InputObject $response.Content
+          $releases = @()
+          if ($parsed -is [System.Array]) {
+            foreach ($item in $parsed) { $releases += $item }
+          } else {
+            $releases += $parsed
+          }
+          Write-Host "release-count=$($releases.Count) parsed-type=$($parsed.GetType().FullName)"
+          $matches = @()
+          foreach ($release in $releases) {
+            $tag = [string]$release.tag_name
+            $assetNames = @($release.assets | ForEach-Object { [string]$_.name })
+            $tagOk = $tag -match '^v(0\.1\.1\.\d+)$'
+            $versionText = if ($tagOk) { $Matches[1] } else { '' }
+            $descriptor = if ($versionText) { "SIRK-Portal-$versionText-win-x64.update.json" } else { '' }
+            $package = if ($versionText) { "SIRK-Portal-$versionText-win-x64.zip" } else { '' }
+            $assetOk = $versionText -and ($assetNames -contains $descriptor) -and ($assetNames -contains $package) -and ($assetNames -contains 'release-trusted-keys.json')
+            Write-Host "tag=$tag draft=$($release.draft) prerelease=$($release.prerelease) tagOk=$tagOk assetsOk=$assetOk"
+            if (-not $release.draft -and $release.prerelease -and $tagOk -and $assetOk) { $matches += $tag }
+          }
+          if ($matches.Count -lt 1) { throw 'Windows PowerShell could not discover any immutable signed preview Portal release.' }
+          Write-Host ('SIRK_PORTAL_WINDOWS_RELEASE_DISCOVERY_OK ' + ($matches -join ',')) -ForegroundColor Green
+
       - name: Clean install through canonical router
         shell: powershell
         env:
@@ -55,6 +84,7 @@ jobs:
           $ErrorActionPreference = 'Stop'
           .\install.ps1 `
             -Branch main `
+            -Channel preview `
             -PortalFqdn 'portal-ci.sir-k.local' `
             -HttpsPort 443 `
             -BootstrapUserName 'admin' `
@@ -80,8 +110,15 @@ jobs:
           if ($ready.status -ne 'ready') { throw 'readyz failed.' }
 
           $manifest = Get-Content 'C:\Program Files\SIRK\Portal\release-manifest.json' -Raw -Encoding UTF8 | ConvertFrom-Json
-          if ($manifest.applicationId -ne 'sirk-portal' -or $manifest.channel -ne 'main') {
+          if ($manifest.applicationId -ne 'sirk-portal' -or $manifest.runtime -ne 'win-x64') {
             throw 'Installed release manifest is invalid.'
+          }
+          if (-not (Test-Path 'C:\Program Files\SIRK\Portal\release-trusted-keys.json')) {
+            throw 'Installed release trust root is missing.'
+          }
+          $updaterManifest = Get-Content 'C:\ProgramData\SIRK\Updater\applications\sirk-portal.json' -Raw -Encoding UTF8 | ConvertFrom-Json
+          if ($updaterManifest.updateSource -ne 'sirk-central-cache' -or $updaterManifest.signatureRequired -ne $true) {
+            throw 'Portal Updater registration is not Central-only and fail-closed.'
           }
           if (-not (Test-Path 'C:\ProgramData\SIRK\Portal\identity.json')) {
             throw 'Portal identity was not initialized.'
