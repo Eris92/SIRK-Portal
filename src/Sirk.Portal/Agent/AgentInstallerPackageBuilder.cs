@@ -39,8 +39,8 @@ internal static partial class AgentInstallerPackageBuilder
             throw new InvalidDataException("Agent installer enrollment ticket is invalid.");
 
         var normalizedChannel = (channel ?? string.Empty).Trim().ToLowerInvariant();
-        if (normalizedChannel is not ("stable" or "dev"))
-            throw new InvalidDataException("Agent installer channel must be stable or dev.");
+        if (normalizedChannel is not ("stable" or "preview"))
+            throw new InvalidDataException("Agent installer channel must be stable or preview.");
 
         var windowsRoot = Environment.GetEnvironmentVariable("WINDIR") ?? @"C:\Windows";
         var iexpress = Path.Combine(windowsRoot, "System32", "iexpress.exe");
