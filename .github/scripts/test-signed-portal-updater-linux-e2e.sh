@@ -162,10 +162,14 @@ sudo "$RUNNER" "$staged" "$sha" "$version"
 rollback_code=$?
 set -e
 [[ "$rollback_code" -ne 0 ]] || { echo 'Forced Linux Portal rollback transaction unexpectedly succeeded.' >&2; exit 7; }
-latest_state="$(sudo find /var/lib/sirk-updater/operations/sirk-portal -type f -name state.json -printf '%T@ %p\n' | sort -nr | head -n1 | cut -d' ' -f2-)"
+latest_state="$(
+  sudo find /var/lib/sirk-updater/operations/sirk-portal -type f -name state.json -printf '%T@ %p\n' |
+    sort -nr |
+    sed -n '1s/^[^ ]* //p'
+)"
 [[ -n "$latest_state" ]] || { echo 'Linux Portal rollback state is missing.' >&2; exit 8; }
 sudo jq -e '
-  .phase == "Failed" and
+  ((.phase // "") | ascii_downcase) == "failed" and
   (.message | test("rollback was attempted";"i")) and
   (.error | test("health check timed out|Health endpoint returned HTTP 503";"i"))
 ' "$latest_state" >/dev/null
