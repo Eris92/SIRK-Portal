@@ -491,8 +491,7 @@ internal sealed class PortalUpdateClient
     private static string NormalizeChannel(string value) =>
         (value ?? string.Empty).Trim().ToLowerInvariant() switch
         {
-            "stable" => "stable",
-            "preview" or "beta" or "dev" => "preview",
+            "preview" => "preview",
             _ => "stable"
         };
 
