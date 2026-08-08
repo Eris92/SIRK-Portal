@@ -1,7 +1,7 @@
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
-COPY global.json Directory.Build.props ./
+COPY global.json Directory.Build.props release-trusted-keys.json ./
 COPY public public
 COPY src/Sirk.Portal src/Sirk.Portal
 RUN dotnet publish src/Sirk.Portal/Sirk.Portal.csproj \
