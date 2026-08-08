@@ -20,9 +20,19 @@
         error.hidden = false;
     }
 
+    function showMessage(message) {
+        if (!microsoftMessage) return;
+        microsoftMessage.textContent = String(message || "");
+        microsoftMessage.hidden = false;
+    }
+
     function parse(response) {
         return response.json().catch(function () { return {}; }).then(function (value) {
-            if (!response.ok || value.ok === false) throw new Error(value.error || ("HTTP " + response.status));
+            if (!response.ok || value.ok === false) {
+                var failure = new Error(value.error || ("HTTP " + response.status));
+                failure.status = response.status;
+                throw failure;
+            }
             return value;
         });
     }
@@ -50,7 +60,11 @@
             headers: accessHeaders()
         }).then(parse).then(function () {
             revealLocalLogin();
-        }).catch(function () {
+        }).catch(function (failure) {
+            if (failure && failure.status === 429) {
+                showMessage("Zbyt wiele prób logowania. Odczekaj chwilę i odśwież stronę.");
+                return;
+            }
             accessCode = "";
             localPanel.hidden = true;
         });
@@ -92,8 +106,7 @@
 
     var microsoftState = new URL(window.location.href).searchParams.get("microsoft");
     if (microsoftState === "not-configured" && microsoftMessage) {
-        microsoftMessage.textContent = "Logowanie Microsoft Entra nie jest jeszcze skonfigurowane dla tego Portalu.";
-        microsoftMessage.hidden = false;
+        showMessage("Logowanie Microsoft Entra nie jest jeszcze skonfigurowane dla tego Portalu.");
     }
 
     validateLocalAccess();
