@@ -72,6 +72,7 @@ internal sealed class PortalUpdateClient
     private readonly PortalPaths _paths;
     private PortalUpdateProbeResult? _cachedProbe;
     private PortalUpdateOffer? _cachedOffer;
+    private string? _cachedChannel;
 
     public PortalUpdateClient(
         CentralConnectionResolver resolver,
@@ -85,11 +86,13 @@ internal sealed class PortalUpdateClient
 
     public PortalUpdateProbeResult Probe(bool force = false)
     {
+        var channel = ReadMaintenanceChannel();
         if (!force)
         {
             lock (_sync)
             {
                 if (_cachedProbe is not null &&
+                    string.Equals(_cachedChannel, channel, StringComparison.Ordinal) &&
                     DateTimeOffset.UtcNow - _cachedProbe.CheckedAtUtc < CacheLifetime)
                     return _cachedProbe;
             }
@@ -103,7 +106,6 @@ internal sealed class PortalUpdateClient
                          ?? throw new PlatformNotSupportedException(
                              "Portal updates are supported only on Windows x64 and Linux x64.");
             var (connection, baseUri) = ResolveCentral();
-            var channel = NormalizeChannel(connection.UpdateChannel);
             var offer = FetchOfferAsync(
                     connection,
                     baseUri,
@@ -132,6 +134,7 @@ internal sealed class PortalUpdateClient
             {
                 _cachedOffer = offer;
                 _cachedProbe = result;
+                _cachedChannel = channel;
             }
             return result;
         }
@@ -151,6 +154,7 @@ internal sealed class PortalUpdateClient
             {
                 _cachedOffer = null;
                 _cachedProbe = result;
+                _cachedChannel = channel;
             }
             return result;
         }
@@ -174,7 +178,7 @@ internal sealed class PortalUpdateClient
                      ?? throw new PlatformNotSupportedException(
                          "Portal updates are supported only on Windows x64 and Linux x64.");
         var (connection, baseUri) = ResolveCentral();
-        var channel = NormalizeChannel(connection.UpdateChannel);
+        var channel = ReadMaintenanceChannel();
         if (offer.Runtime != target || offer.Channel != channel)
             throw new InvalidDataException("Cached Portal update scope changed.");
 
@@ -361,6 +365,27 @@ internal sealed class PortalUpdateClient
         return (resolved, baseUri);
     }
 
+    private string ReadMaintenanceChannel()
+    {
+        var path = Path.Combine(_paths.DataRoot, "maintenance.json");
+        if (!File.Exists(path)) return "preview";
+        try
+        {
+            using var document = JsonDocument.Parse(File.ReadAllText(path));
+            var root = document.RootElement;
+            if (!root.TryGetProperty("channel", out var value) &&
+                !root.TryGetProperty("Channel", out value))
+                throw new InvalidDataException("Portal maintenance state has no update channel.");
+            if (value.ValueKind != JsonValueKind.String)
+                throw new InvalidDataException("Portal maintenance update channel is invalid.");
+            return NormalizeChannel(value.GetString() ?? string.Empty);
+        }
+        catch (JsonException error)
+        {
+            throw new InvalidDataException("Portal maintenance state is invalid JSON.", error);
+        }
+    }
+
     private static void ValidateOffer(
         PortalUpdateOffer offer,
         string runtime,
@@ -492,7 +517,9 @@ internal sealed class PortalUpdateClient
         (value ?? string.Empty).Trim().ToLowerInvariant() switch
         {
             "preview" => "preview",
-            _ => "stable"
+            "stable" => "stable",
+            "beta" or "dev" => "preview",
+            _ => throw new InvalidDataException("Portal maintenance update channel must be stable or preview.")
         };
 
     private static string? PlatformTarget()
