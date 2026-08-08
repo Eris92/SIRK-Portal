@@ -34,8 +34,8 @@ jobs:
           ! grep -Fq 'portal-main-latest' install-linux.sh
           ! grep -Fq 'portal-update-linux-x64.json' install-linux.sh
           ! grep -Fq 'sirk-portal-linux-x64.zip' install-linux.sh
-          grep -Fq 'SIRK-Portal-$v-linux-x64.update.json' install-linux.sh
-          grep -Fq 'SIRK-Portal-$v-linux-x64.zip' install-linux.sh
+          grep -Fq "f'SIRK-Portal-{v}-linux-x64.update.json'" install-linux.sh
+          grep -Fq "f'SIRK-Portal-{v}-linux-x64.zip'" install-linux.sh
           grep -Fq 'release-trusted-keys.json' install-linux.sh
           grep -Fq '"schemaVersion": 1' install-linux.sh
           grep -Fq '"updateSource": "sirk-central-cache"' install-linux.sh
