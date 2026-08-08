@@ -59,6 +59,7 @@ try {
 
     & $installer `
         -Branch $Branch `
+        -Channel preview `
         -NonInteractive `
         -PortalFqdn $Fqdn `
         -HttpsPort $Port `
@@ -77,6 +78,11 @@ try {
     $updaterService = Get-Service SirkUpdater -ErrorAction Stop
     if ($updaterService.Status -ne 'Running' -or $updaterService.StartType -ne 'Automatic') {
         throw "Invalid SirkUpdater service state: $($updaterService.Status) / $($updaterService.StartType)"
+    }
+
+    $updaterManifest = Get-Content 'C:\ProgramData\SIRK\Updater\applications\sirk-portal.json' -Raw -Encoding UTF8 | ConvertFrom-Json
+    if ($updaterManifest.updateSource -ne 'sirk-central-cache' -or $updaterManifest.signatureRequired -ne $true) {
+        throw 'Installed Portal updater manifest is not Central-only and fail-closed.'
     }
 
     $health = Invoke-RestMethod "$baseUrl/healthz"
@@ -132,35 +138,51 @@ try {
         if ($portal -notmatch [regex]::Escape($marker)) { throw "Portal UI marker missing: $marker" }
     }
 
+    # Existing installations are no longer updated by re-running a public/bootstrap
+    # installer. Prove that the installer refuses that path and leaves durable data
+    # untouched; runtime update ownership belongs to Maintenance -> Central -> Updater.
     $manualScript = Join-Path $DataRoot 'Files\management\Preserved\Manual test.ps1'
     New-Item -ItemType Directory -Path (Split-Path -Parent $manualScript) -Force | Out-Null
-    Set-Content -LiteralPath $manualScript -Value '#PL Zachowany skrypt | Test reinstalacji danych.' -Encoding UTF8
+    Set-Content -LiteralPath $manualScript -Value '# Preserved management script for runtime update ownership test.' -Encoding UTF8
     $identityPath = Join-Path $DataRoot 'identity.json'
     $identityHashBefore = (Get-FileHash -LiteralPath $identityPath -Algorithm SHA256).Hash
     $accessCodeBefore = (Get-Content (Join-Path $DataRoot 'security\break-glass-access-code.txt') -Raw).Trim()
     Remove-Item Env:SIRK_INSTALL_BREAKGLASS_PASSWORD -ErrorAction SilentlyContinue
 
-    $reinstallOutput = @(& $installer -Branch $Branch -NonInteractive -PortalFqdn $Fqdn -HttpsPort $Port -TrustCertificate -SkipUpdater 6>&1)
-    $reinstallOutput | Out-Host
-    $reinstallText = (($reinstallOutput | Out-String) -replace '\s+', ' ').Trim()
-    if (-not ($reinstallText.Contains('SIRK_PORTAL_DOTNET10_INSTALL_OK') -or $reinstallText.Contains('SIRK_PORTAL_BINARY_INSTALL_OK'))) {
-        throw 'Preserve-data reinstallation did not complete successfully.'
+    $reinstallRejected = $false
+    try {
+        & $installer `
+            -Branch $Branch `
+            -Channel preview `
+            -NonInteractive `
+            -PortalFqdn $Fqdn `
+            -HttpsPort $Port `
+            -TrustCertificate `
+            -SkipUpdater
     }
-    # Do not infer preserve-data behavior from localized installer prose. The
-    # durable data, identity and Break-Glass assertions below are the contract.
+    catch {
+        if ($_.Exception.Message -notmatch 'Runtime updates must be performed through Portal Maintenance -> SIRK Central -> SIRK Updater') {
+            throw
+        }
+        $reinstallRejected = $true
+    }
+    if (-not $reinstallRejected) {
+        throw 'Bootstrap installer unexpectedly accepted an installed Portal as a runtime update path.'
+    }
+
     if (-not (Test-Path -LiteralPath $manualScript -PathType Leaf)) {
-        throw 'Manual Management script was removed during reinstallation.'
+        throw 'Bootstrap update rejection modified preserved management data.'
     }
     $identityHashAfter = (Get-FileHash -LiteralPath $identityPath -Algorithm SHA256).Hash
     if ($identityHashAfter -ne $identityHashBefore) {
-        throw 'Portal identity changed during preserve-data reinstallation.'
+        throw 'Portal identity changed during rejected bootstrap update attempt.'
     }
     $accessCodeAfter = (Get-Content (Join-Path $DataRoot 'security\break-glass-access-code.txt') -Raw).Trim()
     if ($accessCodeAfter -ne $accessCodeBefore) {
-        throw 'Break-Glass Access Code changed during preserve-data reinstallation.'
+        throw 'Break-Glass Access Code changed during rejected bootstrap update attempt.'
     }
     if ((Invoke-RestMethod "$baseUrl/readyz").status -ne 'ready') {
-        throw 'Portal is not ready after preserve-data reinstallation.'
+        throw 'Portal is not ready after rejected bootstrap update attempt.'
     }
 
     Restart-Service SirkPortal -Force
@@ -168,6 +190,7 @@ try {
     Wait-Ready -BaseUrl $baseUrl
 
     Write-Host 'SIRK_PORTAL_WINDOWS_CLEAN_INSTALL_OK' -ForegroundColor Green
+    Write-Host 'SIRK_PORTAL_BOOTSTRAP_RUNTIME_UPDATE_REJECTED_OK' -ForegroundColor Green
 }
 catch {
     Get-Service SirkPortal,SirkUpdater -ErrorAction SilentlyContinue | Format-List *
