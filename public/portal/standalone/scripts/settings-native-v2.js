@@ -830,7 +830,7 @@
         var remote = state.maintenance.remote || {};
         var capabilities = state.maintenance.capabilities || {};
         var updates = card("Aktualizacje", "Wersja: " + (current.version || "—") + " · dostępna: " + (remote.availableVersion || "—"));
-        var channel = field("Kanał", current.channel || "dev", "select", [["stable", "Stable"], ["beta", "Beta"], ["dev", "Dev"]]);
+        var channel = field("Kanał", current.channel || "preview", "select", [["stable", "Stable"], ["preview", "Preview"]]);
         updates.appendChild(channel.wrapper);
         var actions = actionRow();
         actions.appendChild(button("Zapisz kanał", function () { maintenance("channel", { channel: channel.input.value }, false); }));

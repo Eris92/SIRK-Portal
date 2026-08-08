@@ -86,21 +86,22 @@ internal sealed class PortalUpdateClient
 
     public PortalUpdateProbeResult Probe(bool force = false)
     {
-        var channel = ReadMaintenanceChannel();
-        if (!force)
-        {
-            lock (_sync)
-            {
-                if (_cachedProbe is not null &&
-                    string.Equals(_cachedChannel, channel, StringComparison.Ordinal) &&
-                    DateTimeOffset.UtcNow - _cachedProbe.CheckedAtUtc < CacheLifetime)
-                    return _cachedProbe;
-            }
-        }
-
+        var channel = "preview";
         var installedCommit = ReadInstalledCommit();
         try
         {
+            channel = ReadMaintenanceChannel();
+            if (!force)
+            {
+                lock (_sync)
+                {
+                    if (_cachedProbe is not null &&
+                        string.Equals(_cachedChannel, channel, StringComparison.Ordinal) &&
+                        DateTimeOffset.UtcNow - _cachedProbe.CheckedAtUtc < CacheLifetime)
+                        return _cachedProbe;
+                }
+            }
+
             var currentVersion = CurrentVersion();
             var target = PlatformTarget()
                          ?? throw new PlatformNotSupportedException(

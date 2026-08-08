@@ -14,6 +14,8 @@ internal static class MaintenanceUpdateAvailabilityContract
             root, "src", "Sirk.Portal", "Maintenance", "PortalUpdateProbe.cs"));
         var ui = File.ReadAllText(Path.Combine(
             root, "public", "portal", "standalone", "scripts", "update-availability-ui.js"));
+        var settingsUi = File.ReadAllText(Path.Combine(
+            root, "public", "portal", "standalone", "scripts", "settings-native-v2.js"));
         var bundler = File.ReadAllText(Path.Combine(
             root, "src", "Sirk.Portal", "Ui", "PortalAssetBundler.cs"));
 
@@ -40,6 +42,9 @@ internal static class MaintenanceUpdateAvailabilityContract
         Require(probe.Contains("CacheLifetime = TimeSpan.FromMinutes(1)", StringComparison.Ordinal) &&
                 probe.Contains("public PortalUpdateProbeResult Probe(bool force = false)", StringComparison.Ordinal),
             "Update probing must be cached while allowing an explicit refresh.");
+        Require(probe.IndexOf("channel = ReadMaintenanceChannel();", StringComparison.Ordinal) >
+                probe.IndexOf("try", probe.IndexOf("public PortalUpdateProbeResult Probe", StringComparison.Ordinal), StringComparison.Ordinal),
+            "Maintenance channel read failures must be returned as a controlled probe error.");
         Require(!probe.Contains("api.github.com", StringComparison.OrdinalIgnoreCase) &&
                 !probe.Contains("github.com/Eris92/SIRK-Portal", StringComparison.OrdinalIgnoreCase) &&
                 !probe.Contains("portal-main-latest", StringComparison.OrdinalIgnoreCase),
@@ -48,6 +53,13 @@ internal static class MaintenanceUpdateAvailabilityContract
         Require(ui.Contains("Nie udało się sprawdzić aktualizacji:", StringComparison.Ordinal) &&
                 ui.Contains("updateButton.disabled", StringComparison.Ordinal),
             "Update UI must distinguish available and check-error states.");
+        Require(settingsUi.Contains(
+                    "current.channel || \"preview\", \"select\", [[\"stable\", \"Stable\"], [\"preview\", \"Preview\"]]",
+                    StringComparison.Ordinal) &&
+                !settingsUi.Contains(
+                    "current.channel || \"dev\", \"select\", [[\"stable\", \"Stable\"], [\"beta\", \"Beta\"], [\"dev\", \"Dev\"]]",
+                    StringComparison.Ordinal),
+            "Update channel UI must expose only the canonical stable and preview values.");
         Require(bundler.Contains(
             "portal/standalone/scripts/update-availability-ui.js",
             StringComparison.Ordinal),
