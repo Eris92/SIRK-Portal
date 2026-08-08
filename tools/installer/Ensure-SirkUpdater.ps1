@@ -69,6 +69,14 @@ if ($portalService.Status -ne 'Running') {
     $portalService.WaitForStatus('Running', [TimeSpan]::FromSeconds(30))
 }
 
+# Portal program files are owned operationally by LocalSystem + privileged Updater.
+# Make the replacement contract deterministic instead of depending on inherited or
+# copied ACLs from the signed bootstrap payload under Program Files.
+& icacls.exe $InstallPath /inheritance:r /grant:r 'SYSTEM:(OI)(CI)F' 'Administrators:(OI)(CI)F' /T /C | Out-Null
+if ($LASTEXITCODE -ne 0) {
+    throw "Unable to establish the Portal program-file ACL required by SIRK Updater. ExitCode=$LASTEXITCODE"
+}
+
 $portalVerifier = Join-Path $InstallPath 'Sirk.Portal.exe'
 if (-not (Test-Path -LiteralPath $portalVerifier -PathType Leaf)) {
     throw "Portal verifier is missing: $portalVerifier"
