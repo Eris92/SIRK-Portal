@@ -2,7 +2,10 @@
 #Requires -RunAsAdministrator
 [CmdletBinding()]
 param(
+    [ValidateSet('main')]
     [string]$Branch = 'main',
+    [ValidateSet('preview','stable')]
+    [string]$Channel = 'preview',
     [string]$InstallRoot = 'C:\Program Files\SIRK\Portal',
     [string]$DataRoot = 'C:\ProgramData\SIRK\Portal',
     [int]$HttpsPort = 443,
@@ -22,9 +25,12 @@ Set-StrictMode -Version Latest
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
 $existingIdentity = Join-Path $DataRoot 'identity.json'
-$isMain = [string]::Equals($Branch, 'main', [StringComparison]::OrdinalIgnoreCase)
 $cleanInstall = $RemoveData -or -not (Test-Path -LiteralPath $existingIdentity -PathType Leaf)
-$useBinaryInstaller = $isMain -and -not $ForceSourceBuild -and $cleanInstall
+if (-not $cleanInstall -and -not $ForceSourceBuild) {
+    throw 'Existing SIRK Portal detected. Runtime updates must be performed through Portal Maintenance -> SIRK Central -> SIRK Updater. Use -ForceSourceBuild only for explicit bootstrap/recovery.'
+}
+
+$useBinaryInstaller = $cleanInstall -and -not $ForceSourceBuild
 $scriptName = if ($useBinaryInstaller) { 'install-binary.ps1' } else { 'install-core.ps1' }
 
 $commonDataRoot = [Environment]::GetFolderPath([Environment+SpecialFolder]::CommonApplicationData)
@@ -53,7 +59,9 @@ function Convert-InstallerAclToWellKnownSids {
 
 try {
     New-Item -ItemType Directory -Path $bootstrapRoot -Force | Out-Null
-    Write-Host ('=== SIRK Portal installer route: ' + $(if ($useBinaryInstaller) { 'verified binary clean install' } else { 'core installer/update' }) + ' ===') -ForegroundColor Cyan
+    $route = if ($useBinaryInstaller) { 'immutable signed binary bootstrap' } else { 'explicit source recovery' }
+    Write-Host ('=== SIRK Portal installer route: ' + $route + ' ===') -ForegroundColor Cyan
+    # Public GitHub access is bootstrap/recovery only. Installed runtime updates do not use this router.
     Invoke-WebRequest -UseBasicParsing -Uri $scriptUrl -OutFile $scriptPath
     Convert-InstallerAclToWellKnownSids -Path $scriptPath
 
@@ -65,36 +73,27 @@ try {
         throw "$scriptName contains PowerShell syntax errors."
     }
 
+    $parameters = @{
+        Branch = $Branch
+        Channel = $Channel
+        InstallRoot = $InstallRoot
+        DataRoot = $DataRoot
+        HttpsPort = $HttpsPort
+        BootstrapUserName = $BootstrapUserName
+        PortalFqdn = $PortalFqdn
+    }
+    if ($TrustCertificate) { $parameters.TrustCertificate = $true }
+    if ($DoNotTrustCertificate) { $parameters.DoNotTrustCertificate = $true }
+    if ($NonInteractive) { $parameters.NonInteractive = $true }
+    if ($RemoveData) { $parameters.RemoveData = $true }
+    if ($SkipUpdater) { $parameters.SkipUpdater = $true }
+
     if ($useBinaryInstaller) {
-        $parameters = @{
-            InstallRoot = $InstallRoot
-            DataRoot = $DataRoot
-            HttpsPort = $HttpsPort
-            BootstrapUserName = $BootstrapUserName
-            PortalFqdn = $PortalFqdn
-        }
-        if ($TrustCertificate) { $parameters.TrustCertificate = $true }
-        if ($DoNotTrustCertificate) { $parameters.DoNotTrustCertificate = $true }
-        if ($NonInteractive) { $parameters.NonInteractive = $true }
-        if ($RemoveData) { $parameters.RemoveData = $true }
-        if ($SkipUpdater) { $parameters.SkipUpdater = $true }
+        $parameters.Remove('Branch')
         & $scriptPath @parameters
     }
     else {
-        $parameters = @{
-            Branch = $Branch
-            InstallRoot = $InstallRoot
-            DataRoot = $DataRoot
-            HttpsPort = $HttpsPort
-            BootstrapUserName = $BootstrapUserName
-            PortalFqdn = $PortalFqdn
-        }
-        if ($TrustCertificate) { $parameters.TrustCertificate = $true }
-        if ($DoNotTrustCertificate) { $parameters.DoNotTrustCertificate = $true }
-        if ($NonInteractive) { $parameters.NonInteractive = $true }
-        if ($RemoveData) { $parameters.RemoveData = $true }
         if ($KeepBuildSdk) { $parameters.KeepBuildSdk = $true }
-        if ($SkipUpdater) { $parameters.SkipUpdater = $true }
         if ($ForceSourceBuild) { $parameters.ForceSourceBuild = $true }
         & $scriptPath @parameters
     }
