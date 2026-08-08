@@ -6,7 +6,7 @@ umask 077
 
 INSTALL_ROOT=/opt/sirk/portal
 DATA_ROOT=/var/lib/sirk-portal
-CONFIG_FILE=/etc/sirk-portal/config/portal.env
+CONFIG_FILE=/etc/sirk-portal/portal.env
 REGISTRY=/var/lib/sirk-updater/applications/sirk-portal.json
 UPDATER=/opt/sirk/updater/SirkUpdater
 HELPER=/usr/lib/sirk-portal/update-helper
