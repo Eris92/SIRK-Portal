@@ -252,6 +252,7 @@ try {
     }
 
     $configHashBefore = (Get-FileHash -LiteralPath $configPath -Algorithm SHA256).Hash
+    $configAclBefore = (Get-Acl -LiteralPath $configPath).Sddl
     $identityHashBefore = (Get-FileHash -LiteralPath $identityPath -Algorithm SHA256).Hash
     $accessCodeBefore = (Get-Content -LiteralPath $accessCodePath -Raw).Trim()
 
@@ -267,6 +268,9 @@ try {
     }
     if ((Get-FileHash -LiteralPath $configPath -Algorithm SHA256).Hash -ne $configHashBefore) {
         throw 'Portal machine-specific appsettings.Production.json changed during signed update.'
+    }
+    if ((Get-Acl -LiteralPath $configPath).Sddl -cne $configAclBefore) {
+        throw 'Portal machine-specific appsettings.Production.json ACL changed during signed update.'
     }
     if ((Get-FileHash -LiteralPath $identityPath -Algorithm SHA256).Hash -ne $identityHashBefore -or
         (Get-Content -LiteralPath $accessCodePath -Raw).Trim() -cne $accessCodeBefore) {
@@ -306,6 +310,9 @@ try {
         }
         if ((Get-FileHash -LiteralPath $configPath -Algorithm SHA256).Hash -ne $configHashBefore) {
             throw 'Portal machine-specific configuration changed during rollback.'
+        }
+        if ((Get-Acl -LiteralPath $configPath).Sddl -cne $configAclBefore) {
+            throw 'Portal machine-specific configuration ACL changed during rollback.'
         }
         Assert-ServiceHealthy
         Wait-PortalReady
