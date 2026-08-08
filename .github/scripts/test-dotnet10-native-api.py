@@ -15,6 +15,7 @@ from pathlib import Path
 PORTAL_URL = "http://127.0.0.1:18082"
 PASSWORD = "Sirk-Portal-Test!2026-Strong"
 ACCESS_CODE = "sirk-break-glass-test-access-code-2026"
+EXPECTED_VERSION = "0.1.1.0"
 
 
 class Client:
@@ -203,7 +204,7 @@ def main() -> int:
                 raise RuntimeError("Deleted Agent policy is still listed.")
 
             bootstrap, _, _ = client.request("GET", "/api/v1/bootstrap")
-            if bootstrap.get("version") != "3.0.0-dev.1" or not bootstrap.get("modules"):
+            if bootstrap.get("version") != EXPECTED_VERSION or not bootstrap.get("modules"):
                 raise RuntimeError("Portal module bootstrap is invalid.")
 
             audit, _, _ = client.request("GET", "/api/v1/audit?limit=200")
@@ -238,6 +239,6 @@ def main() -> int:
 if __name__ == "__main__":
     try:
         raise SystemExit(main())
-    except Exception as error:  # noqa: BLE001 - CI boundary
+    except Exception as error:  # noqa: BLE001 - CI entrypoint
         print(str(error), file=sys.stderr)
         raise SystemExit(1)
