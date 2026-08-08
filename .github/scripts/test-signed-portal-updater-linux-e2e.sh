@@ -85,7 +85,8 @@ asset_headers=(
   -H 'User-Agent: SIRK-Portal-Linux-Signed-Update-E2E'
 )
 curl --fail --silent --show-error --location "${asset_headers[@]}" "$descriptor_api" -o "$descriptor"
-curl --fail --silent --show-error --location "${asset_headers[@]}" "$package_api" -o "$package"\n
+curl --fail --silent --show-error --location "${asset_headers[@]}" "$package_api" -o "$package"
+
 expected_name="SIRK-Portal-$version-linux-x64.zip"
 jq -e --arg version "$version" --arg asset "$expected_name" '
   .schemaVersion == 1 and
