@@ -179,7 +179,11 @@ kill "$SERVER_PID" 2>/dev/null || true
 wait "$SERVER_PID" 2>/dev/null || true
 SERVER_PID=''
 sudo systemctl is-active --quiet sirk-portal.service
-curl --fail --silent --show-error https://localhost:8443/readyz | grep -q ready
+ready_deadline=$((SECONDS + 30))
+while ! curl --fail --silent --show-error https://localhost:8443/readyz 2>/dev/null | grep -q ready; do
+  (( SECONDS < ready_deadline )) || { echo 'Portal did not become ready after Linux rollback.' >&2; exit 9; }
+  sleep 1
+done
 sudo test ! -e "$DATA_ROOT/maintenance-update.lock"
 sudo test ! -e "$DATA_ROOT/maintenance.lock"
 [[ "$(sudo sha256sum "$CONFIG_FILE" | awk '{print $1}')" == "$config_before" ]]
