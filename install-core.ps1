@@ -2,7 +2,10 @@
 #Requires -RunAsAdministrator
 [CmdletBinding()]
 param(
+    [ValidateSet('main')]
     [string]$Branch = 'main',
+    [ValidateSet('preview','stable')]
+    [string]$Channel = 'preview',
     [string]$InstallRoot = 'C:\Program Files\SIRK\Portal',
     [string]$DataRoot = 'C:\ProgramData\SIRK\Portal',
     [int]$HttpsPort = 443,
@@ -61,131 +64,13 @@ function Invoke-Utf8Script {
     & $script @Parameters
 }
 
-function Test-SafePortalUpdateMetadata {
-    param([Parameter(Mandatory)]$Metadata)
-
-    if ([int]$Metadata.schemaVersion -ne 1) {
-        throw 'Unsupported Portal binary update metadata schema.'
-    }
-    if ([string]$Metadata.applicationId -cne 'sirk-portal') {
-        throw 'The binary update package targets a different application.'
-    }
-    if ([string]$Metadata.channel -cne 'main') {
-        throw 'The binary update package is not from the main channel.'
-    }
-    if ([string]$Metadata.package -cne 'sirk-portal-win-x64.zip') {
-        throw 'The binary update package name is invalid.'
-    }
-    if ([string]$Metadata.sha256 -notmatch '^[A-Fa-f0-9]{64}$') {
-        throw 'The binary update SHA-256 value is invalid.'
-    }
-    if ([string]$Metadata.commit -notmatch '^[A-Fa-f0-9]{40}$') {
-        throw 'The binary update commit value is invalid.'
-    }
-    $sizeBytes = [long]$Metadata.sizeBytes
-    if ($sizeBytes -lt 1024 -or $sizeBytes -gt 268435456) {
-        throw 'The binary update package size is outside the allowed range.'
-    }
-}
-
-function Invoke-SirkPortalBinaryUpdate {
-    param(
-        [Parameter(Mandatory)][string]$CurrentInstallRoot,
-        [Parameter(Mandatory)][string]$CurrentDataRoot
-    )
-
-    $updaterCli = Join-Path $env:ProgramFiles 'SIRK\Updater\SirkUpdater.exe'
-    if (-not (Test-Path -LiteralPath $updaterCli -PathType Leaf)) {
-        throw 'SIRK Updater is not installed. Run this installer once with -ForceSourceBuild.'
-    }
-
-    $settingsPath = Join-Path $CurrentInstallRoot 'appsettings.Production.json'
-    if (-not (Test-Path -LiteralPath $settingsPath -PathType Leaf)) {
-        throw "Missing installed Portal configuration: $settingsPath"
-    }
-
-    $binaryRoot = Join-Path $installerWorkBase ('BinaryUpdate-' + [guid]::NewGuid().ToString('N'))
-    $metadataPath = Join-Path $binaryRoot 'portal-update.json'
-    $downloadPath = Join-Path $binaryRoot 'sirk-portal-win-x64.zip'
-    $payloadRoot = Join-Path $binaryRoot 'payload'
-    $preparedPath = Join-Path $binaryRoot 'sirk-portal-prepared-win-x64.zip'
-    $releaseBase = 'https://github.com/Eris92/SIRK-Portal/releases/download/portal-main-latest'
-
-    try {
-        New-Item -ItemType Directory -Path $binaryRoot,$payloadRoot -Force | Out-Null
-        & icacls.exe $binaryRoot /inheritance:r /grant:r 'SYSTEM:(OI)(CI)F' 'Administrators:(OI)(CI)F' | Out-Null
-
-        Write-Host '=== Downloading verified SIRK Portal binary update ===' -ForegroundColor Cyan
-        Invoke-WebRequest -UseBasicParsing `
-            -Uri ($releaseBase + '/portal-update.json?nocache=' + [guid]::NewGuid()) `
-            -OutFile $metadataPath
-
-        $metadata = Get-Content -LiteralPath $metadataPath -Raw -Encoding UTF8 | ConvertFrom-Json
-        Test-SafePortalUpdateMetadata -Metadata $metadata
-
-        Invoke-WebRequest -UseBasicParsing `
-            -Uri ($releaseBase + '/' + [string]$metadata.package + '?nocache=' + [guid]::NewGuid()) `
-            -OutFile $downloadPath
-
-        $downloadInfo = Get-Item -LiteralPath $downloadPath
-        if ($downloadInfo.Length -ne [long]$metadata.sizeBytes) {
-            throw "Binary update size mismatch. Expected=$($metadata.sizeBytes), Actual=$($downloadInfo.Length)."
-        }
-        $downloadHash = (Get-FileHash -LiteralPath $downloadPath -Algorithm SHA256).Hash
-        if ($downloadHash -cne ([string]$metadata.sha256).ToUpperInvariant()) {
-            throw "Binary update SHA-256 mismatch. Actual=$downloadHash"
-        }
-
-        Expand-Archive -LiteralPath $downloadPath -DestinationPath $payloadRoot -Force
-        foreach ($required in @(
-            'Sirk.Portal.exe',
-            'Sirk.Portal.dll',
-            'Sirk.Portal.runtimeconfig.json',
-            'public\portal\standalone\index.html'
-        )) {
-            $requiredPath = Join-Path $payloadRoot $required
-            if (-not (Test-Path -LiteralPath $requiredPath -PathType Leaf)) {
-                throw "Binary update payload is incomplete: $required"
-            }
-        }
-        if (Test-Path -LiteralPath (Join-Path $payloadRoot 'appsettings.Production.json')) {
-            throw 'The public binary package must not contain machine-specific appsettings.Production.json.'
-        }
-
-        Copy-Item -LiteralPath $settingsPath `
-            -Destination (Join-Path $payloadRoot 'appsettings.Production.json') `
-            -Force
-
-        Compress-Archive `
-            -Path (Join-Path $payloadRoot '*') `
-            -DestinationPath $preparedPath `
-            -CompressionLevel Optimal `
-            -Force
-        $preparedHash = (Get-FileHash -LiteralPath $preparedPath -Algorithm SHA256).Hash
-
-        Write-Host ('Applying transactional update for commit ' + [string]$metadata.commit + '...') -ForegroundColor Cyan
-        & $updaterCli update 'sirk-portal' $preparedPath $preparedHash ([string]$metadata.commit)
-        if ($LASTEXITCODE -ne 0) {
-            throw "SIRK Updater failed. ExitCode=$LASTEXITCODE"
-        }
-
-        $portal = Get-Service -Name SirkPortal -ErrorAction Stop
-        if ($portal.Status -ne 'Running') {
-            $portal.WaitForStatus('Running', [TimeSpan]::FromSeconds(60))
-        }
-        & icacls.exe $settingsPath /inheritance:r /grant:r 'SYSTEM:F' 'Administrators:F' | Out-Null
-
-        Write-Host 'SIRK_PORTAL_BINARY_UPDATE_OK' -ForegroundColor Green
-        return $true
-    }
-    finally {
-        Remove-Item -LiteralPath $binaryRoot -Recurse -Force -ErrorAction SilentlyContinue
-    }
-}
-
 $defaultFqdn = ($env:COMPUTERNAME + '.local').ToLowerInvariant()
 $existingIdentityFile = Join-Path $DataRoot 'identity.json'
 $preserveExistingData = -not $RemoveData -and (Test-Path -LiteralPath $existingIdentityFile -PathType Leaf)
+if ($preserveExistingData -and -not $ForceSourceBuild) {
+    throw 'Installed SIRK Portal must be updated through Portal Maintenance -> SIRK Central -> SIRK Updater. Source replacement requires explicit -ForceSourceBuild recovery mode.'
+}
+
 $effectiveFqdn = $PortalFqdn.Trim().ToLowerInvariant()
 if ([string]::IsNullOrWhiteSpace($effectiveFqdn)) {
     if (-not [string]::IsNullOrWhiteSpace($env:SIRK_INSTALL_FQDN)) {
@@ -234,32 +119,18 @@ if (-not $NonInteractive -and
     }
 }
 
-if ($preserveExistingData -and
-    -not $ForceSourceBuild -and
-    -not $SkipUpdater -and
-    [string]::Equals($Branch, 'main', [StringComparison]::OrdinalIgnoreCase)) {
-    try {
-        if (Invoke-SirkPortalBinaryUpdate -CurrentInstallRoot $InstallRoot -CurrentDataRoot $DataRoot) {
-            return
-        }
-    }
-    finally {
-        Remove-Item Env:SIRK_INSTALL_BREAKGLASS_PASSWORD -ErrorAction SilentlyContinue
-    }
-}
-
 New-Item -ItemType Directory -Path $workRoot,$extractRoot -Force | Out-Null
 try {
-    Write-Host '=== SIRK Portal .NET 10 source installation ===' -ForegroundColor Cyan
+    Write-Host '=== SIRK Portal .NET 10 explicit source bootstrap/recovery ===' -ForegroundColor Cyan
     Write-Host "Source: Eris92/SIRK-Portal@$Branch" -ForegroundColor DarkCyan
     if ($preserveExistingData) {
-        Write-Host "Mode: program update preserving $DataRoot" -ForegroundColor DarkGreen
+        Write-Host "Recovery mode: preserving $DataRoot" -ForegroundColor DarkGreen
     }
 
-    $encodedBranch = [Uri]::EscapeDataString($Branch)
+    # Public GitHub access here is bootstrap/recovery only; runtime updates use SIRK Central.
     Invoke-WebRequest `
         -UseBasicParsing `
-        -Uri "https://codeload.github.com/Eris92/SIRK-Portal/zip/refs/heads/$encodedBranch" `
+        -Uri 'https://codeload.github.com/Eris92/SIRK-Portal/zip/refs/heads/main' `
         -OutFile $sourceZip
     Expand-Archive -LiteralPath $sourceZip -DestinationPath $extractRoot -Force
     $sourceRoot = Get-ChildItem -LiteralPath $extractRoot -Directory | Select-Object -First 1
@@ -271,7 +142,7 @@ try {
     }
 
     $parameters = @{
-        Branch = $Branch
+        Branch = 'main'
         InstallRoot = $InstallRoot
         DataRoot = $DataRoot
         HttpsPort = $HttpsPort
@@ -301,9 +172,6 @@ try {
     }
     $accessUrl = "$publicUrl/login#access=$accessCode"
 
-    Write-Host ''
-    Write-Host "Access URL: $accessUrl" -ForegroundColor Yellow
-
     if (-not $SkipUpdater) {
         $updaterInstaller = Join-Path $sourceRoot.FullName 'tools\installer\Ensure-SirkUpdater.ps1'
         if (-not (Test-Path -LiteralPath $updaterInstaller)) {
@@ -314,7 +182,7 @@ try {
             InstallPath = $InstallRoot
             DataPath = $DataRoot
             HealthUrl = "https://localhost:$HttpsPort/readyz"
-            Channel = 'dev'
+            Channel = $Channel
         }
         $updater = Get-Service -Name SirkUpdater -ErrorAction Stop
         if ($updater.Status -ne 'Running') { throw 'SIRK Updater is not running after installation.' }
@@ -325,6 +193,8 @@ try {
         throw "Invalid SirkPortal state: $($portal.Status) / $($portal.StartType)"
     }
 
+    Write-Host ''
+    Write-Host "Access URL: $accessUrl" -ForegroundColor Yellow
     Write-Host "Access URL is also stored in: $accessFile" -ForegroundColor DarkYellow
     Write-Host 'SIRK_PORTAL_DOTNET10_INSTALL_OK' -ForegroundColor Green
     if (-not $NonInteractive) { Start-Process $accessUrl }
