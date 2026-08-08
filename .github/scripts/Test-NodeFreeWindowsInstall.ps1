@@ -38,95 +38,6 @@ function Wait-Ready {
     throw "Portal did not become ready at $BaseUrl."
 }
 
-function Test-PortalDeleteAccess {
-    param([Parameter(Mandatory)][string]$BaseUrl)
-
-    $target = Join-Path $InstallRoot 'Microsoft.Extensions.Hosting.WindowsServices.dll'
-    if (-not (Test-Path -LiteralPath $target -PathType Leaf)) {
-        throw "Portal delete-access diagnostic target is missing: $target"
-    }
-
-    $query = (& sc.exe queryex SirkPortal 2>&1 | Out-String)
-    Write-Host '=== SIRK Portal pre-update service query ==='
-    Write-Host $query
-    $match = [regex]::Match($query, '\bPID\s*:\s*(\d+)\b', [Text.RegularExpressions.RegexOptions]::IgnoreCase)
-    $pidBefore = if ($match.Success) { [int]$match.Groups[1].Value } else { 0 }
-
-    Stop-Service -Name SirkPortal -Force
-    (Get-Service -Name SirkPortal).WaitForStatus('Stopped', [TimeSpan]::FromSeconds(60))
-    if ($pidBefore -gt 0) {
-        $deadline = (Get-Date).AddSeconds(60)
-        while ((Get-Process -Id $pidBefore -ErrorAction SilentlyContinue) -and (Get-Date) -lt $deadline) {
-            Start-Sleep -Milliseconds 200
-        }
-        if (Get-Process -Id $pidBefore -ErrorAction SilentlyContinue) {
-            throw "Portal service PID $pidBefore survived after SCM reported Stopped."
-        }
-    }
-
-    $item = Get-Item -LiteralPath $target
-    $acl = Get-Acl -LiteralPath $target
-    Write-Host "SIRK_PORTAL_DELETE_DIAGNOSTIC attributes=$($item.Attributes) owner=$($acl.Owner) sddl=$($acl.Sddl)"
-    & icacls.exe $target | Out-Host
-    & whoami.exe /groups | Select-String -Pattern 'S-1-5-32-544|BUILTIN\\Administrators' | Out-Host
-
-    $holders = @()
-    foreach ($process in Get-Process -ErrorAction SilentlyContinue) {
-        try {
-            foreach ($module in $process.Modules) {
-                if ([string]::Equals([string]$module.FileName, $target, [StringComparison]::OrdinalIgnoreCase)) {
-                    $holders += "$($process.ProcessName):$($process.Id)"
-                    break
-                }
-            }
-        }
-        catch {}
-    }
-    Write-Host ('SIRK_PORTAL_DELETE_DIAGNOSTIC moduleHolders=' + $(if ($holders.Count) { $holders -join ',' } else { '<none>' }))
-
-    if (-not ('SirkDeleteAccessProbe' -as [type])) {
-        Add-Type -TypeDefinition @'
-using System;
-using System.Runtime.InteropServices;
-using Microsoft.Win32.SafeHandles;
-public static class SirkDeleteAccessProbe
-{
-    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-    public static extern SafeFileHandle CreateFile(
-        string fileName,
-        uint desiredAccess,
-        uint shareMode,
-        IntPtr securityAttributes,
-        uint creationDisposition,
-        uint flagsAndAttributes,
-        IntPtr templateFile);
-}
-'@
-    }
-    $deleteAccess = [uint32]0x00010000
-    $shareReadWriteDelete = [uint32]0x00000007
-    $openExisting = [uint32]3
-    $handle = [SirkDeleteAccessProbe]::CreateFile(
-        $target,
-        $deleteAccess,
-        $shareReadWriteDelete,
-        [IntPtr]::Zero,
-        $openExisting,
-        0,
-        [IntPtr]::Zero)
-    if ($handle.IsInvalid) {
-        $win32 = [Runtime.InteropServices.Marshal]::GetLastWin32Error()
-        $handle.Dispose()
-        throw "Portal target cannot be opened with Win32 DELETE access after service stop. Win32Error=$win32"
-    }
-    $handle.Dispose()
-    Write-Host 'SIRK_PORTAL_DELETE_ACCESS_PROBE_OK'
-
-    Start-Service -Name SirkPortal
-    (Get-Service -Name SirkPortal).WaitForStatus('Running', [TimeSpan]::FromSeconds(60))
-    Wait-Ready -BaseUrl $BaseUrl
-}
-
 try {
     Remove-TestService SirkPortal
     Remove-TestService SirkUpdater
@@ -229,8 +140,6 @@ try {
     foreach ($marker in @('sirkStandaloneRoot','data-view="devices"','data-view="settings"','portal-module-shell.css')) {
         if ($portal -notmatch [regex]::Escape($marker)) { throw "Portal UI marker missing: $marker" }
     }
-
-    Test-PortalDeleteAccess -BaseUrl $baseUrl
 
     & (Join-Path $PSScriptRoot 'Test-SignedPortalUpdaterE2E.ps1') `
         -BaseUrl $baseUrl `
